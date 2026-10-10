@@ -27,7 +27,7 @@ NULL
 #' checkpoint without changing the conversation. A file tool call that would
 #' exceed the checkpoint size limits is refused.
 #'
-#' @include agent-approval.R agent-stream.R agent-session.R agent-context.R agent-tool-callbacks.R agent-tool-records.R
+#' @include conversation-state.R agent-approval.R agent-stream.R agent-session.R agent-context.R agent-tool-callbacks.R agent-tool-records.R
 #' @importFrom later run_now
 #' @importFrom utils tail
 #' @export
@@ -186,6 +186,9 @@ Agent <- R6::R6Class(
       # doesn't leave the Agent on a Chat it doesn't hold.
       previous_chat <- private$.chat
       private$.chat <- chat
+      if (is.null(private$.conversation_state)) {
+        private$.conversation_state <- ConversationState$new()
+      }
       if (!is.null(previous_chat) && !identical(previous_chat, chat)) {
         unmark_chat_owner(previous_chat, self)
         mark_chat_owner(chat, self)
@@ -226,7 +229,10 @@ Agent <- R6::R6Class(
 
       # Override system prompt if provided
       if (!is.null(system_prompt)) {
-        private$.chat$set_system_prompt(system_prompt)
+        private$.conversation_state$set_prompt(
+          private$.chat,
+          system_prompt
+        )
       }
 
       # Rebind all tools to this Agent's runtime authority, including tools
@@ -1152,7 +1158,7 @@ Agent <- R6::R6Class(
       # Subagent activity shown in the conversation never reaches the model,
       # as in `$set_turns()`.
       split <- activity_split(list(user, assistant))
-      offset <- length(private$.compacted_turns) +
+      offset <- length(private$.conversation_state$retained_turns()) +
         length(private$.chat$get_turns())
       private$.chat$add_turn(
         split$turns[[1L]],
@@ -1222,30 +1228,12 @@ Agent <- R6::R6Class(
     set_turns = function(value) {
       check_conversation_lease(self, NULL)
       usage <- if (isTRUE(private$run_active)) private$current_run_usage()
-      previous_turns <- private$.chat$get_turns()
-      prompt <- private$.chat$get_system_prompt()
-      prompt_without_compaction <- private$system_prompt_without_compaction()
       # Subagent activity shown in the conversation never reaches the model.
       split <- activity_split(value)
-      tryCatch(
-        {
-          private$.chat$set_turns(split$turns)
-          if (!identical(prompt, prompt_without_compaction)) {
-            private$.chat$set_system_prompt(prompt_without_compaction)
-          }
-        },
-        error = function(error) {
-          try(private$.chat$set_turns(previous_turns), silent = TRUE)
-          try(private$.chat$set_system_prompt(prompt), silent = TRUE)
-          rlang::cnd_signal(error)
-        }
-      )
+      private$.conversation_state$replace(private$.chat, split$turns)
       preserve_run_usage(self, usage)
       private$.activity_overlay <- split$overlay
       activity_reset(self)
-      private$.compaction_summary <- NULL
-      private$.compacted_turns <- list()
-      private$.cleared_tool_results <- list()
       private$.usage_stale_turns <- 0L
       private$reset_frame_snapshots()
       invisible(self)
@@ -1265,19 +1253,11 @@ Agent <- R6::R6Class(
     #' @return The agent, invisibly.
     set_system_prompt = function(value) {
       check_conversation_lease(self, NULL)
-      previous_summary <- private$.compaction_summary
-      private$.chat$set_system_prompt(value)
+      private$.conversation_state$set_prompt(
+        private$.chat,
+        value
+      )
       private$appended_hook_context_hashes <- character()
-      parts <- private$compaction_prompt_parts(value)
-      private$.compaction_summary <- if (
-        is.null(previous_summary) ||
-          is.null(parts) ||
-          !identical(parts$summary, previous_summary)
-      ) {
-        NULL
-      } else {
-        parts$summary
-      }
       invisible(self)
     },
 
@@ -1509,47 +1489,18 @@ Agent <- R6::R6Class(
     #' @return An ellmer turn, or `NULL`.
     last_turn = function(role = c("assistant", "user", "system")) {
       role <- match.arg(role)
-      current <- private$.chat$last_turn(role = role)
-      if (!is.null(current)) {
-        # Restore the returned turn at its actual position in the context,
-        # without assuming how the Chat chose it.
-        context <- private$.chat$get_turns()
-        matches <- which(vapply(
-          context,
-          function(turn) identical(turn, current),
-          logical(1)
-        ))
-        position <- if (length(matches)) {
-          length(private$.compacted_turns) + max(matches)
-        } else {
-          NA_integer_
-        }
-        turn <- restore_cleared_tool_results(
-          list(current),
-          private$.cleared_tool_results,
-          positions = position
-        )[[1L]]
-        return(activity_merge_turn(turn, position, private$.activity_overlay))
-      }
-      turns <- Filter(
-        function(turn) identical(turn@role, role),
-        private$.compacted_turns
+      found <- private$.conversation_state$last_turn(
+        private$.chat,
+        role
       )
-      if (length(turns)) {
-        roles <- vapply(
-          private$.compacted_turns,
-          function(turn) turn@role,
-          character(1)
-        )
-        position <- max(which(roles == role))
-        turn <- restore_cleared_tool_results(
-          tail(turns, 1L),
-          private$.cleared_tool_results,
-          positions = position
-        )[[1L]]
-        activity_merge_turn(turn, position, private$.activity_overlay)
-      } else {
+      if (is.null(found)) {
         NULL
+      } else {
+        activity_merge_turn(
+          found$turn,
+          found$position,
+          private$.activity_overlay
+        )
       }
     },
 
@@ -1682,7 +1633,7 @@ Agent <- R6::R6Class(
     cost = function() {
       summary <- conversation_usage_summary(
         private$.chat,
-        private$.compacted_turns
+        private$.conversation_state$retained_turns()
       )
       summary[c("input", "output", "cached", "total", "complete", "missing")]
     },
@@ -1698,7 +1649,7 @@ Agent <- R6::R6Class(
     usage = function() {
       conversation_usage_snapshot(
         private$.chat,
-        private$.compacted_turns,
+        private$.conversation_state$retained_turns(),
         tool_calls = count_tool_requests(private$transcript_turns())
       )
     },
@@ -2030,70 +1981,17 @@ Agent <- R6::R6Class(
           class = c("deputy_run_active", "deputy_error")
         )
       }
-      if (
-        !is.numeric(keep_last) ||
-          length(keep_last) != 1L ||
-          is.na(keep_last) ||
-          keep_last < 0 ||
-          (is.finite(keep_last) && keep_last != floor(keep_last))
-      ) {
-        cli::cli_abort(
-          "{.arg keep_last} must be a whole number of turns, 0 or more."
-        )
-      }
-      if (!is.character(keep_tools) || anyNA(keep_tools)) {
-        cli::cli_abort("{.arg keep_tools} must be a character vector.")
-      }
-      if (!is_nonempty_string(marker)) {
-        cli::cli_abort("{.arg marker} must be one non-empty string.")
-      }
-      turns <- private$.chat$get_turns()
-      # keep_last may be Inf or larger than the conversation: keep everything.
-      upto <- if (keep_last >= length(turns)) {
-        0L
-      } else {
-        length(turns) - as.integer(keep_last)
-      }
-      # Originals are keyed by position in the complete conversation, which
-      # compaction and new turns do not shift. Tool call IDs can repeat.
-      offset <- length(private$.compacted_turns)
-      originals <- private$.cleared_tool_results
-      cleared <- 0L
-      for (i in seq_len(upto)) {
-        contents <- turns[[i]]@contents
-        changed <- FALSE
-        for (j in seq_along(contents)) {
-          content <- contents[[j]]
-          if (!S7::S7_inherits(content, ellmer::ContentToolResult)) {
-            next
-          }
-          name <- tryCatch(content@request@name, error = function(e) NULL)
-          if (!is.null(name) && name %in% keep_tools) {
-            next
-          }
-          key <- cleared_result_key(offset + i, j)
-          # Already cleared: keep its first original and marker.
-          if (!is.null(originals[[key]])) {
-            next
-          }
-          originals[[key]] <- list(marker = marker, content = content)
-          content@value <- marker
-          content@error <- NULL
-          contents[[j]] <- content
-          changed <- TRUE
-          cleared <- cleared + 1L
-        }
-        if (changed) {
-          turns[[i]]@contents <- contents
-        }
-      }
-      if (cleared > 0L) {
-        private$.chat$set_turns(turns)
-        private$.cleared_tool_results <- originals
+      result <- private$.conversation_state$microcompact(
+        private$.chat,
+        keep_last = keep_last,
+        keep_tools = keep_tools,
+        marker = marker
+      )
+      if (isTRUE(result$cleared > 0L)) {
         # Reported usage counted the results just cleared.
-        private$.usage_stale_turns <- length(turns)
+        private$.usage_stale_turns <- length(private$.chat$get_turns())
       }
-      list(cleared = cleared)
+      result
     },
 
     #' @description
@@ -2237,7 +2135,11 @@ Agent <- R6::R6Class(
           skill$prompt,
           sep = "\n"
         )
-        private$.chat$set_system_prompt(new_prompt)
+        private$.conversation_state$set_prompt(
+          private$.chat,
+          new_prompt,
+          reconcile = FALSE
+        )
       }
 
       # Store reference to loaded skill
@@ -2780,8 +2682,7 @@ Agent <- R6::R6Class(
       last_tool_cycle_signature = NULL,
       consecutive_tool_cycles = 0L,
       .last_compaction = NULL,
-      .compaction_summary = NULL,
-      .compacted_turns = list(),
+      .conversation_state = NULL,
       # Subagent tool calls shown in this conversation, by transcript turn;
       # never part of the model context (R/delegation-activity.R).
       .activity_overlay = list(),
@@ -2798,9 +2699,6 @@ Agent <- R6::R6Class(
       # The prompt-and-tools size before each estimated request, with the turn
       # count then, so estimates can add later growth to reported usage.
       .frame_snapshots = list(),
-      # Original tool results cleared from model context by microcompact(),
-      # keyed by tool call ID, so the conversation view keeps them.
-      .cleared_tool_results = list(),
       .compaction_catalog_registry = NULL,
       .compaction_artifacts = NULL,
       .tool_result_reader_registered = FALSE,
@@ -2814,10 +2712,7 @@ Agent <- R6::R6Class(
       # The selected conversation without subagent activity: what the model
       # was given before compaction, with cleared tool results restored.
       transcript_turns = function() {
-        restore_cleared_tool_results(
-          c(private$.compacted_turns, private$.chat$get_turns()),
-          private$.cleared_tool_results
-        )
+        private$.conversation_state$transcript(private$.chat)
       },
 
       interrupt_run = function(reason, conversation_token = NULL) {
@@ -3576,13 +3471,17 @@ Agent <- R6::R6Class(
         )
 
         current_prompt <- private$.chat$get_system_prompt() %||% ""
-        private$.chat$set_system_prompt(paste(
-          current_prompt,
-          "",
-          "# Hook Additional Context",
-          context_text,
-          sep = "\n"
-        ))
+        private$.conversation_state$set_prompt(
+          private$.chat,
+          paste(
+            current_prompt,
+            "",
+            "# Hook Additional Context",
+            context_text,
+            sep = "\n"
+          ),
+          reconcile = FALSE
+        )
 
         invisible(NULL)
       },

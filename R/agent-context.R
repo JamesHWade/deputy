@@ -351,97 +351,8 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       invisible(NULL)
     },
 
-    compaction_prompt_parts = function(prompt) {
-      if (
-        !is.character(prompt) ||
-          length(prompt) != 1L ||
-          is.na(prompt)
-      ) {
-        return(NULL)
-      }
-      start_pattern <- paste0(
-        "\\n\\n<!-- deputy-compaction-summary:v1 chars=([0-9]+) ",
-        "sha256=([a-f0-9]{64}) -->\\n",
-        "## Previous Conversation Summary\\n"
-      )
-      start <- regexec(start_pattern, prompt, perl = TRUE)[[1L]]
-      captured <- regmatches(prompt, list(start))[[1L]]
-      if (length(captured) != 3L) {
-        return(NULL)
-      }
-      summary_chars <- suppressWarnings(as.numeric(captured[[2L]]))
-      if (
-        length(summary_chars) != 1L ||
-          is.na(summary_chars) ||
-          !is.finite(summary_chars) ||
-          summary_chars < 0 ||
-          summary_chars != floor(summary_chars)
-      ) {
-        return(NULL)
-      }
-
-      summary_start <- start[[1L]] + attr(start, "match.length")[[1L]]
-      summary_end <- summary_start + summary_chars - 1
-      summary <- if (summary_chars == 0) {
-        ""
-      } else {
-        substr(prompt, summary_start, summary_end)
-      }
-      if (
-        !identical(
-          digest::digest(summary, algo = "sha256", serialize = FALSE),
-          captured[[3L]]
-        )
-      ) {
-        return(NULL)
-      }
-
-      end_marker <- paste0(
-        "\n\n## End Previous Conversation Summary\n",
-        "<!-- deputy-compaction-summary:v1:end -->"
-      )
-      end_start <- summary_start + summary_chars
-      end_end <- end_start + nchar(end_marker, type = "chars") - 1
-      if (!identical(substr(prompt, end_start, end_end), end_marker)) {
-        return(NULL)
-      }
-
-      before <- substr(prompt, 1L, start[[1L]] - 1L)
-      after_start <- end_end + 1
-      after <- if (after_start > nchar(prompt)) {
-        ""
-      } else {
-        substr(prompt, after_start, nchar(prompt))
-      }
-      list(before = before, summary = summary, after = after)
-    },
-
-    compaction_prompt_block = function(summary) {
-      paste0(
-        "\n\n<!-- deputy-compaction-summary:v1 chars=",
-        nchar(summary, type = "chars"),
-        " sha256=",
-        digest::digest(summary, algo = "sha256", serialize = FALSE),
-        " -->\n## Previous Conversation Summary\n",
-        summary,
-        "\n\n## End Previous Conversation Summary\n",
-        "<!-- deputy-compaction-summary:v1:end -->"
-      )
-    },
-
     system_prompt_without_compaction = function() {
-      prompt <- private$.chat$get_system_prompt() %||% ""
-      if (is.null(private$.compaction_summary)) {
-        return(prompt)
-      }
-      parts <- private$compaction_prompt_parts(prompt)
-      if (
-        is.null(parts) ||
-          !identical(parts$summary, private$.compaction_summary)
-      ) {
-        return(prompt)
-      }
-      paste0(parts$before, parts$after)
+      private$.conversation_state$prompt_without_summary(private$.chat)
     },
 
     context_token_count = function(messages, turns = NULL) {
@@ -662,8 +573,8 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         "estimated_tokens",
         integer = FALSE
       )
-      turns <- private$.chat$get_turns()
       fallback <- match.arg(fallback, c("error", "text"))
+      turns <- private$.chat$get_turns()
 
       if (is.null(keep_last)) {
         max_tokens <- self$context_policy$max_tokens
@@ -678,12 +589,14 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           )
         }
       }
-      keep_last <- validate_usage_limit(keep_last, "keep_last", integer = TRUE)
-      if (is.null(keep_last)) {
-        keep_last <- 0L
-      }
-
-      if (length(turns) <= keep_last) {
+      # Capture the complete conversational replacement before hooks run.
+      # Hooks may inspect or append state, but automatic compaction must only
+      # install this coherent plan if the selected Chat is still unchanged.
+      plan <- private$.conversation_state$prepare_compaction(
+        private$.chat,
+        keep_last
+      )
+      if (!length(plan$turns_to_compact)) {
         result <- DeputyCompaction(
           method = "none",
           automatic = automatic,
@@ -696,22 +609,15 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         return(list(result = result))
       }
 
-      # Determine which turns to compact
-      compact_count <- length(turns) - keep_last
-      turns_to_compact <- turns[1:compact_count]
-      turns_to_keep <- if (keep_last == 0L) {
-        list()
-      } else {
-        tail(turns, keep_last)
-      }
+      compact_count <- length(plan$turns_to_compact)
 
       # Fire PreCompact hook
       hook_result <- private$fire_hook(
         "PreCompact",
-        turns_to_compact = turns_to_compact,
-        turns_to_keep = turns_to_keep,
+        turns_to_compact = plan$turns_to_compact,
+        turns_to_keep = plan$turns_to_keep,
         context = private$hook_context(
-          total_turns = length(turns),
+          total_turns = length(plan$turns),
           compact_count = compact_count
         )
       )
@@ -722,7 +628,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           method = "cancelled",
           automatic = automatic,
           turns_compacted = 0L,
-          turns_kept = length(turns),
+          turns_kept = length(plan$turns),
           run_id = private$active_run_id(),
           estimated_tokens = estimated_tokens
         )
@@ -730,18 +636,12 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         return(list(result = result))
       }
 
-      list(
-        chat = private$.chat,
-        system_prompt = private$.chat$get_system_prompt(),
-        previous_summary = private$.compaction_summary,
-        turns = turns,
-        turns_to_compact = turns_to_compact,
-        turns_to_keep = turns_to_keep,
-        summary = summary %||% hook_result$summary,
-        method = if (!is.null(summary)) "custom" else "hook",
-        automatic = automatic,
-        estimated_tokens = estimated_tokens
-      )
+      plan$summary <- summary %||% hook_result$summary
+      plan$method <- if (!is.null(summary)) "custom" else "hook"
+      plan$automatic <- automatic
+      plan$estimated_tokens <- estimated_tokens
+      plan$fallback <- fallback
+      plan
     },
 
     install_compaction = function(
@@ -751,18 +651,6 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       summary_usage,
       attempts = list()
     ) {
-      if (
-        isTRUE(plan$automatic) &&
-          (!identical(private$.chat, plan$chat) ||
-            !identical(private$.chat$get_turns(), plan$turns) ||
-            !identical(private$.chat$get_system_prompt(), plan$system_prompt) ||
-            !identical(private$.compaction_summary, plan$previous_summary))
-      ) {
-        abort_deputy(
-          "Conversation changed while compaction was preparing its replacement.",
-          class = c("compaction_conflict", "compaction_error")
-        )
-      }
       summary <- paste(as.character(summary), collapse = "\n")
       catalogs <- character()
       needs_reader <- FALSE
@@ -807,11 +695,6 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           )
         }
       }
-      current_system <- private$system_prompt_without_compaction()
-      new_system <- paste0(
-        current_system,
-        private$compaction_prompt_block(summary)
-      )
       retire_catalogs <- function(prompt, turns) {
         if (!length(catalogs)) {
           return(invisible(NULL))
@@ -833,38 +716,48 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
 
       usage <- if (isTRUE(private$run_active)) private$current_run_usage()
       old_prompt <- private$.chat$get_system_prompt()
+      old_turns <- private$.chat$get_turns()
       old_tools <- if (needs_reader) private$.chat$get_tools()
       had_reader <- private$.tool_result_reader_registered
-      compacted_turns <- c(
-        private$.compacted_turns,
-        portable_session_turns(plan$turns_to_compact)
-      )
-      tryCatch(
-        {
-          private$.chat$set_system_prompt(new_system)
-          private$.chat$set_turns(plan$turns_to_keep)
-          if (needs_reader) private$ensure_tool_result_reader()
-        },
-        error = function(error) {
-          private$.chat$set_system_prompt(old_prompt)
-          private$.chat$set_turns(plan$turns)
-          if (needs_reader) {
-            private$.chat$set_tools(old_tools)
+      install <- function() {
+        if (!needs_reader) {
+          return(invisible(NULL))
+        }
+        tryCatch(
+          private$ensure_tool_result_reader(),
+          error = function(error) {
+            try(private$.chat$set_tools(old_tools), silent = TRUE)
             private$.tool_result_reader_registered <- had_reader
+            rlang::cnd_signal(error)
           }
-          retire_catalogs(old_prompt, plan$turns)
+        )
+        invisible(NULL)
+      }
+      tryCatch(
+        private$.conversation_state$compact(
+          private$.chat,
+          plan,
+          summary,
+          install = install
+        ),
+        error = function(error) {
+          # ConversationState has already restored the Chat and owned fields;
+          # retire provisional catalogs against the pre-install conversation
+          # before re-signalling the original installation error.
+          retire_catalogs(old_prompt, old_turns)
           rlang::cnd_signal(error)
         }
       )
-      private$.compacted_turns <- compacted_turns
-      private$.compaction_summary <- summary
       # Retained turns report usage for the context before compaction.
       private$.usage_stale_turns <- length(plan$turns_to_keep)
       private$reset_frame_snapshots()
       if (!is.null(private$.compaction_artifacts)) {
         private$.compaction_artifacts$installed <- TRUE
       }
-      retire_catalogs(new_system, plan$turns_to_keep)
+      retire_catalogs(
+        private$.chat$get_system_prompt(),
+        private$.chat$get_turns()
+      )
       if (!is.null(usage)) {
         preserve_run_usage(self, usage)
         state <- private$current_run_state
@@ -1048,7 +941,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       )
 
       conversation_text <- paste(turn_texts, collapse = "\n\n")
-      prior_summary <- private$.compaction_summary
+      prior_summary <- private$.conversation_state$summary()
       prior_summary_text <- if (is.null(prior_summary)) {
         ""
       } else {
@@ -1163,58 +1056,18 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         " earlier turns - LLM summary unavailable]\n\n",
         paste(summary_parts, collapse = "\n\n")
       )
-      if (is.null(private$.compaction_summary)) {
+      prior_summary <- private$.conversation_state$summary()
+      if (is.null(prior_summary)) {
         return(excerpt_summary)
       }
       paste0(
         "[Prior compacted conversation]\n",
-        private$.compaction_summary,
+        prior_summary,
         "\n\n",
         excerpt_summary
       )
     }
   )
-}
-
-cleared_result_key <- function(turn, content) {
-  paste0(turn, ":", content)
-}
-
-# Swap microcompact markers back to the original tool results for the
-# conversation view. `positions` gives each turn's index in the complete
-# conversation. A result is restored only while it still holds its marker.
-restore_cleared_tool_results <- function(
-  turns,
-  originals,
-  positions = seq_along(turns)
-) {
-  if (length(originals) == 0L) {
-    return(turns)
-  }
-  for (i in seq_along(turns)) {
-    if (is.na(positions[[i]])) {
-      next
-    }
-    contents <- turns[[i]]@contents
-    changed <- FALSE
-    for (j in seq_along(contents)) {
-      entry <- originals[[cleared_result_key(positions[[i]], j)]]
-      content <- contents[[j]]
-      if (
-        !is.null(entry) &&
-          S7::S7_inherits(content, ellmer::ContentToolResult) &&
-          identical(content@value, entry$marker) &&
-          is.null(content@error)
-      ) {
-        contents[[j]] <- entry$content
-        changed <- TRUE
-      }
-    }
-    if (changed) {
-      turns[[i]]@contents <- contents
-    }
-  }
-  turns
 }
 
 # Agent$set_context_policy(): thresholds and bounds may change between runs.

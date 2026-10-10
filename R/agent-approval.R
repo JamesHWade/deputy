@@ -44,13 +44,11 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
         )
       }
       session <- private$build_session_payload()
-      session$turns <- approval_record_turns(session$turns)
-      session$compacted_turns <- approval_record_turns(session$compacted_turns)
-      if (length(session$cleared_tool_results)) {
-        session$cleared_tool_results$turns <- approval_record_turns(
-          session$cleared_tool_results$turns
-        )
-      }
+      session <- map_conversation_snapshot(
+        session,
+        context = approval_record_turns,
+        retained = approval_record_turns
+      )
       session$activity <- approval_record_activity(session$activity)
       session$metadata$saved_at <- as.numeric(session$metadata$saved_at)
       policy <- approval_policy_record(self$permissions)
@@ -502,20 +500,15 @@ approval_resume <- function(
   }
   record$usage_limits <- S7::props(limits)
   session <- record$session
-  session$turns <- approval_replay_turns(
-    session$turns,
-    private$.chat$get_tools()
+  session <- map_conversation_snapshot(
+    session,
+    context = function(turns) {
+      approval_replay_turns(turns, private$.chat$get_tools())
+    },
+    retained = function(turns) {
+      approval_replay_turns(turns, tools = list())
+    }
   )
-  session$compacted_turns <- approval_replay_turns(
-    session$compacted_turns,
-    tools = list()
-  )
-  if (length(session$cleared_tool_results)) {
-    session$cleared_tool_results$turns <- approval_replay_turns(
-      session$cleared_tool_results$turns,
-      tools = list()
-    )
-  }
   session$activity <- approval_replay_activity(session$activity)
   private$restore_session_payload(session, source = path)
   record$status <- "resuming"

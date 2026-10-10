@@ -89,6 +89,7 @@ Collate:
     'agent-tool-callbacks.R'
     'agent-tool-records.R'
     'agent-tracing.R'
+    'conversation-state.R'
     'delegation-input.R'
     'delegation-inspection.R'
     'delegation-observation.R'

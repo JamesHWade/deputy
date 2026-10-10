@@ -3,35 +3,30 @@
 deputy_agent_session_methods <- function(self = NULL, private = NULL) {
   list(
     build_session_payload = function() {
-      session <- list(
-        schema_version = 3L,
-        turns = portable_session_turns(private$.chat$get_turns()),
-        compacted_turns = portable_session_turns(private$.compacted_turns),
-        # Optional: originals of results cleared by microcompact(), stored as
-        # one user turn so they share the turn serializers.
-        cleared_tool_results = cleared_tool_results_turns(
-          private$.cleared_tool_results
-        ),
-        system_prompt = private$.chat$get_system_prompt(),
-        compaction_summary = private$.compaction_summary,
-        tool_result_envelopes = collect_tool_result_envelopes(
-          private$.context_policy,
-          private$.session_id
-        ),
-        run_context = private$snapshot_run_context(),
-        appended_hook_context_hashes = private$appended_hook_context_hashes,
-        file_checkpoint_state = if (is.null(private$.file_checkpoints)) {
-          NULL
-        } else {
-          private$.file_checkpoints$export_state()
-        },
-        metadata = list(
-          saved_at = Sys.time(),
-          deputy_version = as.character(utils::packageVersion("deputy")),
-          provider = self$provider(),
-          session_id = private$.session_id,
-          agent_id = private$.agent_id,
-          agent_name = private$.agent_name
+      snapshot <- private$.conversation_state$snapshot(private$.chat)
+      session <- c(
+        list(schema_version = 3L),
+        snapshot,
+        list(
+          tool_result_envelopes = collect_tool_result_envelopes(
+            private$.context_policy,
+            private$.session_id
+          ),
+          run_context = private$snapshot_run_context(),
+          appended_hook_context_hashes = private$appended_hook_context_hashes,
+          file_checkpoint_state = if (is.null(private$.file_checkpoints)) {
+            NULL
+          } else {
+            private$.file_checkpoints$export_state()
+          },
+          metadata = list(
+            saved_at = Sys.time(),
+            deputy_version = as.character(utils::packageVersion("deputy")),
+            provider = self$provider(),
+            session_id = private$.session_id,
+            agent_id = private$.agent_id,
+            agent_name = private$.agent_name
+          )
         )
       )
       # Subagent tool calls shown in the conversation, beside the turns the
@@ -100,60 +95,7 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
           path = source
         )
       }
-      if (
-        !is.list(session$compacted_turns) ||
-          !all(vapply(
-            session$compacted_turns,
-            function(turn) {
-              S7::S7_inherits(turn, ellmer::UserTurn) ||
-                S7::S7_inherits(turn, ellmer::AssistantTurn)
-            },
-            logical(1)
-          ))
-      ) {
-        abort_session_load(
-          "Invalid session file - compacted_turns must be a list of conversation turns",
-          path = source
-        )
-      }
-      restored_compacted_turns <- portable_session_turns(
-        session$compacted_turns
-      )
-      restored_cleared <- tryCatch(
-        cleared_tool_results_from_turns(session$cleared_tool_results),
-        error = function(error) {
-          abort_session_load(
-            c(
-              "Invalid session file - cleared tool results are malformed",
-              "x" = conditionMessage(error)
-            ),
-            path = source,
-            parent = error
-          )
-        }
-      )
-      if (
-        !is.null(session$system_prompt) &&
-          (!is.character(session$system_prompt) ||
-            length(session$system_prompt) != 1L ||
-            is.na(session$system_prompt))
-      ) {
-        abort_session_load(
-          "Invalid session file - system_prompt must be one string or NULL",
-          path = source
-        )
-      }
-      if (
-        !is.null(session$compaction_summary) &&
-          (!is.character(session$compaction_summary) ||
-            length(session$compaction_summary) != 1L ||
-            is.na(session$compaction_summary))
-      ) {
-        abort_session_load(
-          "Invalid session file - compaction_summary must be one string or NULL",
-          path = source
-        )
-      }
+      prepared <- private$.conversation_state$prepare_restore(session, source)
 
       restored_tool_results <- tryCatch(
         validate_tool_result_envelopes(
@@ -220,8 +162,6 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
         }
       }
 
-      previous_turns <- private$.chat$get_turns()
-      previous_prompt <- private$.chat$get_system_prompt()
       previous_tools <- private$.chat$get_tools()
       previous_reader_registered <- private$.tool_result_reader_registered
       tool_result_replacement <- NULL
@@ -233,16 +173,21 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
             source_session_id = metadata$session_id,
             target_session_id = private$.session_id
           )
-          private$.chat$set_turns(session$turns)
-          private$.chat$set_system_prompt(session$system_prompt)
-          if (length(restored_tool_results) > 0L) {
-            private$ensure_tool_result_reader()
-          }
-          commit_tool_result_envelope_replacement(tool_result_replacement)
+          private$.conversation_state$restore(
+            private$.chat,
+            prepared,
+            install = function() {
+              if (length(restored_tool_results) > 0L) {
+                private$ensure_tool_result_reader()
+              }
+              commit_tool_result_envelope_replacement(
+                tool_result_replacement
+              )
+              invisible(NULL)
+            }
+          )
         },
         error = function(error) {
-          try(private$.chat$set_turns(previous_turns), silent = TRUE)
-          try(private$.chat$set_system_prompt(previous_prompt), silent = TRUE)
           try(private$.chat$set_tools(previous_tools), silent = TRUE)
           private$.tool_result_reader_registered <- previous_reader_registered
           if (!is.null(tool_result_replacement)) {
@@ -276,9 +221,6 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       private$.run_context <- restored_run_context
       private$last_run_context <- clone_run_context(restored_run_context)
       private$appended_hook_context_hashes <- restored_hashes
-      private$.compaction_summary <- session$compaction_summary
-      private$.compacted_turns <- restored_compacted_turns
-      private$.cleared_tool_results <- restored_cleared
       # Saved usage describes the saving Agent's prompt, tools and any later
       # rewrite, none of which a load restores, so none of it is reused.
       private$.usage_stale_turns <- length(private$.chat$get_turns())
@@ -352,66 +294,4 @@ portable_tool_errors <- function(turns) {
     turn@contents <- lapply(turn@contents, plain)
     turn
   })
-}
-
-# Saved as positions and markers plus one user turn holding the originals in
-# the same order, so the originals share the turn serializers.
-cleared_tool_results_turns <- function(originals) {
-  if (length(originals) == 0L) {
-    return(list())
-  }
-  list(
-    keys = names(originals),
-    markers = vapply(
-      originals,
-      function(x) x$marker,
-      character(1),
-      USE.NAMES = FALSE
-    ),
-    turns = portable_session_turns(list(ellmer::UserTurn(
-      contents = unname(lapply(originals, function(x) x$content))
-    )))
-  )
-}
-
-# Older schema 3 snapshots have no field, which means nothing was cleared.
-cleared_tool_results_from_turns <- function(saved) {
-  if (is.null(saved) || length(saved) == 0L) {
-    return(list())
-  }
-  keys <- saved$keys
-  markers <- saved$markers
-  turns <- saved$turns
-  if (
-    !is.character(keys) ||
-      !is.character(markers) ||
-      length(keys) != length(markers) ||
-      anyDuplicated(keys) ||
-      !is.list(turns) ||
-      length(turns) != 1L ||
-      !S7::S7_inherits(turns[[1L]], ellmer::UserTurn)
-  ) {
-    cli_abort("Expected positions, markers and one user turn.")
-  }
-  contents <- turns[[1L]]@contents
-  if (
-    length(contents) != length(keys) ||
-      !all(vapply(
-        contents,
-        function(x) S7::S7_inherits(x, ellmer::ContentToolResult),
-        logical(1)
-      ))
-  ) {
-    cli_abort("Expected one tool result per saved position.")
-  }
-  stats::setNames(
-    Map(
-      function(marker, content) {
-        list(marker = marker, content = content)
-      },
-      markers,
-      contents
-    ),
-    keys
-  )
 }

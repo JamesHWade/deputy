@@ -24,7 +24,8 @@ Key capabilities:
 deputy/
 ├── R/                      # Source code (R6 classes and functions)
 │   ├── agent.R             # Public Agent API and runtime wiring
-│   ├── agent-context.R     # Context estimation and compaction
+│   ├── agent-context.R     # Context estimation and compaction orchestration
+│   ├── conversation-state.R # Selected conversation reconstruction and transitions
 │   ├── agent-session.R     # Session payload construction and restoration
 │   ├── agent-tool-callbacks.R # Permission/hook callbacks and tool content extraction
 │   ├── agent-tool-records.R # Tool call records and delegation correlation
