@@ -60,11 +60,8 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
         )
       }
 
+      # ConversationState$prepare_restore() checks the conversation fields.
       required_fields <- c(
-        "turns",
-        "compacted_turns",
-        "system_prompt",
-        "compaction_summary",
         "tool_result_envelopes",
         "run_context",
         "appended_hook_context_hashes",
@@ -86,12 +83,6 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       if (!is.list(metadata)) {
         abort_session_load(
           "Invalid session file - metadata must be a list",
-          path = source
-        )
-      }
-      if (!is.list(session$turns)) {
-        abort_session_load(
-          "Invalid session file - turns must be a list",
           path = source
         )
       }

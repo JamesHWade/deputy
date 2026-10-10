@@ -280,3 +280,62 @@ test_that("failed same-Chat initialization preserves compacted state", {
   )
   expect_match(agent$get_system_prompt(), "Retry summary", fixed = TRUE)
 })
+
+test_that("a stale automatic plan is rejected before catalogs are written", {
+  reference <- paste0(
+    "deputy://tool-result/result_",
+    strrep("a", 64L),
+    "?text_sha256=",
+    strrep("b", 64L)
+  )
+  chat <- create_compaction_mock_chat()
+  chat$set_turns(list(
+    ellmer::UserTurn(paste("Keep", reference)),
+    ellmer::AssistantTurn("Kept."),
+    create_mock_user_turn("Latest question")
+  ))
+  agent <- Agent$new(chat = chat)
+  handles_called <- FALSE
+  local_mocked_bindings(
+    compaction_reference_handles = function(...) {
+      handles_called <<- TRUE
+      cli::cli_abort("Catalog written for a stale plan.")
+    }
+  )
+  private <- agent$.__enclos_env__$private
+  plan <- private$prepare_compaction(1L, NULL, "error", TRUE, NULL)
+  replacement <- list(ellmer::UserTurn("Host replacement"))
+  agent$set_turns(replacement)
+
+  error <- tryCatch(
+    private$install_compaction(plan, "Stale summary", "text", AgentUsage()),
+    error = identity
+  )
+
+  expect_s3_class(error, "deputy_compaction_conflict")
+  expect_false(handles_called)
+  expect_identical(agent$get_turns(), replacement)
+})
+
+test_that("re-initializing with a different Chat starts a new conversation", {
+  chat <- create_compaction_mock_chat()
+  chat$set_turns(conversation_state_turns())
+  agent <- Agent$new(chat = chat, system_prompt = "First prompt")
+  agent$microcompact(keep_last = 2L, marker = "[first cleared]")
+  agent$compact(keep_last = 2L, summary = "First summary")
+
+  other <- create_compaction_mock_chat()
+  other_turns <- list(
+    create_mock_user_turn("Other question"),
+    create_mock_assistant_turn("Other answer")
+  )
+  other$set_turns(other_turns)
+  agent$initialize(other, system_prompt = "Other prompt")
+
+  expect_identical(
+    lapply(agent$get_turns(), ellmer::contents_record),
+    lapply(other_turns, ellmer::contents_record)
+  )
+  expect_identical(agent$get_context_turns(), agent$get_turns())
+  expect_no_match(agent$get_system_prompt(), "First summary", fixed = TRUE)
+})

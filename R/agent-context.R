@@ -640,7 +640,6 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       plan$method <- if (!is.null(summary)) "custom" else "hook"
       plan$automatic <- automatic
       plan$estimated_tokens <- estimated_tokens
-      plan$fallback <- fallback
       plan
     },
 
@@ -651,6 +650,8 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       summary_usage,
       attempts = list()
     ) {
+      # Reject a stale automatic plan before writing any catalog or artifact.
+      private$.conversation_state$check_plan(private$.chat, plan)
       summary <- paste(as.character(summary), collapse = "\n")
       catalogs <- character()
       needs_reader <- FALSE

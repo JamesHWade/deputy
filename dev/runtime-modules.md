@@ -65,7 +65,11 @@ The factories are not alternate runtimes or provider adapters.
 
 `ConversationState` owns retained turns, the originals of microcompacted tool
 results, and the installed summary. Its operations receive the current Chat;
-the owner never caches a Chat or an Agent callback. This keeps reconstruction
+the owner never caches a Chat or an Agent callback. A compaction plan holds
+only a weak reference to the Chat it was prepared from, so a stale automatic
+plan is rejected without keeping a replaced Chat alive; the check runs before
+any catalog or artifact is written. Re-initializing an Agent with a different
+Chat starts a new `ConversationState`. This keeps reconstruction
 consistent after cloning, fallback, and explicit Chat replacement. Agent-owned
 prompt writes pass through the same module, with explicit prompt replacement
 reconciling summary identity and internal appends preserving it.

@@ -186,7 +186,12 @@ Agent <- R6::R6Class(
       # doesn't leave the Agent on a Chat it doesn't hold.
       previous_chat <- private$.chat
       private$.chat <- chat
-      if (is.null(private$.conversation_state)) {
+      # A different Chat is a different conversation: its retained turns,
+      # cleared results and summary don't carry over.
+      if (
+        is.null(private$.conversation_state) ||
+          (!is.null(previous_chat) && !identical(previous_chat, chat))
+      ) {
         private$.conversation_state <- ConversationState$new()
       }
       if (!is.null(previous_chat) && !identical(previous_chat, chat)) {

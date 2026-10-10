@@ -325,16 +325,13 @@ ConversationState <- R6::R6Class(
         private$.originals <- list()
         private$.summary <- NULL
       }
-      if (identical(previous_prompt, prompt)) {
-        private$transaction(chat, turns = turns, commit = commit)
-      } else {
-        private$transaction(
-          chat,
-          turns = turns,
-          prompt = prompt,
-          commit = commit
-        )
-      }
+      private$transaction(
+        chat,
+        turns = turns,
+        prompt = prompt,
+        set_prompt = !identical(previous_prompt, prompt),
+        commit = commit
+      )
       invisible(NULL)
     },
 
@@ -473,7 +470,9 @@ ConversationState <- R6::R6Class(
         tail(turns, keep_last)
       }
       list(
-        chat = chat,
+        # A weak reference, so a plan held across an async summary doesn't
+        # keep a replaced Chat alive.
+        chat_ref = rlang::new_weakref(chat),
         system_prompt = chat$get_system_prompt(),
         previous_summary = private$.summary,
         turns = turns,
@@ -482,23 +481,35 @@ ConversationState <- R6::R6Class(
       )
     },
 
-    compact = function(chat, plan, summary, install = NULL) {
-      if (!is.null(install) && !is.function(install)) {
-        cli::cli_abort("{.arg install} must be a function or NULL.")
+    # An automatic plan is installed only if the conversation it was
+    # prepared from is unchanged.
+    check_plan = function(chat, plan) {
+      if (!isTRUE(plan$automatic)) {
+        return(invisible(NULL))
+      }
+      planned <- if (rlang::is_weakref(plan$chat_ref)) {
+        rlang::wref_key(plan$chat_ref)
       }
       if (
-        isTRUE(plan$automatic) &&
-          (is.null(plan$chat) ||
-            !identical(chat, plan$chat) ||
-            !identical(chat$get_turns(), plan$turns) ||
-            !identical(chat$get_system_prompt(), plan$system_prompt) ||
-            !identical(private$.summary, plan$previous_summary))
+        is.null(planned) ||
+          !identical(chat, planned) ||
+          !identical(chat$get_turns(), plan$turns) ||
+          !identical(chat$get_system_prompt(), plan$system_prompt) ||
+          !identical(private$.summary, plan$previous_summary)
       ) {
         abort_deputy(
           "Conversation changed while compaction was preparing its replacement.",
           class = c("compaction_conflict", "compaction_error")
         )
       }
+      invisible(NULL)
+    },
+
+    compact = function(chat, plan, summary, install = NULL) {
+      if (!is.null(install) && !is.function(install)) {
+        cli::cli_abort("{.arg install} must be a function or NULL.")
+      }
+      self$check_plan(chat, plan)
 
       summary <- paste(as.character(summary), collapse = "\n")
       current_system <- self$prompt_without_summary(chat)
@@ -643,31 +654,33 @@ ConversationState <- R6::R6Class(
       prompt = NULL,
       callback = NULL,
       commit = function() invisible(NULL),
-      prompt_first = FALSE
+      prompt_first = FALSE,
+      set_turns = !missing(turns),
+      set_prompt = !missing(prompt)
     ) {
-      has_turns <- !missing(turns)
-      has_prompt <- !missing(prompt)
+      has_turns <- isTRUE(set_turns)
+      has_prompt <- isTRUE(set_prompt)
       previous_turns <- chat$get_turns()
       previous_prompt <- chat$get_system_prompt()
 
       failure <- tryCatch(
         {
-          set_prompt <- function() {
+          apply_prompt <- function() {
             if (has_prompt) {
               chat$set_system_prompt(prompt)
             }
           }
-          set_turns <- function() {
+          apply_turns <- function() {
             if (has_turns) {
               chat$set_turns(turns)
             }
           }
           if (isTRUE(prompt_first)) {
-            set_prompt()
-            set_turns()
+            apply_prompt()
+            apply_turns()
           } else {
-            set_turns()
-            set_prompt()
+            apply_turns()
+            apply_prompt()
           }
           if (!is.null(callback)) {
             callback()
