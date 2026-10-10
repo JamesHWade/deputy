@@ -195,6 +195,8 @@ Agent <- R6::R6Class(
         private$.conversation_state <- ConversationState$new()
       }
       if (!is.null(previous_chat) && !identical(previous_chat, chat)) {
+        private$.activity_overlay <- list()
+        activity_reset(self)
         unmark_chat_owner(previous_chat, self)
         mark_chat_owner(chat, self)
       }

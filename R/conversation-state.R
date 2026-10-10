@@ -657,10 +657,9 @@ ConversationState <- R6::R6Class(
       callback = NULL,
       commit = function() invisible(NULL),
       prompt_first = FALSE,
-      set_turns = !missing(turns),
       set_prompt = !missing(prompt)
     ) {
-      has_turns <- isTRUE(set_turns)
+      has_turns <- !missing(turns)
       has_prompt <- isTRUE(set_prompt)
       previous_turns <- chat$get_turns()
       previous_prompt <- chat$get_system_prompt()

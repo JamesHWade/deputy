@@ -69,10 +69,13 @@ the owner never caches a Chat or an Agent callback. A compaction plan holds
 only a weak reference to the Chat it was prepared from, so a stale automatic
 plan is rejected without keeping a replaced Chat alive; the check runs before
 any catalog or artifact is written. Re-initializing an Agent with a different
-Chat starts a new `ConversationState`. This keeps reconstruction
-consistent after cloning, fallback, and explicit Chat replacement. Agent-owned
-prompt writes pass through the same module, with explicit prompt replacement
-reconciling summary identity and internal appends preserving it.
+Chat starts a new `ConversationState` and clears the previous conversation's
+activity overlay through its existing owner, which also resets the presenter.
+Re-initializing with the same Chat preserves both conversation and activity.
+This keeps reconstruction consistent after cloning, fallback, and explicit Chat
+replacement. Agent-owned prompt writes pass through the same module, with
+explicit prompt replacement reconciling summary identity and internal appends
+preserving it.
 
 Conversation installation rolls back the Chat when a setter or synchronous
 installation callback fails, and commits its owned state only after that
