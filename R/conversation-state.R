@@ -471,8 +471,9 @@ ConversationState <- R6::R6Class(
       }
       list(
         # A weak reference, so a plan held across an async summary doesn't
-        # keep a replaced Chat alive.
-        chat_ref = rlang::new_weakref(chat),
+        # keep a replaced Chat alive. Only environments (R6 Chats) can be
+        # weakly referenced.
+        chat_ref = if (is.environment(chat)) rlang::new_weakref(chat) else chat,
         system_prompt = chat$get_system_prompt(),
         previous_summary = private$.summary,
         turns = turns,
@@ -487,8 +488,9 @@ ConversationState <- R6::R6Class(
       if (!isTRUE(plan$automatic)) {
         return(invisible(NULL))
       }
-      planned <- if (rlang::is_weakref(plan$chat_ref)) {
-        rlang::wref_key(plan$chat_ref)
+      planned <- plan$chat_ref
+      if (rlang::is_weakref(planned)) {
+        planned <- rlang::wref_key(planned)
       }
       if (
         is.null(planned) ||

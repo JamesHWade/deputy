@@ -189,9 +189,15 @@ test_that("last_turn preserves Chat selection with trailing tool results", {
   expected <- chat$last_turn("user")
   agent <- Agent$new(chat = chat)
   agent$microcompact(keep_last = 0L, marker = "[cleared]")
+  # The selection holds a tool result, so the restoration is checked too.
+  expect_identical(result_values(list(expected)), "the latest search result")
   expect_identical(
     ellmer::contents_record(agent$last_turn("user")),
     ellmer::contents_record(expected)
+  )
+  expect_identical(
+    result_values(list(agent$last_turn("user"))),
+    "the latest search result"
   )
   expect_true("[cleared]" %in% result_values(agent$get_context_turns()))
 
