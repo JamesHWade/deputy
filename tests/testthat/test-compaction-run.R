@@ -1052,3 +1052,88 @@ test_that("compaction IDs distinguish automatic no-ops from manual work after a 
   expect_identical(agent$last_run()$run_id, result$run_id)
   expect_null(agent$compact()$run_id)
 })
+
+test_that("PostModelRequest fires after a compaction summary request, with its usage", {
+  server <- local_runtime_server(list(
+    runtime_reply("A summary of the earlier turns."),
+    runtime_reply("Task response")
+  ))
+  chat <- runtime_compaction_chat(server)
+  agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
+  seen <- list()
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context) {
+      seen[[length(seen) + 1L]] <<- list(
+        request_number = context$request_number,
+        requests = context$usage$requests,
+        tokens = context$usage$total_tokens
+      )
+      NULL
+    }
+  ))
+
+  result <- agent$run_sync("Continue")
+
+  expect_identical(agent$last_compaction()$method, "llm")
+  expect_identical(result$usage$requests, 2L)
+  expect_identical(
+    vapply(seen, function(x) x$request_number, integer(1)),
+    c(1L, 2L)
+  )
+  expect_identical(vapply(seen, function(x) x$requests, integer(1)), c(1L, 2L))
+  # The summary's own tokens are in the usage the hook is given.
+  expect_gt(seen[[1L]]$tokens, 0)
+})
+
+test_that("the task request waits for a PostModelRequest hook's promise after a compaction request", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply("A summary of the earlier turns."),
+    runtime_reply("Task response")
+  ))
+  chat <- runtime_compaction_chat(server)
+  agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
+  served <- integer()
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context) {
+      promises::then(later_value(NULL, 0.1), function(value) {
+        served <<- c(served, length(server$requests()))
+        value
+      })
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("Continue"), max_polls = 500L)
+
+  expect_identical(served, c(1L, 2L))
+  expect_identical(result$stop_reason, "complete")
+})
+
+test_that("an interrupt while a compaction request's PostModelRequest hook is pending ends the run before the task", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply("A summary of the earlier turns."),
+    runtime_reply("Task response")
+  ))
+  chat <- runtime_compaction_chat(server)
+  agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context) {
+      later::later(function() agent$interrupt("enough"), 0.05)
+      later_value(NULL, 0.3)
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("Continue"), max_polls = 500L)
+
+  expect_length(server$requests(), 1L)
+  expect_identical(result$stop_reason, "enough")
+  expect_false(agent$.__enclos_env__$private$run_active)
+})

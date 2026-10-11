@@ -196,6 +196,15 @@ end_model_request <- function(agent, turn) {
     model = agent$get_model(),
     outcome = "response"
   ))
+  # ellmer awaits this callback's promise, so the next request waits for it.
+  fire_post_model_request(agent, state)
+}
+
+# PostModelRequest, with the run's usage so far. Every model request of a run
+# ends here: the task's, a structured request's and a compaction summary's.
+# Returns a promise when a callback returned one, for the run to wait on.
+fire_post_model_request <- function(agent, state) {
+  private <- agent$.__enclos_env__$private
   fired <- private$fire_hook(
     "PostModelRequest",
     context = private$hook_context(
@@ -205,7 +214,6 @@ end_model_request <- function(agent, turn) {
       run_id = state$active_run_id
     )
   )
-  # ellmer awaits this callback's promise, so the next request waits for it.
   if (promises::is.promising(fired)) {
     return(promises::then(fired, function(value) invisible(NULL)))
   }

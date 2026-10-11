@@ -34,7 +34,8 @@
 * New hook event `PostModelRequest`, fired after each model request of a run
   with the run's usage so far (`context$usage`, `context$usage_limits`,
   `context$request_number`), so a host can show what a run is spending while
-  it runs, tools or no tools.
+  it runs, tools or no tools. Structured requests and the summary requests of
+  automatic compaction count.
 
 * `$stream()` and `$stream_async()` take `usage_limits` for one run, merged
   over the agent's limits as `$run_async()` merges them.

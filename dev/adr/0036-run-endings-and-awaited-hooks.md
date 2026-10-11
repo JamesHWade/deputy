@@ -41,7 +41,10 @@ promise of it when a callback returned a promise; later hooks wait for an
 earlier hook's promise. Callers follow one rule: a value is used at once, a
 promise is waited for. Nothing becomes asynchronous unless a callback returns
 a promise, so every existing hook, and every test that calls the tool
-callbacks directly, behaves as before.
+callbacks directly, behaves as before. Deputy's own two callers of the
+tool-request callback follow the rule too: a tool called from a running R
+session awaits the answer, and the operation a resumed approval restores
+resolves it as it resolves the tool's own promise.
 
 `HookMatcher(promise_timeout = 60)` bounds the wait. A promise that rejects or
 does not settle in time is recorded as a hook error and counts as no answer;
@@ -54,7 +57,7 @@ Where each event waits:
 |---|---|
 | `PreToolUse`, `PermissionRequest` | before the tool runs: ellmer awaits the request callback |
 | `PostToolUse`, `PostToolUseFailure` | before the next model request, and at the end of a pass: ellmer does not await the result callback, so Deputy holds the promise |
-| `PostModelRequest` | before the run goes on: ellmer awaits the request-end callback, and Deputy waits itself for a structured request, which ellmer's callbacks miss |
+| `PostModelRequest` | before the run goes on: ellmer awaits the request-end callback, and Deputy waits itself for a structured request, which ellmer's callbacks miss, and for a compaction summary request, once its usage is settled |
 | `SessionStart`, `UserPromptSubmit` | before the first model request; in a delegate batch, before any task is admitted |
 | `SubagentStart`, `SubagentStop` | around the delegated run |
 | `PreCompact`, `PostCompact` | in automatic compaction; `$compact()` does not wait |
@@ -109,7 +112,8 @@ delegate batch, which has no answer of its own.
   equal to `cost_usd` when that is known, a lower bound when it is `NA`. One
   function says which cost a limit is checked against, and the limit check,
   a subagent's budget and a retained conversation's budget all read it.
-- `PostModelRequest` fires after each model request with the run's usage.
+- `PostModelRequest` fires after each model request with the run's usage: the
+  task's requests, a structured request and a compaction summary request.
 - `stream_result(stream)` gives a promise of the run's `AgentResult`. It
   resolves however the run ended. A stream refused before its run has an ID
   (the agent is running, or another Agent holds its Chat) has no result, so

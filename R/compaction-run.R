@@ -339,6 +339,15 @@ compaction_summary_attempt_async <- coro::async(function(
     private$current_external_usage,
     settled
   )
+  # A summary request is a model request of the run. Its hook fires here,
+  # once its tokens and cost are in the run's usage, and the run waits for
+  # it before it goes on to the task.
+  if (dispatched > 0L && is.null(condition)) {
+    ended <- fire_post_model_request(agent, state)
+    if (promises::is.promising(ended)) {
+      coro::await(ended)
+    }
+  }
   last_turn <- NULL
   if (!is.null(chat)) {
     last_turn <- tryCatch(chat$last_turn(), error = function(e) NULL)

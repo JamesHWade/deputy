@@ -50,9 +50,10 @@ the permission policy has allowed it.
 call finishes, whether or not it failed.
 \item \code{PostToolUseFailure(tool_name, tool_result, tool_error, context)}: after
 \code{PostToolUse}, when the tool failed.
-\item \code{PostModelRequest(context)}: after each model request of a run, once the
-response is in the conversation. It needs ellmer's request callbacks, so
-a stand-in for a Chat that lacks them never fires it.
+\item \code{PostModelRequest(context)}: after each model request of a run, once its
+response has arrived: the task's requests, a structured request, and the
+summary request of an automatic compaction. It needs ellmer's request
+callbacks, so a stand-in for a Chat that lacks them never fires it.
 \item \code{PermissionRequest(tool_name, tool_input, permission_result, context)}:
 when the permission policy denies a call.
 \item \code{SessionStart(context)}: at the start of each run.

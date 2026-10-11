@@ -47,9 +47,10 @@ NULL
 #'   call finishes, whether or not it failed.
 #' * `PostToolUseFailure(tool_name, tool_result, tool_error, context)`: after
 #'   `PostToolUse`, when the tool failed.
-#' * `PostModelRequest(context)`: after each model request of a run, once the
-#'   response is in the conversation. It needs ellmer's request callbacks, so
-#'   a stand-in for a Chat that lacks them never fires it.
+#' * `PostModelRequest(context)`: after each model request of a run, once its
+#'   response has arrived: the task's requests, a structured request, and the
+#'   summary request of an automatic compaction. It needs ellmer's request
+#'   callbacks, so a stand-in for a Chat that lacks them never fires it.
 #' * `PermissionRequest(tool_name, tool_input, permission_result, context)`:
 #'   when the permission policy denies a call.
 #' * `SessionStart(context)`: at the start of each run.
