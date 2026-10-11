@@ -837,3 +837,89 @@ test_that("the hook timeout is a deputy error as well as a hook timeout", {
   expect_s3_class(timed_out, "deputy_hook_timeout")
   expect_s3_class(timed_out, "deputy_error")
 })
+
+test_that("errors can be read by the firing that raised them", {
+  registry <- HookRegistry$new()
+  registry$add(HookMatcher(
+    "PostToolUse",
+    callback = function(tool_name, tool_result, tool_error, context) {
+      if (identical(tool_name, "first")) {
+        return(promises::promise(function(resolve, reject) {
+          later::later(
+            function() reject(rlang::error_cnd(message = "first failed")),
+            0.05
+          )
+        }))
+      }
+      promises::promise(function(resolve, reject) {
+        later::later(function() resolve(NULL), 0.15)
+      })
+    }
+  ))
+
+  first_id <- registry$reserve_fire_id()
+  first <- registry$fire(
+    "PostToolUse",
+    tool_name = "first",
+    tool_result = "r",
+    tool_error = NULL,
+    context = list()
+  )
+  second_id <- registry$reserve_fire_id()
+  second <- registry$fire(
+    "PostToolUse",
+    tool_name = "second",
+    tool_result = "r",
+    tool_error = NULL,
+    context = list()
+  )
+  resolve_async_value(promises::promise_all(first, second))
+
+  expect_length(registry$errors_from(first_id), 1L)
+  expect_match(registry$errors_from(first_id)[[1]]$error, "first failed")
+  expect_length(registry$errors_from(second_id), 0L)
+
+  unreserved <- resolve_async_value(registry$fire(
+    "PostToolUse",
+    tool_name = "first",
+    tool_result = "r",
+    tool_error = NULL,
+    context = list()
+  ))
+  expect_null(unreserved)
+  own_id <- registry$last_errors()[[length(registry$last_errors())]]$fire_id
+  expect_false(identical(own_id, first_id))
+  expect_false(identical(own_id, second_id))
+  expect_length(registry$errors_from(own_id), 1L)
+})
+
+test_that("a hook that fires the same registry again does not take the outer firing's ID", {
+  registry <- HookRegistry$new()
+  registry$add(HookMatcher(
+    "PostToolUse",
+    callback = function(tool_name, tool_result, tool_error, context) {
+      registry$fire("Notification", message = "x", context = list())
+      rlang::abort("outer failed")
+    }
+  ))
+  registry$add(HookMatcher(
+    "Notification",
+    callback = function(message, context) {
+      rlang::abort("notice failed")
+    }
+  ))
+
+  outer_id <- registry$reserve_fire_id()
+  registry$fire(
+    "PostToolUse",
+    tool_name = "t",
+    tool_result = "r",
+    tool_error = NULL,
+    context = list()
+  )
+
+  outer_errors <- registry$errors_from(outer_id)
+  expect_length(outer_errors, 1L)
+  expect_match(outer_errors[[1]]$error, "outer failed")
+  expect_length(registry$last_errors(), 2L)
+})

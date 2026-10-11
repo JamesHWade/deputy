@@ -193,28 +193,6 @@ lead_settle_delegation <- function(
 lead_delegation_hook <- function(lead, id, event, definition = NULL) {
   private <- lead$.__enclos_env__$private
   record <- private$subagent_runs[[id]]
-  previous_errors <- length(lead$hooks$last_errors())
-  # A promise's error is recorded only when it settles, after this function
-  # has returned, so the copy runs again then.
-  copy_errors <- function() {
-    errors <- lead$hooks$last_errors()
-    if (length(errors) > previous_errors) {
-      messages <- vapply(
-        errors[seq.int(previous_errors + 1L, length(errors))],
-        function(error) paste0(error$event, ": ", error$error),
-        character(1)
-      )
-      current <- private$subagent_runs[[id]]
-      current$hook_error <- paste(
-        c(current$hook_error, messages),
-        collapse = "\n"
-      )
-      private$subagent_runs[[id]] <- current
-      # Advance the marker so a later copy does not repeat these messages.
-      previous_errors <<- length(errors)
-    }
-  }
-  on.exit(copy_errors(), add = TRUE)
   args <- list(
     event = event,
     agent_name = record$agent_name,
@@ -237,14 +215,23 @@ lead_delegation_hook <- function(lead, id, event, definition = NULL) {
   if (identical(event, "SubagentStop")) {
     args["result"] <- list(record$result)
   }
-  fired <- do.call(private$fire_hook, args)
-  if (promises::is.promising(fired)) {
-    return(hook_then(fired, function(value) {
-      copy_errors()
-      value
-    }))
-  }
-  fired
+  fire_with_errors(
+    lead$hooks,
+    function() do.call(private$fire_hook, args),
+    function(errors) {
+      messages <- vapply(
+        errors,
+        function(error) paste0(error$event, ": ", error$error),
+        character(1)
+      )
+      current <- private$subagent_runs[[id]]
+      current$hook_error <- paste(
+        c(current$hook_error, messages),
+        collapse = "\n"
+      )
+      private$subagent_runs[[id]] <- current
+    }
+  )
 }
 
 # Both callers reserve usage before starting this promise. Always release it,
