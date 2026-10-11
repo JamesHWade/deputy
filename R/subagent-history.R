@@ -1178,7 +1178,11 @@ subagent_history_panel_child <- function(conversation, lead, live, id) {
 #' sets `lead$conversation_id` back to `NULL`, so the previous conversation's
 #' subagents stop showing until you set the next ID. If you pass your own
 #' `conversation_id` function, make it return `NULL` or the new ID after a new
-#' chat. When a conversation is reopened, its ID must be the open one
+#' chat. shinychat also empties the lead when the first message of a
+#' conversation is edited, and from the lead the two look the same: the
+#' example below gives such an edit a new ID, so the subagents from before the
+#' edit are no longer saved with that conversation. When a conversation is
+#' reopened, its ID must be the open one
 #' before `on_restore` runs: records saved under another ID are not read. By
 #' default the open conversation's ID is read from `lead$conversation_id`;
 #' pass `conversation_id` to read it from somewhere else. For example, keeping

@@ -98,7 +98,11 @@ conversation. shinychat's "new chat" empties the lead's conversation, which
 sets \code{lead$conversation_id} back to \code{NULL}, so the previous conversation's
 subagents stop showing until you set the next ID. If you pass your own
 \code{conversation_id} function, make it return \code{NULL} or the new ID after a new
-chat. When a conversation is reopened, its ID must be the open one
+chat. shinychat also empties the lead when the first message of a
+conversation is edited, and from the lead the two look the same: the
+example below gives such an edit a new ID, so the subagents from before the
+edit are no longer saved with that conversation. When a conversation is
+reopened, its ID must be the open one
 before \code{on_restore} runs: records saved under another ID are not read. By
 default the open conversation's ID is read from \code{lead$conversation_id};
 pass \code{conversation_id} to read it from somewhere else. For example, keeping

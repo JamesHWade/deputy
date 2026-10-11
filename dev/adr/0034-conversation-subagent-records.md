@@ -209,3 +209,12 @@ subagent started in the meantime carries no `host_conversation_id` instead of
 the conversation just left. `chat_server()` sets the ID before every reply, so
 it is unaffected. A host passing its own `conversation_id` function must
 return `NULL` (or the new ID) after a new chat itself.
+
+shinychat's `handle_edit()` also empties the client when the first message of
+a conversation is edited (the new branch starts at the root), and from the
+client that is indistinguishable from a new chat. A host that mints an ID
+whenever the lead is empty (as the documented example does, and as it would
+without Deputy clearing the ID) gives that edit a new ID; the record's saved
+subagents are then replaced by the new branch's. Telling the two apart needs
+the controller's conversation ID, which shinychat 0.5.0 keeps private; that is
+the upstream ask that would remove the host's own ID altogether.
