@@ -1,5 +1,15 @@
 # deputy (development version)
 
+* `LeadAgent$register_sub_agent(replace = TRUE)` no longer adds a newline to
+  the lead's system prompt each time it's called. Replacing a definition with
+  an identical one leaves the prompt unchanged, so the provider's prompt cache
+  stays valid (#236).
+
+* `ask_user` and `multi_edit` read their JSON arguments only as JSON text. A
+  string that isn't JSON was read as a file path or URL, so a model could make
+  these tools read a local file or fetch a URL. The `RSession` tool bridge
+  reads its messages the same way.
+
 * `AgentResult` has an `ending`: a `RunEnding` value that says how the run
   ended and holds only what that ending has. `RunEndingAnswered()`,
   `RunEndingStopped()` (who stopped it and the reason they gave),

@@ -107,7 +107,7 @@ r_session_evaluate <- function(
       collapse = "\n"
     )
     tryCatch(
-      jsonlite::fromJSON(text, simplifyVector = FALSE),
+      jsonlite::parse_json(text, simplifyVector = FALSE),
       error = function(error) worker_abort(conditionMessage(error))
     )
   }

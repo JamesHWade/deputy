@@ -524,6 +524,11 @@ LeadAgent <- R6::R6Class(
       } else {
         substr(full_prompt, after_start, nchar(full_prompt))
       }
+      # The section ends with the newline that followed the old end marker,
+      # so `after` must not bring a second one.
+      if (endsWith(section, "\n") && startsWith(after, "\n")) {
+        after <- substr(after, 2L, nchar(after))
+      }
       paste0(before, section, after)
     },
 

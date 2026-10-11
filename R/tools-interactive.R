@@ -212,7 +212,7 @@ ask_user_tool_impl <- function(
 ) {
   if (is.character(questions) && length(questions) == 1) {
     parsed <- tryCatch(
-      jsonlite::fromJSON(questions, simplifyVector = FALSE),
+      jsonlite::parse_json(questions, simplifyVector = FALSE),
       error = function(e) {
         ellmer::tool_reject(paste(
           "Failed to parse questions JSON:",

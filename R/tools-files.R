@@ -83,7 +83,7 @@ parse_multi_edits <- function(edits) {
     rlang::check_installed("jsonlite", reason = "to parse JSON edits")
 
     parsed <- tryCatch(
-      jsonlite::fromJSON(edits, simplifyVector = FALSE),
+      jsonlite::parse_json(edits, simplifyVector = FALSE),
       error = function(e) {
         cli_abort("Could not parse {.arg edits} as JSON.", parent = e)
       }
