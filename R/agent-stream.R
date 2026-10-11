@@ -1003,7 +1003,12 @@ governed_run_stream <- coro::async_generator(function(
     # that was stopped, hit a limit or failed ends as it stands.
     if (
       S7::S7_inherits(stop_answer, HookResultStop) &&
-        identical(stream_state$reason, "complete") &&
+        # The ending, not the reason: an answer the provider cut short has
+        # the reason "complete" too.
+        S7::S7_inherits(
+          agent$.__enclos_env__$private$run_ending_now(stream_state),
+          RunEndingAnswered
+        ) &&
         !agent$.__enclos_env__$private$should_stop &&
         is.null(structured)
     ) {

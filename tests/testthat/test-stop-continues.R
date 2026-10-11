@@ -306,3 +306,27 @@ test_that("a run sent on asks the provider again with the hook's message", {
   expect_match(last_user, "Fix the table.", fixed = TRUE)
   expect_identical(trimws(result$response), "Second answer.")
 })
+
+test_that("a Stop hook cannot send on an answer the provider cut short", {
+  server <- local_runtime_server(list(
+    runtime_reply(text = "partial", finish = "length"),
+    runtime_reply("more")
+  ))
+  agent <- Agent$new(runtime_chat(server))
+  endings <- list()
+  agent$hooks$add(HookMatcher(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context, ...) {
+      endings[[length(endings) + 1L]] <<- context$ending
+      HookResultStop("Go on.")
+    }
+  ))
+
+  result <- suppressWarnings(agent$run_sync("Write a long answer"))
+
+  expect_length(server$requests(), 1L)
+  expect_length(endings, 1L)
+  expect_s7_class(endings[[1]], RunEndingCutOff)
+  expect_s7_class(result$ending, RunEndingCutOff)
+})
