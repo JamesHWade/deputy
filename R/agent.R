@@ -1164,6 +1164,7 @@ Agent <- R6::R6Class(
     #' @param usage_limits [UsageLimits] for this run. `NULL` fields use the
     #'   agent's limits.
     #' @return An asynchronous generator suitable for `shinychat::chat_append()`.
+    #'   [stream_result()] gives a promise of this run's [AgentResult].
     #' @param type Optional ellmer type for structured streaming, passed to
     #'   ellmer. If the provider can't stream structured output, use
     #'   `$chat_structured()` instead.
@@ -1198,10 +1199,13 @@ Agent <- R6::R6Class(
         stream_type = type
       )
       reset_stream_controller(controller)
-      if (!is.null(private$.activity) && identical(stream, "content")) {
-        return(activity_stream(self, governed_run$stream, private$.activity))
+      out <- if (!is.null(private$.activity) && identical(stream, "content")) {
+        activity_stream(self, governed_run$stream, private$.activity)
+      } else {
+        governed_run$stream
       }
-      governed_run$stream
+      attr(out, "deputy_run_state") <- governed_run$state
+      out
     },
 
     #' @description
