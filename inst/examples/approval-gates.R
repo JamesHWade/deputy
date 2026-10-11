@@ -1,5 +1,6 @@
 # Source this file to create approval hooks for one Agent.
-# callback(questions, context) must return a named list of answers.
+# callback(questions, context) must return a named list that maps the
+# question's text to the chosen label, as for tools_interactive().
 # Omit callback for an interactive terminal prompt.
 library(deputy)
 
@@ -37,7 +38,9 @@ approval_gate <- function(
         ),
         multiSelect = FALSE
       )))
-      approved <- identical(response$answers[[question]], "Approve")
+      # The tool returns the JSON the model would read: one answer per question.
+      answer <- jsonlite::parse_json(response)$answers[[1]]
+      approved <- identical(answer$selected, list("Approve"))
       if (approved) {
         return(NULL)
       }

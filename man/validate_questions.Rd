@@ -10,9 +10,12 @@ validate_questions(questions)
 \item{questions}{List of question objects}
 }
 \value{
-TRUE if valid, otherwise throws an error via tool_reject
+The questions, each with exactly \code{question}, \code{header}, \code{options}
+(each with \code{label} and \code{description}) and a logical \code{multiSelect}.
 }
 \description{
-Validate questions structure
+Checks the typed questions array. A string is never parsed or read: it is
+rejected like any other malformed value. Each failure is a tool rejection
+whose message tells the model what to fix.
 }
 \keyword{internal}

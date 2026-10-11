@@ -55,7 +55,14 @@ test_that("binding configuration is immutable and rejects unsupported combinatio
 })
 
 test_that("concurrent owners receive only their own routed human requests and policy", {
-  question <- '[{"question":"Continue?","header":"Choice","options":[{"label":"Yes","description":"Continue"},{"label":"No","description":"Stop"}]}]'
+  question <- list(list(
+    question = "Continue?",
+    header = "Choice",
+    options = list(
+      list(label = "Yes", description = "Continue"),
+      list(label = "No", description = "Stop")
+    )
+  ))
   responses <- list(
     runtime_reply(tool = "ask_user", arguments = list(questions = question)),
     runtime_reply(tool = "effect"),

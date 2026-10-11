@@ -12,6 +12,91 @@ interaction_test_questions <- function() {
   ))
 }
 
+# A multi-select question whose first label holds a comma, a single-select
+# question, and a question that can be left unanswered.
+interaction_shape_questions <- function() {
+  list(
+    list(
+      question = "Which outputs?",
+      header = "Outputs",
+      options = list(
+        list(label = "Tables, charts", description = "Figures and tables"),
+        list(label = "Text", description = "A written summary"),
+        list(label = "Slides", description = "A short deck")
+      ),
+      multiSelect = TRUE
+    ),
+    interaction_test_questions()[[1]],
+    list(
+      question = "Anything else?",
+      header = "Else",
+      options = list(
+        list(label = "No", description = "Nothing more"),
+        list(label = "Yes", description = "Something more")
+      ),
+      multiSelect = FALSE
+    )
+  )
+}
+
+# The first test question with fields replaced; a NULL value removes a field.
+interaction_question_with <- function(...) {
+  question <- interaction_test_questions()[[1]]
+  changes <- list(...)
+  for (field in names(changes)) {
+    question[[field]] <- changes[[field]]
+  }
+  list(question)
+}
+
+# What the model reads: the tool's JSON text, parsed without simplification.
+interaction_model_view <- function(result) {
+  expect_s3_class(result, "json")
+  jsonlite::parse_json(result)
+}
+
+interaction_answer <- function(result, index = 1L) {
+  interaction_model_view(result)$answers[[index]]
+}
+
+interaction_answering_tool <- function(answers) {
+  force(answers)
+  tools_interactive(callback = function(questions, context) answers)[[1]]
+}
+
+expect_questions_rejected <- function(questions, message) {
+  asked <- FALSE
+  tool <- tools_interactive(callback = function(questions, context) {
+    asked <<- TRUE
+    list()
+  })[[1]]
+  condition <- rlang::catch_cnd(tool(questions), "error")
+  expect_s3_class(condition, "ellmer_tool_reject")
+  expect_match(conditionMessage(condition), message, fixed = TRUE)
+  expect_false(asked)
+}
+
+expect_answers_rejected <- function(answers, message) {
+  condition <- rlang::catch_cnd(
+    interaction_answering_tool(answers)(interaction_shape_questions()),
+    "error"
+  )
+  expect_s3_class(condition, "ellmer_tool_reject")
+  expect_match(
+    conditionMessage(condition),
+    "Failed to get user input: ",
+    fixed = TRUE
+  )
+  expect_match(conditionMessage(condition), message, fixed = TRUE)
+}
+
+# The content of each tool result the model was sent in one recorded request.
+sent_tool_results <- function(server, request) {
+  messages <- server$requests()[[request]]$body$messages
+  results <- Filter(function(message) identical(message$role, "tool"), messages)
+  vapply(results, function(message) message$content, character(1))
+}
+
 test_that("tool_ask_user has correct structure", {
   expect_true(inherits(tool_ask_user, "ellmer::ToolDef"))
 
@@ -21,6 +106,27 @@ test_that("tool_ask_user has correct structure", {
   annotations <- tool_ask_user@annotations
   expect_true(annotations$read_only_hint)
   expect_false(annotations$destructive_hint)
+})
+
+test_that("ask_user declares a typed questions array and receives it as sent", {
+  questions <- tool_ask_user@arguments@properties$questions
+  question <- questions@items
+  option <- question@properties$options@items
+
+  expect_false(tool_ask_user@convert)
+  expect_true(S7::S7_inherits(questions, ellmer::TypeArray))
+  expect_true(S7::S7_inherits(question, ellmer::TypeObject))
+  expect_named(
+    question@properties,
+    c("question", "header", "options", "multiSelect")
+  )
+  expect_true(S7::S7_inherits(question@properties$question, ellmer::TypeBasic))
+  expect_identical(question@properties$question@type, "string")
+  expect_identical(question@properties$header@type, "string")
+  expect_identical(question@properties$multiSelect@type, "boolean")
+  expect_false(question@properties$multiSelect@required)
+  expect_true(question@properties$header@required)
+  expect_named(option@properties, c("label", "description"))
 })
 
 test_that("tools_interactive returns tool list", {
@@ -69,8 +175,8 @@ test_that("tools_interactive isolates handlers and routing context", {
 
   expect_s3_class(agent_a, "Agent")
   expect_s3_class(agent_b, "Agent")
-  expect_identical(result_a$answers[["Which format?"]], "agent-a")
-  expect_identical(result_b$answers[["Which format?"]], "agent-b")
+  expect_identical(interaction_answer(result_a)$other_text, "agent-a")
+  expect_identical(interaction_answer(result_b)$other_text, "agent-b")
   expect_identical(seen[["agent-a"]]$session_id, "session-a")
   expect_identical(seen[["agent-b"]]$session_id, "session-b")
 })
@@ -89,7 +195,7 @@ test_that("per-tool handler takes precedence over the legacy global fallback", {
   )[[1]]
   result <- tool(interaction_test_questions())
 
-  expect_identical(result$answers[["Which format?"]], "instance")
+  expect_identical(interaction_answer(result)$other_text, "instance")
 })
 
 test_that("tools_interactive resolves dynamic context for each request", {
@@ -107,8 +213,8 @@ test_that("tools_interactive resolves dynamic context for each request", {
   current_run <- "run-two"
   second <- tool(interaction_test_questions())
 
-  expect_identical(first$answers[["Which format?"]], "run-one")
-  expect_identical(second$answers[["Which format?"]], "run-two")
+  expect_identical(interaction_answer(first)$other_text, "run-one")
+  expect_identical(interaction_answer(second)$other_text, "run-two")
   expect_identical(seen, c("run-one", "run-two"))
 })
 
@@ -257,174 +363,299 @@ test_that("ask_user_impl reports missing non-interactive handler", {
   expect_match(conditionMessage(condition), "handler", fixed = TRUE)
 })
 
-test_that("tool_ask_user works with callback", {
-  # Set up callback that returns answers in the expected format
+test_that("tool_ask_user answers through the process-wide callback", {
+  captured <- NULL
   set_ask_user_callback(function(questions) {
-    answers <- list()
-    for (q in questions) {
-      answers[[q$question]] <- "Selected option"
-    }
-    answers
+    captured <<- questions
+    list("Which format?" = "YAML")
   })
   withr::defer(set_ask_user_callback(NULL))
 
-  # Create questions in the new format
-  test_questions <- list(
+  questions <- interaction_test_questions()
+  questions[[1]]$multiSelect <- NULL
+  result <- tool_ask_user(questions)
+
+  # The handler receives every field, with multiSelect filled in.
+  expect_identical(captured, interaction_test_questions())
+  expect_identical(
+    interaction_model_view(result),
     list(
-      question = "What do you prefer?",
-      header = "Preference",
-      options = list(
-        list(label = "Option A", description = "First option"),
-        list(label = "Option B", description = "Second option")
-      ),
-      multiSelect = FALSE
+      questions = list(list(
+        question = "Which format?",
+        header = "Format",
+        options = list(
+          list(label = "JSON", description = "Structured JSON"),
+          list(label = "YAML", description = "Readable YAML")
+        ),
+        multiSelect = FALSE
+      )),
+      answers = list(list(
+        question = "Which format?",
+        selected = list("YAML"),
+        other_text = NULL
+      ))
     )
   )
-
-  # Tools are directly callable (inherit from function)
-  result <- tool_ask_user(test_questions)
-
-  # Result should have questions and answers
-  expect_true(is.list(result))
-  expect_true("questions" %in% names(result))
-  expect_true("answers" %in% names(result))
-  expect_equal(result$answers[["What do you prefer?"]], "Selected option")
 })
 
-test_that("tool_ask_user validates questions array", {
-  set_ask_user_callback(function(questions) list())
+test_that("the process-wide callback's answers are checked like any handler's", {
+  set_ask_user_callback(function(questions) list("Which format" = "JSON"))
   withr::defer(set_ask_user_callback(NULL))
 
-  # Empty questions should be rejected
-  expect_error(
-    tool_ask_user(list()),
-    "non-empty array"
+  condition <- rlang::catch_cnd(tool_ask_user(interaction_test_questions()))
+
+  expect_s3_class(condition, "ellmer_tool_reject")
+  expect_match(
+    conditionMessage(condition),
+    "answered \"Which format\", which isn't one of the questions asked",
+    fixed = TRUE
+  )
+})
+
+test_that("tool_ask_user validates the questions array", {
+  expect_questions_rejected(list(), "questions must be a non-empty array")
+  expect_questions_rejected(
+    42,
+    "questions must be an array of 1 to 4 question objects"
+  )
+  expect_questions_rejected(
+    TRUE,
+    "questions must be an array of 1 to 4 question objects"
+  )
+  expect_questions_rejected(
+    interaction_test_questions()[[1]],
+    "put a single question inside an array"
   )
 
-  # Too many questions should be rejected (max 4)
   too_many <- lapply(1:5, function(i) {
-    list(
-      question = paste("Question", i),
-      header = paste0("Q", i),
-      options = list(
-        list(label = "A", description = "Option A"),
-        list(label = "B", description = "Option B")
-      )
-    )
+    question <- interaction_test_questions()[[1]]
+    question$question <- paste("Question", i)
+    question
   })
-  expect_error(
-    tool_ask_user(too_many),
-    "Maximum 4 questions"
+  expect_questions_rejected(
+    too_many,
+    "Maximum 4 questions allowed per call; got 5."
+  )
+  expect_questions_rejected(
+    list("Which format?"),
+    "Question 1 must be an object with 'question', 'header' and 'options'."
   )
 })
 
-test_that("tool_ask_user validates question structure", {
-  set_ask_user_callback(function(questions) list())
-  withr::defer(set_ask_user_callback(NULL))
-
-  # Missing question field
-  expect_error(
-    tool_ask_user(list(list(
-      header = "H",
-      options = list(
-        list(label = "A", description = "A"),
-        list(label = "B", description = "B")
-      )
-    ))),
-    "missing 'question'"
+test_that("tool_ask_user requires each text field to be one non-empty string", {
+  expect_questions_rejected(
+    interaction_question_with(question = NULL),
+    "Question 1 is missing 'question'."
   )
-
-  # Missing header field
-  expect_error(
-    tool_ask_user(list(list(
-      question = "Q?",
-      options = list(
-        list(label = "A", description = "A"),
-        list(label = "B", description = "B")
-      )
-    ))),
-    "missing 'header'"
+  expect_questions_rejected(
+    interaction_question_with(header = NULL),
+    "Question 1 is missing 'header'."
   )
-
-  # Header too long (max 12 chars)
-  expect_error(
-    tool_ask_user(list(list(
-      question = "Q?",
-      header = "This header is way too long",
-      options = list(
-        list(label = "A", description = "A"),
-        list(label = "B", description = "B")
-      )
-    ))),
-    "exceeds 12 characters"
-  )
-
-  # Missing options
-  expect_error(
-    tool_ask_user(list(list(question = "Q?", header = "H"))),
-    "missing 'options'"
+  for (bad in list(NA_character_, "", "  ", c("A?", "B?"), 1, list("A?"))) {
+    expect_questions_rejected(
+      interaction_question_with(question = bad),
+      "Question 1 'question' must be one non-empty string."
+    )
+  }
+  # An empty header once failed outside the tool's own checks.
+  for (bad in list(character(0), NA_character_, TRUE)) {
+    expect_questions_rejected(
+      interaction_question_with(header = bad),
+      "Question 1 'header' must be one non-empty string."
+    )
+  }
+  expect_questions_rejected(
+    interaction_question_with(header = "This header is way too long"),
+    "Question 1 'header' has 27 characters; use at most 12."
   )
 })
 
-test_that("tool_ask_user validates options count", {
-  set_ask_user_callback(function(questions) list())
-  withr::defer(set_ask_user_callback(NULL))
+test_that("tool_ask_user reads fields by their exact names", {
+  question <- interaction_test_questions()[[1]]
+  names(question)[names(question) == "question"] <- "questionText"
 
-  # Too few options (need at least 2)
-  expect_error(
-    tool_ask_user(list(list(
-      question = "Q?",
-      header = "H",
-      options = list(list(label = "A", description = "A"))
-    ))),
-    "must have 2-4 options"
-  )
-
-  # Too many options (max 4)
-  expect_error(
-    tool_ask_user(list(list(
-      question = "Q?",
-      header = "H",
-      options = list(
-        list(label = "A", description = "A"),
-        list(label = "B", description = "B"),
-        list(label = "C", description = "C"),
-        list(label = "D", description = "D"),
-        list(label = "E", description = "E")
-      )
-    ))),
-    "must have 2-4 options"
+  expect_questions_rejected(
+    list(question),
+    "Question 1 is missing 'question'."
   )
 })
 
-test_that("tool_ask_user validates option structure", {
-  set_ask_user_callback(function(questions) list())
-  withr::defer(set_ask_user_callback(NULL))
+test_that("tool_ask_user validates the options of each question", {
+  options <- interaction_test_questions()[[1]]$options
+  expect_questions_rejected(
+    interaction_question_with(options = NULL),
+    "Question 1 is missing 'options'."
+  )
+  expect_questions_rejected(
+    interaction_question_with(options = "JSON"),
+    "Question 1 'options' must be an array of 2-4 options."
+  )
+  expect_questions_rejected(
+    interaction_question_with(
+      options = list(first = options[[1]], second = options[[2]])
+    ),
+    "Question 1 'options' must be an array of 2-4 options."
+  )
+  expect_questions_rejected(
+    interaction_question_with(options = options[1]),
+    "Question 1 must have 2-4 options; got 1."
+  )
+  expect_questions_rejected(
+    interaction_question_with(options = rep(options, 3)),
+    "Question 1 must have 2-4 options; got 6."
+  )
+  expect_questions_rejected(
+    interaction_question_with(options = list("JSON", "YAML")),
+    "Question 1 option 1 must be an object with 'label' and 'description'."
+  )
+  expect_questions_rejected(
+    interaction_question_with(
+      options = list(list(description = "A"), options[[2]])
+    ),
+    "Question 1 option 1 is missing 'label'."
+  )
+  expect_questions_rejected(
+    interaction_question_with(options = list(options[[1]], list(label = "B"))),
+    "Question 1 option 2 is missing 'description'."
+  )
+  expect_questions_rejected(
+    interaction_question_with(
+      options = list(options[[1]], list(label = NA, description = "B"))
+    ),
+    "Question 1 option 2 'label' must be one non-empty string."
+  )
+  expect_questions_rejected(
+    interaction_question_with(
+      options = list(options[[1]], list(label = "B", description = ""))
+    ),
+    "Question 1 option 2 'description' must be one non-empty string."
+  )
+})
 
-  # Option missing label
-  expect_error(
-    tool_ask_user(list(list(
-      question = "Q?",
-      header = "H",
+test_that("tool_ask_user rejects repeated option labels and questions", {
+  expect_questions_rejected(
+    interaction_question_with(
       options = list(
-        list(description = "A"),
-        list(label = "B", description = "B")
+        list(label = "JSON", description = "One"),
+        list(label = "JSON", description = "Two")
       )
-    ))),
-    "must have 'label' and 'description'"
+    ),
+    "Question 1 has the option label \"JSON\" more than once"
+  )
+  expect_questions_rejected(
+    c(interaction_test_questions(), interaction_test_questions()),
+    "Each question must be different; \"Which format?\" is asked more than once."
+  )
+})
+
+test_that("tool_ask_user requires multiSelect to be true or false", {
+  for (bad in list("yes", NA, c(TRUE, FALSE), 1)) {
+    expect_questions_rejected(
+      interaction_question_with(multiSelect = bad),
+      "Question 1 'multiSelect' must be true or false."
+    )
+  }
+})
+
+test_that("answers keep labels apart and pass the person's own text", {
+  tool <- interaction_answering_tool(list(
+    "Which outputs?" = c("Text", "Tables, charts", "Maps"),
+    "Which format?" = c("YAML", "")
+  ))
+
+  result <- tool(interaction_shape_questions())
+  view <- interaction_model_view(result)
+
+  expect_identical(
+    view$answers,
+    list(
+      list(
+        question = "Which outputs?",
+        selected = list("Tables, charts", "Text"),
+        other_text = "Maps"
+      ),
+      list(
+        question = "Which format?",
+        selected = list("YAML"),
+        other_text = NULL
+      ),
+      list(question = "Anything else?", selected = list(), other_text = NULL)
+    )
+  )
+  expect_length(view$questions, 3L)
+  # One label is still an array, and an empty other_text is null.
+  expect_match(
+    result,
+    "\"selected\":[\"YAML\"],\"other_text\":null",
+    fixed = TRUE
+  )
+  expect_match(result, "\"selected\":[],\"other_text\":null", fixed = TRUE)
+})
+
+test_that("the person's own text can take the place of a single label", {
+  result <- interaction_answering_tool(list("Which format?" = "TOML"))(
+    interaction_shape_questions()
   )
 
-  # Option missing description
-  expect_error(
-    tool_ask_user(list(list(
-      question = "Q?",
-      header = "H",
-      options = list(
-        list(label = "A"),
-        list(label = "B", description = "B")
-      )
-    ))),
-    "must have 'label' and 'description'"
+  expect_identical(
+    interaction_answer(result, 2L),
+    list(question = "Which format?", selected = list(), other_text = "TOML")
+  )
+})
+
+test_that("labels joined into one string reach the model as typed text", {
+  result <- interaction_answering_tool(list(
+    "Which outputs?" = "Text, Slides"
+  ))(interaction_shape_questions())
+
+  expect_identical(
+    interaction_answer(result, 1L),
+    list(
+      question = "Which outputs?",
+      selected = list(),
+      other_text = "Text, Slides"
+    )
+  )
+})
+
+test_that("handler answers in the wrong shape become tool rejections", {
+  expect_answers_rejected(
+    c("Which format?" = "JSON"),
+    "The handler must return a named list"
+  )
+  expect_answers_rejected(
+    list("JSON"),
+    "The handler must name each answer with its question's text."
+  )
+  expect_answers_rejected(
+    list("Which format" = "JSON"),
+    "The handler answered \"Which format\", which isn't one of the questions asked."
+  )
+  expect_answers_rejected(
+    list("Which format?" = "JSON", "Which format?" = "YAML"),
+    "The handler answered \"Which format?\" more than once."
+  )
+  for (bad in list(1, NULL, list("JSON"), factor("JSON"))) {
+    expect_answers_rejected(
+      list("Which format?" = bad),
+      "The handler's answer to \"Which format?\" must be a character vector"
+    )
+  }
+  expect_answers_rejected(
+    list("Which format?" = NA_character_),
+    "The handler's answer to \"Which format?\" contains NA."
+  )
+  expect_answers_rejected(
+    list("Which outputs?" = c("Text", "Maps", "Graphs")),
+    "The handler gave 2 answers to \"Which outputs?\" that aren't option labels"
+  )
+  expect_answers_rejected(
+    list("Which format?" = c("JSON", "YAML")),
+    "\"Which format?\" takes one answer, but the handler gave 2."
+  )
+  expect_answers_rejected(
+    list("Which format?" = c("JSON", "my own")),
+    "\"Which format?\" takes one answer, but the handler gave 2."
   )
 })
 
@@ -435,82 +666,80 @@ test_that("parse_user_response handles single selection", {
   )
 
   # Numeric selection
-  expect_equal(parse_user_response("1", options, FALSE), "JSON")
-  expect_equal(parse_user_response("2", options, FALSE), "YAML")
+  expect_identical(parse_user_response("1", options, FALSE), "JSON")
+  expect_identical(parse_user_response(" 2 ", options, FALSE), "YAML")
 
   # Free text response
-  expect_equal(
+  expect_identical(
     parse_user_response("custom answer", options, FALSE),
     "custom answer"
   )
+  # Two numbers for one choice are asked again.
+  expect_null(parse_user_response("1,2", options, FALSE))
 })
 
-test_that("parse_user_response handles multi-selection", {
+test_that("parse_user_response returns each multi-selected label", {
   options <- list(
-    list(label = "A", description = "Option A"),
+    list(label = "Tables, charts", description = "Option A"),
     list(label = "B", description = "Option B"),
     list(label = "C", description = "Option C")
   )
 
-  # Multiple numeric selections
-  expect_equal(parse_user_response("1,2", options, TRUE), "A, B")
-  expect_equal(parse_user_response("1, 3", options, TRUE), "A, C")
+  expect_identical(
+    parse_user_response("1,2", options, TRUE),
+    c("Tables, charts", "B")
+  )
+  expect_identical(
+    parse_user_response("3, 1", options, TRUE),
+    c("C", "Tables, charts")
+  )
+  expect_identical(parse_user_response("2,2", options, TRUE), "B")
+  expect_identical(parse_user_response("2", options, TRUE), "B")
 
   # Free text still works
-  expect_equal(parse_user_response("all of them", options, TRUE), "all of them")
-})
-
-# JSON string input tests (critical for LLM integration)
-test_that("tool_ask_user handles valid JSON string input", {
-  set_ask_user_callback(function(questions) {
-    list("What format?" = "JSON")
-  })
-  withr::defer(set_ask_user_callback(NULL))
-
-  json_input <- '[{"question": "What format?", "header": "Format", "options": [{"label": "JSON", "description": "JS Object Notation"}, {"label": "YAML", "description": "YAML format"}]}]'
-
-  result <- tool_ask_user(json_input)
-  expect_equal(result$answers[["What format?"]], "JSON")
-  expect_true("questions" %in% names(result))
-})
-
-test_that("tool_ask_user rejects malformed JSON", {
-  set_ask_user_callback(function(questions) list())
-  withr::defer(set_ask_user_callback(NULL))
-
-  expect_error(
-    tool_ask_user("{ invalid json }"),
-    "Failed to parse questions JSON"
+  expect_identical(
+    parse_user_response("all of them", options, TRUE),
+    "all of them"
   )
+  expect_identical(parse_user_response("1 and 2", options, TRUE), "1 and 2")
 })
 
-test_that("tool_ask_user reads questions from JSON text, never a path or URL", {
+test_that("tool_ask_user rejects a string, including a path or URL, unread", {
   asked <- FALSE
   set_ask_user_callback(function(questions) {
     asked <<- TRUE
-    list("What format?" = "JSON")
+    list("Which format?" = "JSON")
   })
   withr::defer(set_ask_user_callback(NULL))
+  json <- as.character(jsonlite::toJSON(
+    interaction_test_questions(),
+    auto_unbox = TRUE
+  ))
   saved <- withr::local_tempfile(fileext = ".json")
-  writeLines(
-    '[{"question": "What format?", "header": "Format", "options": [{"label": "JSON", "description": "J"}, {"label": "YAML", "description": "Y"}]}]',
-    saved
+  writeLines(json, saved)
+  texts <- list(
+    json,
+    "[]",
+    "{ invalid json }",
+    saved,
+    "http://127.0.0.1:9/questions.json",
+    NA_character_,
+    c(json, json)
   )
 
-  for (text in c(saved, "http://127.0.0.1:9/questions.json")) {
-    expect_error(tool_ask_user(text), "Failed to parse questions JSON: lexical")
+  for (text in texts) {
+    condition <- rlang::catch_cnd(tool_ask_user(text), "error")
+    expect_s3_class(condition, "ellmer_tool_reject")
+    expect_match(
+      conditionMessage(condition),
+      paste(
+        "questions must be an array of question objects, not a string;",
+        "send the array itself rather than JSON text."
+      ),
+      fixed = TRUE
+    )
   }
   expect_false(asked)
-})
-
-test_that("tool_ask_user rejects empty JSON array", {
-  set_ask_user_callback(function(questions) list())
-  withr::defer(set_ask_user_callback(NULL))
-
-  expect_error(
-    tool_ask_user("[]"),
-    "non-empty array"
-  )
 })
 
 # Callback error propagation tests
@@ -520,55 +749,36 @@ test_that("tool_ask_user handles callback errors gracefully", {
   })
   withr::defer(set_ask_user_callback(NULL))
 
-  test_questions <- list(list(
-    question = "Q?",
-    header = "H",
-    options = list(
-      list(label = "A", description = "A"),
-      list(label = "B", description = "B")
-    )
-  ))
-
   expect_error(
-    tool_ask_user(test_questions),
+    tool_ask_user(interaction_test_questions()),
     "Failed to get user input.*Callback error"
   )
 })
 
 # Edge case tests for parse_user_response
-test_that("parse_user_response handles out-of-range indices", {
+test_that("parse_user_response asks again for numbers that aren't options", {
   options <- list(
     list(label = "A", description = "Option A"),
     list(label = "B", description = "Option B")
   )
 
-  # Out-of-range falls back to free text
-  expect_equal(parse_user_response("5", options, FALSE), "5")
-  expect_equal(parse_user_response("0", options, FALSE), "0")
-  expect_equal(parse_user_response("-1", options, FALSE), "-1")
-})
-
-test_that("parse_user_response handles mixed valid/invalid multi-select", {
-  options <- list(
-    list(label = "A", description = "Option A"),
-    list(label = "B", description = "Option B")
-  )
-
-  # "1,5" - 5 is invalid, only valid indices are used
-  expect_equal(parse_user_response("1,5", options, TRUE), "A")
-
-  # All invalid falls back to free text
-  expect_equal(parse_user_response("5,6", options, TRUE), "5,6")
+  for (response in c("5", "0", "-1", "1.5", "+1", "1,2")) {
+    expect_null(parse_user_response(response, options, FALSE))
+  }
+  # Nothing is dropped or truncated from a multi-select answer.
+  for (response in c("1,5", "1,9", "5,6", "1.5", "1,,2", "1, 2.0", "1 2")) {
+    expect_null(parse_user_response(response, options, TRUE))
+  }
 })
 
 # Multiple questions workflow test
-test_that("tool_ask_user handles multiple questions", {
+test_that("tool_ask_user answers every question in order", {
   captured <- NULL
   set_ask_user_callback(function(questions) {
     captured <<- questions
     list(
-      "First question?" = "Option A",
-      "Second question?" = "Option X"
+      "Second question?" = "Option X",
+      "First question?" = "Option A"
     )
   })
   withr::defer(set_ask_user_callback(NULL))
@@ -593,16 +803,116 @@ test_that("tool_ask_user handles multiple questions", {
   )
 
   result <- tool_ask_user(questions)
+  view <- interaction_model_view(result)
 
-  # Verify callback received both questions
   expect_equal(length(captured), 2)
+  expect_identical(
+    vapply(view$answers, function(answer) answer$question, character(1)),
+    c("First question?", "Second question?")
+  )
+  expect_identical(view$answers[[1]]$selected, list("Option A"))
+  expect_identical(view$answers[[2]]$selected, list("Option X"))
+  expect_equal(length(view$questions), 2)
+})
 
-  # Verify both answers are in result
-  expect_equal(result$answers[["First question?"]], "Option A")
-  expect_equal(result$answers[["Second question?"]], "Option X")
+test_that("the model receives typed answers through an Agent", {
+  questions <- interaction_shape_questions()
+  server <- local_runtime_server(list(
+    runtime_tool_calls_reply(list(
+      list(
+        id = "call_shapes",
+        name = "ask_user",
+        arguments = list(questions = questions)
+      ),
+      list(
+        id = "call_format",
+        name = "ask_user",
+        arguments = list(questions = interaction_test_questions())
+      )
+    )),
+    runtime_reply("done")
+  ))
+  seen <- list()
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = tools_interactive(function(questions, context) {
+      seen[[length(seen) + 1L]] <<- questions
+      if (length(questions) == 1L) {
+        return(list("Which format?" = "JSON"))
+      }
+      list("Which outputs?" = c("Tables, charts", "Slides", "Maps"))
+    })
+  )
 
-  # Verify questions are echoed back
-  expect_equal(length(result$questions), 2)
+  result <- agent$run_sync("Ask me")
+
+  expect_identical(trimws(result$response), "done")
+  # Provider arrays arrive as lists, with multiSelect filled in.
+  expect_identical(seen[[1]], questions)
+  expect_identical(seen[[2]], interaction_test_questions())
+  sent <- sent_tool_results(server, 2L)
+  expect_length(sent, 2L)
+  expect_identical(
+    jsonlite::parse_json(sent[[1]])$answers,
+    list(
+      list(
+        question = "Which outputs?",
+        selected = list("Tables, charts", "Slides"),
+        other_text = "Maps"
+      ),
+      list(question = "Which format?", selected = list(), other_text = NULL),
+      list(question = "Anything else?", selected = list(), other_text = NULL)
+    )
+  )
+  expect_match(
+    sent[[2]],
+    "\"answers\":[{\"question\":\"Which format?\",\"selected\":[\"JSON\"],\"other_text\":null}]",
+    fixed = TRUE
+  )
+})
+
+test_that("a model that sends invalid questions is told what to fix", {
+  text <- as.character(jsonlite::toJSON(
+    interaction_test_questions(),
+    auto_unbox = TRUE
+  ))
+  server <- local_runtime_server(list(
+    runtime_tool_calls_reply(list(
+      list(
+        id = "call_text",
+        name = "ask_user",
+        arguments = list(questions = text)
+      ),
+      list(
+        id = "call_header",
+        name = "ask_user",
+        arguments = list(questions = interaction_question_with(header = ""))
+      )
+    )),
+    runtime_reply("done")
+  ))
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = tools_interactive(function(questions, context) {
+      stop("The handler must not run")
+    })
+  )
+
+  expect_warning(agent$run_sync("Ask me"), "Failed to evaluate")
+
+  sent <- sent_tool_results(server, 2L)
+  expect_length(sent, 2L)
+  expect_match(
+    sent[[1]],
+    "questions must be an array of question objects, not a string;",
+    fixed = TRUE
+  )
+  expect_match(
+    sent[[2]],
+    "Question 1 'header' must be one non-empty string.",
+    fixed = TRUE
+  )
+  expect_no_match(paste(sent, collapse = "\n"), "must not run", fixed = TRUE)
 })
 
 test_that("AskUserDeferred is a read-only value with default instructions", {
@@ -656,16 +966,42 @@ test_that("a promise handler resolves to structured answers", {
     }
   )[[1]]
 
-  result <- NULL
-  promises::then(tool(interaction_test_questions()), function(value) {
-    result <<- value
+  result <- resolve_async_value(tool(interaction_test_questions()))
+
+  expect_identical(
+    interaction_model_view(result),
+    list(
+      questions = interaction_test_questions(),
+      answers = list(list(
+        question = "Which format?",
+        selected = list("YAML"),
+        other_text = NULL
+      ))
+    )
+  )
+})
+
+test_that("a promise for answers in the wrong shape becomes a tool rejection", {
+  tool <- tools_interactive(
+    callback = function(questions, context) {
+      promises::promise_resolve(list("Which format?" = 2))
+    }
+  )[[1]]
+
+  failure <- NULL
+  promises::catch(tool(interaction_test_questions()), function(e) {
+    failure <<- e
   })
-  while (is.null(result)) {
+  while (is.null(failure)) {
     later::run_now(0.01)
   }
 
-  expect_identical(result$answers[["Which format?"]], "YAML")
-  expect_identical(result$questions, interaction_test_questions())
+  expect_s3_class(failure, "ellmer_tool_reject")
+  expect_match(
+    conditionMessage(failure),
+    "Failed to get user input: The handler's answer to \"Which format?\" must be a character vector",
+    fixed = TRUE
+  )
 })
 
 test_that("a rejected promise handler becomes a tool rejection", {
@@ -700,26 +1036,115 @@ test_that("delegated handlers cannot defer answers to a later turn", {
     tool(interaction_test_questions()),
     class = "deputy_human_input_unavailable"
   )
-})
-
-test_that("delegated ask_user results serialize after a promise resolves", {
-  answers <- list(
-    questions = interaction_test_questions(),
-    answers = list(`Which format?` = "JSON")
+  failure <- NULL
+  promised <- new_ask_user_tool(
+    callback = function(questions, context) {
+      promises::promise_resolve(AskUserDeferred())
+    },
+    allow_deferred = FALSE
   )
-  expect_match(
-    delegated_ask_user_json(answers),
-    "\"Which format?\":\"JSON\"",
-    fixed = TRUE
-  )
-
-  json <- NULL
-  promises::then(
-    delegated_ask_user_json(promises::promise_resolve(answers)),
-    function(value) json <<- value
-  )
-  while (is.null(json)) {
+  promises::catch(promised(interaction_test_questions()), function(e) {
+    failure <<- e
+  })
+  while (is.null(failure)) {
     later::run_now(0.01)
   }
-  expect_match(json, "\"Which format?\":\"JSON\"", fixed = TRUE)
+  expect_s3_class(failure, "deputy_human_input_unavailable")
+})
+
+test_that("a subagent's model receives typed answers from human_input", {
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "ask_user",
+      arguments = list(questions = interaction_shape_questions())
+    ),
+    runtime_reply("done")
+  ))
+  routed <- NULL
+  lead <- LeadAgent$new(
+    runtime_chat(server),
+    sub_agents = list(agent_definition(
+      "a",
+      "A",
+      "worker",
+      tools = tools_interactive(function(...) {
+        stop("stale handler must not run")
+      })
+    )),
+    delegation_policy = DelegationPolicy(human_input = function(
+      questions,
+      context
+    ) {
+      routed <<- questions
+      promises::promise_resolve(list(
+        "Which outputs?" = c("Tables, charts", "Text"),
+        "Which format?" = "my own"
+      ))
+    })
+  )
+
+  suppressMessages(resolve_async_value(
+    lead$get_tools()$delegate_to_agent("a", "Ask the user"),
+    max_polls = 10000L
+  ))
+
+  expect_identical(routed, interaction_shape_questions())
+  sent <- sent_tool_results(server, 2L)
+  expect_identical(
+    jsonlite::parse_json(sent)$answers,
+    list(
+      list(
+        question = "Which outputs?",
+        selected = list("Tables, charts", "Text"),
+        other_text = NULL
+      ),
+      list(
+        question = "Which format?",
+        selected = list(),
+        other_text = "my own"
+      ),
+      list(question = "Anything else?", selected = list(), other_text = NULL)
+    )
+  )
+  expect_match(
+    sent,
+    "\"selected\":[\"Tables, charts\",\"Text\"],\"other_text\":null",
+    fixed = TRUE
+  )
+})
+
+test_that("a subagent's model is told when human_input answers are malformed", {
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "ask_user",
+      arguments = list(questions = interaction_test_questions())
+    ),
+    runtime_reply("done")
+  ))
+  lead <- LeadAgent$new(
+    runtime_chat(server),
+    sub_agents = list(agent_definition(
+      "a",
+      "A",
+      "worker",
+      tools = tools_interactive()
+    )),
+    delegation_policy = DelegationPolicy(
+      human_input = function(questions, context) list(`Which format?` = 1)
+    )
+  )
+
+  expect_warning(
+    suppressMessages(resolve_async_value(
+      lead$get_tools()$delegate_to_agent("a", "Ask the user"),
+      max_polls = 10000L
+    )),
+    "Failed to evaluate"
+  )
+
+  expect_match(
+    sent_tool_results(server, 2L),
+    "Failed to get user input: The handler's answer to \"Which format?\" must be a character vector, not numeric.",
+    fixed = TRUE
+  )
 })

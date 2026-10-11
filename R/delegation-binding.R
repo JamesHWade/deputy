@@ -27,8 +27,9 @@ NULL
 #' @param human_input Optional `function(questions, context)` that answers
 #'   `ask_user` questions from subagents whose definition includes that tool.
 #'   `context` holds the subagent's IDs, the lead's `delegation_scope` and the
-#'   run context. Return the answers or a promise of them; [AskUserDeferred()]
-#'   isn't supported. Without it, delegating to a definition with `ask_user`
+#'   run context. Return the answers, in the form described for
+#'   [tools_interactive()], or a promise of them; [AskUserDeferred()] isn't
+#'   supported. Without it, delegating to a definition with `ask_user`
 #'   fails. Subagents never use [set_ask_user_callback()].
 #' @param observers Extra hook events for which the lead's hooks also run when
 #'   a subagent fires them. The lead's `PreToolUse`, `PostToolUse` and
@@ -448,6 +449,8 @@ bind_delegation_host <- function(
         "Delegated human input requires DelegationPolicy(human_input = ...)."
       )
     }
+    # The same tool as tools_interactive(): it validates questions and
+    # answers and returns JSON, but its handler may not defer.
     interactive_tool <- new_ask_user_tool(
       policy$human_input,
       context = function() {
@@ -455,18 +458,7 @@ bind_delegation_host <- function(
       },
       allow_deferred = FALSE
     )
-    child$register_tool(
-      mark_native_tool(ellmer::tool(
-        function(questions) {
-          delegated_ask_user_json(interactive_tool(questions))
-        },
-        name = interactive_tool@name,
-        description = interactive_tool@description,
-        arguments = interactive_tool@arguments@properties,
-        annotations = interactive_tool@annotations
-      )),
-      replace = TRUE
-    )
+    child$register_tool(interactive_tool, replace = TRUE)
     binding$manifest$human_input <- "host-bound"
   }
   if (stateless && length(child$get_tools())) {
@@ -507,12 +499,3 @@ local({
   S7::method(`$`, DelegationPolicy) <- function(x, name) S7::prop(x, name)
   S7::method(`$`, DelegationResources) <- function(x, name) S7::prop(x, name)
 })
-
-# A delegated handler may answer now or through a promise; either way the child
-# receives the answers as JSON within its current run.
-delegated_ask_user_json <- function(result) {
-  if (promises::is.promising(result)) {
-    return(promises::then(result, delegated_ask_user_json))
-  }
-  jsonlite::toJSON(result, auto_unbox = TRUE, null = "null")
-}

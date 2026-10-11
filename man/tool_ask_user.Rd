@@ -10,15 +10,23 @@ A tool definition created with \code{ellmer::tool()}.
 tool_ask_user(questions)
 }
 \arguments{
-\item{questions}{A JSON string or list of 1 to 4 questions. Each has
-\code{question} (the full text), \code{header} (a label of at most 12 characters),
-\code{options} (2 to 4, each with \code{label} and \code{description}) and, optionally,
-\code{multiSelect}.}
+\item{questions}{A list of 1 to 4 questions. Each has \code{question} (the full
+text), \code{header} (a label of at most 12 characters), \code{options} (2 to 4,
+each with \code{label} and \code{description}) and, optionally, \code{multiSelect}
+(\code{TRUE} to allow several options). Every text is a non-empty string, no
+two questions have the same text, and no two options of a question have
+the same label. Questions that break these rules, or that arrive as a
+string such as JSON text, are sent back to the model to fix.}
 }
 \value{
-A list with the \code{questions} and a named \code{answers} list that maps
-each question's text to the chosen label. Several labels are joined with
-\code{", "}, and a person can also type their own answer.
+JSON text, which is what the model reads. It holds the \code{questions}
+and an \code{answers} array with one entry per question, in the same order:
+\code{question}, \code{selected} (an array of the chosen option labels, empty if
+none was chosen) and \code{other_text} (the answer the person typed instead
+of, or for a multi-select question as well as, choosing options; \code{null}
+if none). Read it in R with \code{jsonlite::parse_json()}. If the handler
+returns \code{\link[=AskUserDeferred]{AskUserDeferred()}}, the result is instead a list with the
+\code{questions}, \code{status} \code{"deferred"} and \code{instructions} for the model.
 }
 \description{
 A tool that lets the model ask the user one to four multiple-choice
@@ -30,6 +38,10 @@ there is one, and otherwise with \code{readline()} in an interactive session.
 With neither, the call errors. In a Shiny app, or anywhere several agents
 share one R process, use \code{\link[=tools_interactive]{tools_interactive()}} to give each agent its own
 handler.
+
+At the \code{readline()} prompt, the person enters an option number, several
+numbers separated by commas for a multi-select question, or their own
+answer. A number that doesn't match an option asks again.
 }
 \examples{
 \dontrun{

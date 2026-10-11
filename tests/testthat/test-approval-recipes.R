@@ -9,7 +9,7 @@ load_approval_recipes <- function() {
 
 test_that("approval recipe fails closed through Agent hooks", {
   recipes <- load_approval_recipes()
-  for (answer in list("Approve", "Deny", NULL, "approve")) {
+  for (answer in list("Approve", "Deny", character(), "approve", NULL)) {
     seen <- NULL
     handler <- function(questions, context) {
       seen <<- list(questions = questions, context = context)
@@ -22,7 +22,15 @@ test_that("approval recipe fails closed through Agent hooks", {
       permissions = permissions_full()
     )
     agent$add_hook(recipes$approval_gate(handler))
-    agent$run_sync("Write a report")
+    if (is.null(answer)) {
+      # A malformed answer is a handler error, which denies the call.
+      expect_message(
+        agent$run_sync("Write a report"),
+        "must be a character vector, not NULL"
+      )
+    } else {
+      agent$run_sync("Write a report")
+    }
     expect_identical(mock$state$executed, identical(answer, "Approve"))
     expect_match(seen$questions[[1]]$question, "report.txt", fixed = TRUE)
     expect_type(seen$context$run_id, "character")

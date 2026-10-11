@@ -37,8 +37,9 @@ anything it created. Definitions with \code{mcp_servers} need this mode.}
 \item{human_input}{Optional \verb{function(questions, context)} that answers
 \code{ask_user} questions from subagents whose definition includes that tool.
 \code{context} holds the subagent's IDs, the lead's \code{delegation_scope} and the
-run context. Return the answers or a promise of them; \code{\link[=AskUserDeferred]{AskUserDeferred()}}
-isn't supported. Without it, delegating to a definition with \code{ask_user}
+run context. Return the answers, in the form described for
+\code{\link[=tools_interactive]{tools_interactive()}}, or a promise of them; \code{\link[=AskUserDeferred]{AskUserDeferred()}} isn't
+supported. Without it, delegating to a definition with \code{ask_user}
 fails. Subagents never use \code{\link[=set_ask_user_callback]{set_ask_user_callback()}}.}
 
 \item{observers}{Extra hook events for which the lead's hooks also run when
