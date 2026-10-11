@@ -2589,28 +2589,11 @@ Agent <- R6::R6Class(
         } else {
           AgentUsage()
         }
-        usage_fields <- c(
-          max_requests = "requests",
-          max_tool_calls = "tool_calls",
-          max_input_tokens = "input_tokens",
-          max_output_tokens = "output_tokens",
-          max_total_tokens = "total_tokens",
-          max_cost_usd = "cost_usd"
+        remaining <- usage_limits_remaining(
+          limits,
+          current,
+          private$reserved_delegation_usage()
         )
-        reserved <- private$reserved_delegation_usage()
-        remaining <- lapply(names(usage_fields), function(limit_field) {
-          limit <- S7::prop(limits, limit_field)
-          if (is.null(limit)) {
-            return(NULL)
-          }
-          max(
-            0,
-            limit -
-              S7::prop(current, usage_fields[[limit_field]]) -
-              reserved[[limit_field]]
-          )
-        })
-        names(remaining) <- names(usage_fields)
         if (!is.null(def$max_requests)) {
           remaining$max_requests <- if (is.null(remaining$max_requests)) {
             def$max_requests

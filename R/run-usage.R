@@ -44,8 +44,9 @@ NULL
 #'   still available from `$last_run()`.
 #' @param on_unknown_cost What happens when `max_cost_usd` is set and the cost
 #'   of a response is unknown. `"stop"` (the default) ends the run with
-#'   `"cost_unavailable"`. `"continue"` lets the run go on, and checks the
-#'   limit against the cost that is known ([AgentUsage]'s `known_cost_usd`).
+#'   `"cost_unavailable"`. `"continue"` lets the run go on. The limit is then
+#'   checked against the cost that is known ([AgentUsage]'s `known_cost_usd`),
+#'   and a subagent's budget is what that leaves.
 #'
 #' @return A `UsageLimits` object.
 #' @examples
@@ -522,6 +523,42 @@ usage_limit_fields <- function() {
   )
 }
 
+# The usage each limit is checked against, named by limit. A cost that is
+# unknown is `NA`, unless the limits say to go on without it: then it is the
+# cost that is known, a lower bound.
+usage_against_limits <- function(usage, limits) {
+  cost <- usage$cost_usd
+  if (is.na(cost) && identical(limits$on_unknown_cost, "continue")) {
+    cost <- usage$known_cost_usd
+  }
+  list(
+    max_requests = usage$requests,
+    max_tool_calls = usage$tool_calls,
+    max_input_tokens = usage$input_tokens,
+    max_output_tokens = usage$output_tokens,
+    max_total_tokens = usage$total_tokens,
+    max_cost_usd = cost
+  )
+}
+
+# What is left of each limit after `usage`, less what is `reserved` for
+# others: the budget a subagent or a retained conversation can be given.
+# `NULL` where there is no limit, and `NA` where the cost is unknown and the
+# limits stop on that.
+usage_limits_remaining <- function(limits, usage, reserved = NULL) {
+  used <- usage_against_limits(usage, limits)
+  fields <- usage_limit_fields()
+  remaining <- lapply(fields, function(field) {
+    limit <- S7::prop(limits, field)
+    if (is.null(limit)) {
+      return(NULL)
+    }
+    held <- if (field %in% names(reserved)) reserved[[field]] else 0
+    max(0, limit - used[[field]] - held)
+  })
+  stats::setNames(remaining, fields)
+}
+
 merge_usage_limits <- function(override, defaults) {
   if (!S7::S7_inherits(override, UsageLimits)) {
     cli::cli_abort("{.arg usage_limits} must be created with UsageLimits()")
@@ -743,45 +780,40 @@ preserve_run_usage <- function(agent, usage) {
 }
 
 usage_limit_status <- function(usage, limits, require_followup = FALSE) {
+  used <- usage_against_limits(usage, limits)
   checks <- list(
     list(
       field = "max_requests",
-      actual = usage$requests,
       reason = "request_limit",
       label = "model requests",
       reached = require_followup
     ),
     list(
       field = "max_tool_calls",
-      actual = usage$tool_calls,
       reason = "tool_call_limit",
       label = "tool calls",
       reached = FALSE
     ),
     list(
       field = "max_input_tokens",
-      actual = usage$input_tokens,
       reason = "input_token_limit",
       label = "input tokens",
       reached = require_followup
     ),
     list(
       field = "max_output_tokens",
-      actual = usage$output_tokens,
       reason = "output_token_limit",
       label = "output tokens",
       reached = require_followup
     ),
     list(
       field = "max_total_tokens",
-      actual = usage$total_tokens,
       reason = "total_token_limit",
       label = "total tokens",
       reached = require_followup
     ),
     list(
       field = "max_cost_usd",
-      actual = usage$cost_usd,
       reason = "cost_limit",
       label = "estimated cost",
       reached = require_followup
@@ -793,16 +825,12 @@ usage_limit_status <- function(usage, limits, require_followup = FALSE) {
     if (is.null(limit)) {
       next
     }
+    check$actual <- used[[check$field]]
+    # The cost is still unknown here only when the limits stop on that.
     if (identical(check$field, "max_cost_usd") && is.na(check$actual)) {
-      if (identical(limits$on_unknown_cost, "stop")) {
-        check$reason <- "cost_unavailable"
-        check$label <- "estimated cost"
-        check$limit <- limit
-        return(check)
-      }
-      # The run goes on, so the limit is enforced against the cost that is
-      # known: a lower bound, and the limit can only be reached by it.
-      check$actual <- usage$known_cost_usd
+      check$reason <- "cost_unavailable"
+      check$limit <- limit
+      return(check)
     }
     exceeded <- check$actual > limit ||
       (isTRUE(check$reached) && check$actual >= limit)

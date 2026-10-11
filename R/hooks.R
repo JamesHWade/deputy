@@ -30,10 +30,10 @@ NULL
 #' and is recorded as a hook error; for `PreToolUse` that denies the call.
 #' Deputy does not wait for `Notification` or `ConfigChange` hooks, for a hook
 #' fired by `$compact()`, or for `Stop` and `SessionEnd` when a run ends with
-#' an error, its stream is abandoned, or the run is a delegate batch. With
-#' tools run concurrently, other tool calls of the same response may start or
-#' finish while a hook waits. If `$interrupt()` is called while a hook waits,
-#' the run stops when the promise settles.
+#' an error or its stream is abandoned. With tools run concurrently, other
+#' tool calls of the same response may start or finish while a hook waits. If
+#' `$interrupt()` is called while a hook waits, the run stops when the promise
+#' settles.
 #'
 #' @section Events:
 #'

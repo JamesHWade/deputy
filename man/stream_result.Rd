@@ -18,6 +18,8 @@ and gives a promise of that run's \link{AgentResult}. The promise resolves when
 the run has finished, however it ended: a run that was stopped, hit a limit
 or failed resolves too, and its \code{ending} says which. Draining the stream is
 still what makes the run go; a stream that is never read never resolves.
+The promise is rejected only when there is no result to give: the run could
+not start, as when the agent was already running, or finishing it failed.
 }
 \examples{
 \dontrun{

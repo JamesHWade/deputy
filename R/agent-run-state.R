@@ -20,8 +20,7 @@ initialize_agent_run <- function(
   run_context,
   controller = NULL,
   stream_mode = "content",
-  initial_usage = AgentUsage(),
-  start_hooks = TRUE
+  initial_usage = AgentUsage()
 ) {
   private <- agent$.__enclos_env__$private
   runtime_chat <- private$.chat
@@ -157,14 +156,51 @@ initialize_agent_run <- function(
     )
   }
 
-  if (isTRUE(start_hooks)) {
-    hook_unawaited(fire_session_start(agent, state))
-    state$session_started <- TRUE
-    hook_unawaited(fire_prompt_submit(agent, state, messages))
-    check_initial_run_limits(agent, state)
-  }
-
   invisible(state)
+}
+
+# A stream that fails before its run has an ID leaves no result and nothing
+# to finish. It is no longer waiting to start, and whoever holds the promise
+# of its result is told why.
+refuse_unstarted_run <- function(agent, state, error) {
+  if (!is.null(state$active_run_id) || isTRUE(state$finished)) {
+    return(invisible(NULL))
+  }
+  private <- agent$.__enclos_env__$private
+  state$finished <- TRUE
+  state$start_error <- error
+  if (identical(private$unstarted_run, state)) {
+    private$unstarted_run <- NULL
+  }
+  if (is.function(state$reject_result)) {
+    state$reject_result(error)
+  }
+  invisible(NULL)
+}
+
+# The hooks at a run's start: SessionStart, then UserPromptSubmit, then the
+# check of limits the run has already reached. Returns a promise when a
+# callback returned one, for the run to wait on.
+run_start_hooks <- function(agent, state, messages) {
+  private <- agent$.__enclos_env__$private
+  stopped_before <- isTRUE(private$should_stop)
+  started <- fire_session_start(agent, state)
+  waited <- promises::is.promising(started)
+  hook_then(started, function(value) {
+    state$session_started <- TRUE
+    # A stop that arrived while SessionStart was pending takes effect now:
+    # the prompt is not submitted, and no later hook can hold the stop.
+    stopped_meanwhile <- waited &&
+      !stopped_before &&
+      isTRUE(private$should_stop)
+    submitted <- if (!stopped_meanwhile) {
+      fire_prompt_submit(agent, state, messages)
+    }
+    hook_then(submitted, function(value) {
+      check_initial_run_limits(agent, state)
+      invisible(NULL)
+    })
+  })
 }
 
 # The SessionStart hook for a run. Returns what `fire_hook()` returned: a

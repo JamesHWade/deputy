@@ -142,18 +142,17 @@ lead_parallel_delegate <- function(
       },
       add = TRUE
     )
-    initialize_agent_run(
-      lead,
-      state,
-      lapply(
-        selected$tasks,
-        delegation_task_label,
-        max_bytes = private$delegation_max_bytes
-      ),
-      limits,
-      context,
-      controller
+    labels <- lapply(
+      selected$tasks,
+      delegation_task_label,
+      max_bytes = private$delegation_max_bytes
     )
+    initialize_agent_run(lead, state, labels, limits, context, controller)
+    # No task is admitted until the batch's own start hooks have answered.
+    started <- run_start_hooks(lead, state, labels)
+    if (promises::is.promising(started)) {
+      coro::await(started)
+    }
     count <- length(selected$tasks)
     # Admit every selected task before preparing children. Failed preparation
     # must retain the failing record and unstarted siblings without paid work.
@@ -301,6 +300,16 @@ lead_parallel_delegate <- function(
       state$reason <- "complete"
     }
     completed <- TRUE
+    # The batch waits for its own Stop and SessionEnd hooks, as a streamed run
+    # does. A batch has no answer of its own, so Stop cannot send it on.
+    stopped <- private$stop_in_body(state)
+    if (promises::is.promising(stopped)) {
+      coro::await(stopped)
+    }
+    ended <- private$session_end_in_body(state)
+    if (promises::is.promising(ended)) {
+      coro::await(ended)
+    }
     private$finish_callback_run(state)
     list(
       mode = "stateless",

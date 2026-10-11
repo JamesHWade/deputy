@@ -380,18 +380,22 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
         }
       }
       # settle_run() runs again after a Stop hook, so the warning is guarded.
+      # It reads the cost the limit is checked against.
+      limited_cost <- if (!is.null(limits$max_cost_usd)) {
+        usage_against_limits(usage, limits)$max_cost_usd
+      }
       if (
         is.null(private$last_limit_status) &&
           !isTRUE(state$cost_warned) &&
-          !is.null(limits$max_cost_usd) &&
-          is.finite(usage$cost_usd) &&
-          usage$cost_usd >= limits$max_cost_usd * 0.9
+          !is.null(limited_cost) &&
+          is.finite(limited_cost) &&
+          limited_cost >= limits$max_cost_usd * 0.9
       ) {
         state$cost_warned <- TRUE
         private$notify(
           paste0(
             "Approaching run cost limit: ",
-            format_cost(usage$cost_usd),
+            format_cost(limited_cost),
             " / ",
             format_cost(limits$max_cost_usd)
           ),
@@ -401,7 +405,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           max_cost_usd = limits$max_cost_usd
         )
         cli::cli_warn(
-          "Approaching run cost limit: {format_cost(usage$cost_usd)} / {format_cost(limits$max_cost_usd)}"
+          "Approaching run cost limit: {format_cost(limited_cost)} / {format_cost(limits$max_cost_usd)}"
         )
       }
       invisible(NULL)
@@ -446,6 +450,35 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
         context$stop_hook_active <- isTRUE(state$stop_hook_active)
       }
       private$fire_hook(event, reason = state$reason, context = context)
+    },
+
+    # Stop, fired from the body of a run, where the run can wait for the
+    # answer. Returns the hook's answer, or a promise of it.
+    stop_in_body = function(state) {
+      # Stop and SessionEnd fire only once the run has started a session, as
+      # finish_callback_run() has it for the other endings.
+      if (!isTRUE(state$session_started)) {
+        return(NULL)
+      }
+      private$settle_run(state)
+      state$stop_hook_fired <- TRUE
+      hook_then(private$fire_end_hook("Stop", state), function(answer) {
+        # An interrupt that arrived while the hook was pending takes effect now.
+        private$settle_run(state)
+        answer
+      })
+    },
+
+    # SessionEnd, fired from the body of a run once nothing can send it on.
+    # Returns a promise when a callback returned one.
+    session_end_in_body = function(state) {
+      graph_cancel_descendants(self, "parent_completed")
+      if (!isTRUE(state$session_started)) {
+        return(NULL)
+      }
+      state$session_end_fired <- TRUE
+      state$ended <- TRUE
+      private$fire_end_hook("SessionEnd", state)
     },
 
     # Terminal accounting for a callback-driven run: settles the stop reason,
@@ -725,13 +758,21 @@ governed_run_stream <- coro::async_generator(function(
   stream_type,
   conversation_token
 ) {
-  check_conversation_lease(agent, conversation_token)
-  if (isTRUE(agent$.__enclos_env__$private$run_active)) {
-    cli::cli_abort(
-      "This agent already has an active run",
-      class = c("deputy_run_active", "deputy_error")
-    )
-  }
+  tryCatch(
+    {
+      check_conversation_lease(agent, conversation_token)
+      if (isTRUE(agent$.__enclos_env__$private$run_active)) {
+        cli::cli_abort(
+          "This agent already has an active run",
+          class = c("deputy_run_active", "deputy_error")
+        )
+      }
+    },
+    error = function(error) {
+      refuse_unstarted_run(agent, stream_state, error)
+      rlang::cnd_signal(error)
+    }
+  )
 
   on.exit(
     agent$.__enclos_env__$private$finish_callback_run(stream_state),
@@ -746,32 +787,17 @@ governed_run_stream <- coro::async_generator(function(
         run_limits,
         effective_run_context,
         controller,
-        stream_mode,
-        start_hooks = FALSE
+        stream_mode
       )
-      stopped_before <- agent$.__enclos_env__$private$should_stop
-      started <- fire_session_start(agent, stream_state)
-      waited <- promises::is.promising(started)
-      if (waited) {
+      started <- run_start_hooks(agent, stream_state, messages)
+      if (promises::is.promising(started)) {
         coro::await(started)
       }
-      stream_state$session_started <- TRUE
-      # A stop that arrived while SessionStart was pending takes effect now:
-      # the prompt is not submitted, and no later hook can hold the stop.
-      if (
-        !(waited &&
-          !stopped_before &&
-          agent$.__enclos_env__$private$should_stop)
-      ) {
-        submitted <- fire_prompt_submit(agent, stream_state, messages)
-        if (promises::is.promising(submitted)) {
-          coro::await(submitted)
-        }
-      }
-      check_initial_run_limits(agent, stream_state)
     },
     error = function(error) {
       stream_state$reason <- "error"
+      # A Chat another Agent holds refuses the run before it has an ID.
+      refuse_unstarted_run(agent, stream_state, error)
       record_run_failure(agent, "initialization", error)
       rlang::cnd_signal(error)
     }
@@ -1004,21 +1030,9 @@ governed_run_stream <- coro::async_generator(function(
     if (length(held)) {
       coro::await(promises::promise_all(.list = held))
     }
-    # Stop and SessionEnd fire in the body only once the run has started a
-    # session, as finish_callback_run() does for the other endings.
-    stop_answer <- NULL
-    if (isTRUE(stream_state$session_started)) {
-      agent$.__enclos_env__$private$settle_run(stream_state)
-      stream_state$stop_hook_fired <- TRUE
-      stop_answer <- agent$.__enclos_env__$private$fire_end_hook(
-        "Stop",
-        stream_state
-      )
-      if (promises::is.promising(stop_answer)) {
-        stop_answer <- coro::await(stop_answer)
-      }
-      # An interrupt that arrived while the hook was pending takes effect now.
-      agent$.__enclos_env__$private$settle_run(stream_state)
+    stop_answer <- agent$.__enclos_env__$private$stop_in_body(stream_state)
+    if (promises::is.promising(stop_answer)) {
+      stop_answer <- coro::await(stop_answer)
     }
     # A Stop hook may send an answered run on. Nothing else is sent on: a run
     # that was stopped, hit a limit or failed ends as it stands.
@@ -1062,16 +1076,8 @@ governed_run_stream <- coro::async_generator(function(
     }
     break
   }
-  graph_cancel_descendants(agent, "parent_completed")
-  if (isTRUE(stream_state$session_started)) {
-    stream_state$session_end_fired <- TRUE
-    stream_state$ended <- TRUE
-    ended <- agent$.__enclos_env__$private$fire_end_hook(
-      "SessionEnd",
-      stream_state
-    )
-    if (promises::is.promising(ended)) {
-      coro::await(ended)
-    }
+  ended <- agent$.__enclos_env__$private$session_end_in_body(stream_state)
+  if (promises::is.promising(ended)) {
+    coro::await(ended)
   }
 })

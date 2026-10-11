@@ -88,13 +88,14 @@
 * `UsageLimits()` gains `on_unknown_cost`. `"continue"` lets a run with
   `max_cost_usd` go on when the cost of a response is unknown. The limit is
   then enforced against the new `AgentUsage` field `known_cost_usd`: the cost
-  of the responses whose cost is known. A run that was stopped or failed now
-  reports the cost of the requests that finished there, where `cost_usd` alone
-  is `NA`.
+  of the responses whose cost is known. The budget a subagent or a retained
+  conversation is given is worked out from it too. A run that was stopped or
+  failed now reports the cost of the requests that finished there, where
+  `cost_usd` alone is `NA`.
 
 * `stream_result()` takes the stream that `$stream_async()` returned and gives
   a promise of that run's `AgentResult`. It resolves when the run has
-  finished, however it ended.
+  finished, however it ended, and is rejected when the run could not start.
 
 * `$interrupt()` called after `$stream_async()` but before the stream is first
   read now stops the run when it starts. It was ignored, and the run started.

@@ -15,7 +15,8 @@ A \code{HookResultStop} object.
 \description{
 Return this from a Stop hook to send the run on: the model is asked again
 with \code{message}, in the same run, which keeps its run ID, limits and usage.
-Only an answered run is sent on. \code{Stop} fires again at the next stop, with
+Only an answered run is sent on, and never a batch from
+\verb{$parallel_delegate()}. \code{Stop} fires again at the next stop, with
 \code{context$stop_hook_active} set to \code{TRUE}; check it so a hook doesn't send
 the run on for ever.
 }
