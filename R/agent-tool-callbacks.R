@@ -196,7 +196,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
           decision = "deny"
         ))
         if (isTRUE(perm_result$interrupt)) {
-          private$request_stream_stop("permission_denied")
+          private$request_stream_stop("permission_denied", by = "permission")
         }
         r_session_tool_notify(
           private,
@@ -226,7 +226,8 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         # Check continue field - signal to stop after this tool
         if (!is.null(hook_result$continue) && !hook_result$continue) {
           private$request_stream_stop(
-            hook_result$stop_reason %||% "hook_requested_stop"
+            hook_result$stop_reason %||% "hook_requested_stop",
+            by = "hook"
           )
         }
         if (hook_result$permission == "deny") {
@@ -386,6 +387,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
           private$should_stop <- TRUE
           private$stop_reason_from_hook <- hook_result$stop_reason %||%
             "hook_requested_stop"
+          private$stop_requested_by <- "hook"
         }
       }
 

@@ -1,6 +1,10 @@
 # Shared lifecycle for model runs and host-driven delegation batches.
 record_run_failure <- function(agent, phase, condition) {
   private <- agent$.__enclos_env__$private
+  state <- private$current_run_state
+  if (!is.null(state)) {
+    state$run_error <- list(phase = phase, condition = condition)
+  }
   private$record_run_event(private$agent_event(
     "run_error",
     phase = phase,
@@ -50,6 +54,7 @@ initialize_agent_run <- function(
     limits$max_tool_calls
   private$should_stop <- FALSE
   private$stop_reason_from_hook <- NULL
+  private$stop_requested_by <- NULL
   private$current_usage_limits <- limits
   private$current_usage_baseline <-
     agent_usage_snapshot(private$.chat)

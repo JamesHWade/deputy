@@ -2718,6 +2718,7 @@ Agent <- R6::R6Class(
       # Flag to signal stopping from hooks
       should_stop = FALSE,
       stop_reason_from_hook = NULL,
+      stop_requested_by = NULL,
 
       # Pending executions retain cancellation even if registered tools change.
       active_owned_tools = list(),
@@ -2793,7 +2794,7 @@ Agent <- R6::R6Class(
         if (!isTRUE(private$run_active)) {
           return(invisible(interrupted))
         }
-        private$request_stream_stop(as.character(reason[[1]]))
+        private$request_stream_stop(as.character(reason[[1]]), by = "caller")
         invisible(TRUE)
       },
 
@@ -3463,6 +3464,7 @@ Agent <- R6::R6Class(
         }
         private$should_stop <- TRUE
         private$stop_reason_from_hook <- status$reason
+        private$stop_requested_by <- NULL
 
         message <- usage_limit_message(status)
         private$notify(

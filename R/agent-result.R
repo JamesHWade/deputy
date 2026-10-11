@@ -1,4 +1,4 @@
-#' @include value-properties.R run-usage.R
+#' @include value-properties.R run-usage.R run-ending.R
 NULL
 
 # Agent result and event types for deputy
@@ -178,6 +178,9 @@ S7::method(print, AgentEvent) <- function(x, ...) {
 #' `result$response`, or use [result_n_turns()], [result_tool_calls()],
 #' [result_tool_results()], [result_text_chunks()] and [result_is_success()].
 #'
+#' `ending` says how the run ended in terms of its own classes, so a host need
+#' not parse `stop_reason`; see [RunEnding].
+#'
 #' `usage` covers this run only, but `cost` covers the whole conversation,
 #' including earlier runs and turns that compaction removed from the model
 #' context.
@@ -197,6 +200,10 @@ S7::method(print, AgentEvent) <- function(x, ...) {
 #'   subagent, to the parent run and delegation.
 #' @param usage [AgentUsage] for this run only, or `NULL`.
 #' @param run_context The run's `run_context`, a named list.
+#' @param ending How the run ended, as a [RunEnding] object, or `NULL` to
+#'   derive it from `stop_reason`. The five classes are [RunEndingAnswered()],
+#'   [RunEndingStopped()], [RunEndingLimit()], [RunEndingCutOff()] and
+#'   [RunEndingFailed()].
 #' @return An `AgentResult` object.
 #' @examples
 #' result <- AgentResult(response = "Done", events = list(
@@ -257,7 +264,8 @@ AgentResult <- S7::new_class(
       "delegation_id",
       S7::new_union(NULL, S7::class_character)
     ),
-    run_context = readonly_property("run_context", S7::class_list)
+    run_context = readonly_property("run_context", S7::class_list),
+    ending = readonly_property("ending", RunEnding)
   ),
   constructor = function(
     response = NULL,
@@ -282,7 +290,8 @@ AgentResult <- S7::new_class(
     parent_agent_id = NULL,
     parent_run_id = NULL,
     delegation_id = NULL,
-    run_context = list()
+    run_context = list(),
+    ending = NULL
   ) {
     ids <- list(
       session_id = session_id,
@@ -323,6 +332,10 @@ AgentResult <- S7::new_class(
       cli_abort("{.arg events} must be a list of AgentEvent objects")
     }
     run_context <- normalize_run_context(run_context)
+    if (!is.null(ending) && !S7::S7_inherits(ending, RunEnding)) {
+      cli_abort("{.arg ending} must be NULL or a RunEnding")
+    }
+    ending <- ending %||% run_ending_for(stop_reason)
     value <- S7::new_object(
       S7::S7_object(),
       response = response,
@@ -340,7 +353,8 @@ AgentResult <- S7::new_class(
       parent_agent_id = parent_agent_id,
       parent_run_id = parent_run_id,
       delegation_id = delegation_id,
-      run_context = run_context
+      run_context = run_context,
+      ending = ending
     )
     freeze_value(value)
   }
