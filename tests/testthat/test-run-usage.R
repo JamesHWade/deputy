@@ -36,6 +36,13 @@ test_that("UsageLimits takes on_unknown_cost and rejects other values", {
   expect_error(UsageLimits(on_unknown_cost = "maybe"), "should be one of")
 })
 
+test_that("every UsageLimits property is a limit or a named option", {
+  expect_setequal(
+    setdiff(names(S7::props(UsageLimits())), usage_limit_fields()),
+    c("on_unknown_cost", "on_exceed")
+  )
+})
+
 test_that("per-run limits inherit unspecified agent defaults", {
   defaults <- UsageLimits(
     max_requests = 5,
