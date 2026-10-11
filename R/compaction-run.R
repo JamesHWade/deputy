@@ -332,7 +332,8 @@ compaction_summary_attempt_async <- coro::async(function(
     input_tokens = usage@input_tokens,
     output_tokens = usage@output_tokens,
     cached_tokens = usage@cached_tokens,
-    cost_usd = usage@cost_usd
+    cost_usd = usage@cost_usd,
+    known_cost_usd = usage@known_cost_usd
   )
   private$current_external_usage <- agent_usage_add(
     private$current_external_usage,

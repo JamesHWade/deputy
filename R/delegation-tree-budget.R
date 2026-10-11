@@ -129,7 +129,11 @@ tree_usage_difference <- function(inclusive, descendant) {
       descendant$output_tokens
     ),
     cached_tokens = subtract(inclusive$cached_tokens, descendant$cached_tokens),
-    cost_usd = cost
+    cost_usd = cost,
+    known_cost_usd = subtract(
+      inclusive$known_cost_usd,
+      descendant$known_cost_usd
+    )
   )
 }
 
