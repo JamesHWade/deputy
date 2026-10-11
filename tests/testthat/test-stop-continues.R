@@ -144,6 +144,33 @@ test_that("a run that is sent on keeps its limits", {
   expect_s7_class(result$ending, RunEndingLimit)
 })
 
+test_that("a run sent on into a limit leaves no unhandled promise", {
+  scripted <- scripted_stop_chat(list("First answer.", "Second answer."))
+  agent <- Agent$new(
+    chat = scripted$chat,
+    usage_limits = UsageLimits(max_requests = 1)
+  )
+  agent$hooks$add(HookMatcher(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context, ...) {
+      HookResultStop("Fix the table.")
+    }
+  ))
+
+  # promises reports a rejection nobody handled on the next turn of the loop.
+  printed <- capture.output(
+    {
+      result <- agent$run_sync("Make a table.")
+      later::run_now(0.1)
+    },
+    type = "message"
+  )
+
+  expect_identical(result$stop_reason, "request_limit")
+  expect_false(any(grepl("Unhandled promise error", printed, fixed = TRUE)))
+})
+
 test_that("a Stop hook cannot send on a run that was stopped", {
   scripted <- scripted_stop_chat(list("First answer.", "Second answer."))
   agent <- Agent$new(chat = scripted$chat)

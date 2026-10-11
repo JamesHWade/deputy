@@ -1021,6 +1021,14 @@ governed_run_stream <- coro::async_generator(function(
           stream_type = stream_type
         ),
         error = function(error) {
+          # A limit can refuse the request as the stream is made. The loop
+          # then ends the run on its first check and never reads the stream,
+          # so a rejected promise here would have nobody to handle it.
+          if (agent$.__enclos_env__$private$should_stop) {
+            return(coro::async_generator(function() {
+              if (FALSE) coro::yield("unreachable")
+            })())
+          }
           promises::promise_reject(error)
         }
       )
