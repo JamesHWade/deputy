@@ -89,6 +89,26 @@ test_that("a chat function builds the subagent's chat", {
   expect_identical(redacted$policies$binding$chat, "host factory")
 })
 
+test_that("named param values are recorded without their names", {
+  state <- new.env(parent = emptyenv())
+  lead <- LeadAgent$new(
+    create_parallel_chat(state),
+    sub_agents = list(agent_definition("a", "A", "a")),
+    delegation_policy = DelegationPolicy(chat = function(definition, context) {
+      factory_chat(
+        state,
+        params = ellmer::params(stop_sequences = c(first = "END"))
+      )
+    })
+  )
+
+  expect_identical(delegate_run(lead), "a task")
+  expect_identical(
+    lead$get_subagent_contexts()[[1L]]$params,
+    list(stop_sequences = "END")
+  )
+})
+
 test_that("a chat function builds parallel_delegate() responders", {
   state <- new.env(parent = emptyenv())
   efforts <- c(a = "low", b = "high", c = "medium")

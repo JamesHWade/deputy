@@ -233,7 +233,13 @@ delegation_chat_params <- function(agent) {
     return(list())
   }
   params <- params[setdiff(names(params), "extra_args")]
-  Filter(function(value) is.atomic(value) && length(value) > 0L, params)
+  params <- Filter(
+    function(value) is.atomic(value) && length(value) > 0L,
+    params
+  )
+  # A manifest holds plain values: names (as on a named stop_sequences) and
+  # other attributes say nothing about the request and fail validation.
+  lapply(params, as.vector)
 }
 
 redact_delegation_manifest <- function(manifest) {
