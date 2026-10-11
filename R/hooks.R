@@ -31,6 +31,10 @@ NULL
 #'   call finishes, whether or not it failed.
 #' * `PostToolUseFailure(tool_name, tool_result, tool_error, context)`: after
 #'   `PostToolUse`, when the tool failed.
+#' * `PostModelRequest(context)`: after each model request of a run, once the
+#'   assistant's turn is in the conversation. Only an ellmer Chat fires
+#'   it, so a mock Chat never does. Its return value is ignored, but a promise is
+#'   waited for before the run goes on.
 #' * `PermissionRequest(tool_name, tool_input, permission_result, context)`:
 #'   when the permission policy denies a call.
 #' * `SessionStart(context)`: at the start of each run.
@@ -86,6 +90,9 @@ NULL
 #' * `tool_call_id`, `permission_mode`, `usage`, `usage_limits` (tool events):
 #'   the call's ID, the permission mode, the run's [AgentUsage] so far and its
 #'   [UsageLimits].
+#' * `usage`, `usage_limits`, `request_number` (PostModelRequest): the run's
+#'   [AgentUsage] so far, its [UsageLimits] and the request's number in the
+#'   run.
 #' * `tool_annotations`, `tool_arguments`, `tool_metadata` (PreToolUse,
 #'   PermissionRequest): the tool's annotations, declared arguments and
 #'   [tool_metadata()], when available.
@@ -132,6 +139,7 @@ HookEvent <- c(
   "PreToolUse",
   "PostToolUse",
   "PostToolUseFailure",
+  "PostModelRequest",
 
   "Stop",
   "SubagentStart",
