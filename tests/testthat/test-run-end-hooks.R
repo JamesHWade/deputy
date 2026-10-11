@@ -314,6 +314,47 @@ test_that("a delegate batch fires Stop and SessionEnd once each, in order", {
   expect_identical(log, c("Stop", "SessionEnd"))
 })
 
+test_that("a delegate batch does not wait for a Stop or SessionEnd hook's promise", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  state$hold_a_until_b <- FALSE
+  lead <- parallel_test_lead(state)
+  log <- character()
+  settled <- character()
+  for (event in c("Stop", "SessionEnd")) {
+    local({
+      name <- event
+      lead$add_hook(HookMatcher(
+        event = name,
+        timeout = 0,
+        callback = function(reason, context, ...) {
+          log <<- c(log, name)
+          promises::promise(function(resolve, reject) {
+            later::later(
+              function() {
+                settled <<- c(settled, name)
+                resolve(NULL)
+              },
+              0.3
+            )
+          })
+        }
+      ))
+    })
+  }
+
+  batch <- resolve_async_value(lead$parallel_delegate_async(c(
+    a = "first",
+    b = "second"
+  )))
+
+  expect_identical(batch$status, c(a = "completed", b = "completed"))
+  expect_identical(log, c("Stop", "SessionEnd"))
+  expect_identical(settled, character())
+})
+
 test_that("the approaching-cost warning is given once", {
   mock_chat <- create_mock_chat(responses = list("Response"))
   mock_chat$stream <- function(prompt = NULL) {

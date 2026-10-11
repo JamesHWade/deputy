@@ -321,7 +321,7 @@ hook_promise_timeout <- function(promise, seconds, event) {
     cancel <- later::later(
       function() {
         reject(rlang::error_cnd(
-          class = "deputy_hook_timeout",
+          class = c("deputy_hook_timeout", "deputy_error"),
           message = sprintf(
             "%s hook's promise did not settle within %s seconds",
             event,

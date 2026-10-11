@@ -867,12 +867,7 @@ Agent <- R6::R6Class(
         run_context
       )
 
-      limits <- if (is.null(usage_limits)) {
-        self$usage_limits
-      } else {
-        merge_usage_limits(usage_limits, self$usage_limits)
-      }
-      limits <- normalize_usage_limits(limits)
+      limits <- private$run_usage_limits(usage_limits)
 
       governed_run <- private$start_governed_stream(
         messages = list(task),
@@ -1129,12 +1124,7 @@ Agent <- R6::R6Class(
         private$.run_context,
         run_context
       )
-      limits <- if (is.null(usage_limits)) {
-        self$usage_limits
-      } else {
-        merge_usage_limits(usage_limits, self$usage_limits)
-      }
-      limits <- normalize_usage_limits(limits)
+      limits <- private$run_usage_limits(usage_limits)
       governed_run <- private$start_governed_stream(
         messages = rlang::list2(...),
         limits = limits,
@@ -1183,12 +1173,7 @@ Agent <- R6::R6Class(
         private$.run_context,
         run_context
       )
-      limits <- if (is.null(usage_limits)) {
-        self$usage_limits
-      } else {
-        merge_usage_limits(usage_limits, self$usage_limits)
-      }
-      limits <- normalize_usage_limits(limits)
+      limits <- private$run_usage_limits(usage_limits)
       governed_run <- private$start_governed_stream(
         messages = rlang::list2(...),
         limits = limits,
@@ -2478,12 +2463,7 @@ Agent <- R6::R6Class(
         run_context
       )
 
-      limits <- if (is.null(usage_limits)) {
-        self$usage_limits
-      } else {
-        merge_usage_limits(usage_limits, self$usage_limits)
-      }
-      limits <- normalize_usage_limits(limits)
+      limits <- private$run_usage_limits(usage_limits)
 
       governed_run <- private$start_governed_stream(
         messages = list(task),
@@ -2819,6 +2799,16 @@ Agent <- R6::R6Class(
       # was given before compaction, with cleared tool results restored.
       transcript_turns = function() {
         private$.conversation_state$transcript(private$.chat)
+      },
+
+      # The limits for one run: the run's own, merged over the agent's.
+      run_usage_limits = function(usage_limits) {
+        limits <- if (is.null(usage_limits)) {
+          self$usage_limits
+        } else {
+          merge_usage_limits(usage_limits, self$usage_limits)
+        }
+        normalize_usage_limits(limits)
       },
 
       interrupt_run = function(reason, conversation_token = NULL) {

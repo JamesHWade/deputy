@@ -570,11 +570,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           state$resolve_result(state$result)
         } else {
           state$reject_result(
-            cleanup_error %||%
-              rlang::error_cnd(
-                class = "deputy_error",
-                message = "The governed run ended without an AgentResult"
-              )
+            cleanup_error %||% run_without_result_error()
           )
         }
       }
@@ -639,6 +635,13 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
 # coro caches each factory's state machine, so these factories are defined once
 # and receive per-run values as arguments instead of closing over a method
 # frame. Their bodies reference only arguments and namespace functions.
+
+# A stream that ends at once: for a run that is stopped before it asks the
+# model. Defined once, as the factories below are.
+empty_run_stream <- coro::async_generator(function() {
+  # jarl-ignore unreachable_code: the yield is never run; it makes this a generator
+  if (FALSE) coro::yield("unreachable")
+})
 
 collect_governed_stream_async <- coro::async(function(stream, state) {
   repeat {
@@ -783,9 +786,7 @@ governed_run_stream <- coro::async_generator(function(
   active_run_id <- stream_state$active_run_id
 
   if (agent$.__enclos_env__$private$should_stop) {
-    stream <- coro::async_generator(function() {
-      if (FALSE) coro::yield("unreachable")
-    })()
+    stream <- empty_run_stream()
   } else {
     stream <- tryCatch(
       agent$.__enclos_env__$private$start_async_stream(
@@ -1025,9 +1026,7 @@ governed_run_stream <- coro::async_generator(function(
           # then ends the run on its first check and never reads the stream,
           # so a rejected promise here would have nobody to handle it.
           if (agent$.__enclos_env__$private$should_stop) {
-            return(coro::async_generator(function() {
-              if (FALSE) coro::yield("unreachable")
-            })())
+            return(empty_run_stream())
           }
           promises::promise_reject(error)
         }

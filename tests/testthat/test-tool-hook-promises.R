@@ -249,6 +249,49 @@ test_that("a PermissionRequest hook's promised allow lets a denied call through"
   expect_identical(readLines(target), "approved")
 })
 
+test_that("a PermissionRequest hook whose promise does not settle in time leaves the call denied", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  sandbox <- withr::local_tempdir(pattern = "deputy-promise-timeout-")
+  root <- file.path(sandbox, "root")
+  outside <- file.path(sandbox, "outside")
+  dir.create(root)
+  dir.create(outside)
+  target <- file.path(normalizePath(outside, mustWork = TRUE), "approved.txt")
+
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "write_file",
+      arguments = list(path = target, content = "approved")
+    ),
+    runtime_reply("done")
+  ))
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = list(tool_write_file),
+    permissions = permissions_standard(root),
+    working_dir = root
+  )
+  agent$add_hook(HookMatcher(
+    "PermissionRequest",
+    function(tool_name, tool_input, permission_result, context) {
+      promises::promise(function(resolve, reject) NULL)
+    },
+    promise_timeout = 0.05
+  ))
+  suppressWarnings(resolve_async_value(
+    agent$run_async("Write outside the root with approval."),
+    max_polls = 500L
+  ))
+
+  expect_false(file.exists(target))
+  expect_match(
+    agent$hooks$last_errors()[[1]]$error,
+    "did not settle within 0.05 seconds"
+  )
+})
+
 test_that("plain-value tool hooks keep the tool events in order", {
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
@@ -305,6 +348,34 @@ test_that("the next model request waits for a PostToolUse hook's promise", {
 
   expect_identical(seen, 1L)
   expect_identical(trimws(result$response), "final answer")
+})
+
+test_that("an interrupt while a PostToolUse hook is pending ends the run before the next request", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  agent$register_tool(ellmer::tool(
+    function() "probed",
+    name = "probe",
+    description = "Probe."
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PostToolUse",
+    callback = function(tool_name, tool_result, tool_error, context) {
+      later::later(function() agent$interrupt("enough"), 0.05)
+      later_value(NULL, 0.3)
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("task"), max_polls = 500L)
+
+  expect_length(server$requests(), 1L)
+  expect_identical(result$stop_reason, "enough")
 })
 
 test_that("a PostToolUse hook's promised stop ends the run before the next request", {
@@ -401,4 +472,61 @@ test_that("a PostToolUseFailure hook's promise is waited for before the next req
 
   expect_identical(seen, 1L)
   expect_identical(trimws(result$response), "final answer")
+})
+
+test_that("a PostToolUse hook that answers after its run failed changes nothing in the next run", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  callbacks <- new.env(parent = emptyenv())
+  callbacks$request <- function(request) invisible(NULL)
+  callbacks$result <- function(result) invisible(NULL)
+  calls <- 0L
+  chat <- create_mock_chat()
+  chat$on_tool_request <- function(callback) callbacks$request <- callback
+  chat$on_tool_result <- function(callback) callbacks$result <- callback
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    calls <<- calls + 1L
+    if (calls == 1L) {
+      # A tool call whose result is reported, then a stream that fails while
+      # the hook's promise is still pending.
+      return(coro::async_generator(function() {
+        request <- ellmer::ContentToolRequest(
+          id = "late-1",
+          name = "read_file",
+          arguments = list(path = "a.txt")
+        )
+        callbacks$request(request)
+        callbacks$result(ellmer::ContentToolResult(
+          value = "ok",
+          request = request
+        ))
+        stop("stream failed")
+      })())
+    }
+    # The next run is still going when the first run's hook answers.
+    coro::async_generator(function() {
+      coro::await(later_value(NULL, 0.3))
+      coro::yield(ellmer::ContentText("second run done"))
+    })()
+  }
+  agent <- Agent$new(chat = chat, permissions = permissions_full())
+  hook_calls <- 0L
+  agent$add_hook(HookMatcher(
+    "PostToolUse",
+    function(tool_name, tool_result, tool_error, context) {
+      hook_calls <<- hook_calls + 1L
+      later_value(
+        HookResultPostToolUse(continue = FALSE, stop_reason = "late"),
+        0.15
+      )
+    }
+  ))
+
+  expect_error(resolve_async_value(agent$run_async("first")), "stream failed")
+  second <- resolve_async_value(agent$run_async("second"), max_polls = 300L)
+
+  expect_identical(hook_calls, 1L)
+  expect_identical(second$stop_reason, "complete")
+  expect_identical(second$response, "second run done")
 })

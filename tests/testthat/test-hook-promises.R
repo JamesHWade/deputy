@@ -12,7 +12,7 @@ test_that("tool hook results merge the same whether or not they arrived as promi
       NULL
     )
   )
-  expect_true(S7::S7_inherits(pre, HookResultPreToolUse))
+  expect_s7_class(pre, HookResultPreToolUse)
   expect_equal(pre@permission, "deny")
   expect_equal(pre@reason, "no")
   expect_false(pre@continue)
@@ -30,7 +30,7 @@ test_that("tool hook results merge the same whether or not they arrived as promi
       )
     )
   )
-  expect_true(S7::S7_inherits(post, HookResultPostToolUse))
+  expect_s7_class(post, HookResultPostToolUse)
   expect_false(post@continue)
   expect_equal(post@stop_reason, "halt")
   expect_equal(post@additional_context, "x\ny")

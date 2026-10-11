@@ -497,6 +497,14 @@ S7::method(print, AgentResult) <- function(x, ...) {
   invisible(x)
 }
 
+# The condition a result promise rejects with when a run left no result.
+run_without_result_error <- function() {
+  rlang::error_cnd(
+    class = "deputy_error",
+    message = "The run ended without an AgentResult"
+  )
+}
+
 #' Get the result of a streamed run
 #'
 #' @description
@@ -531,10 +539,7 @@ stream_result <- function(stream) {
       if (!is.null(state$result)) {
         resolve(state$result)
       } else if (isTRUE(state$finished)) {
-        reject(rlang::error_cnd(
-          class = c("deputy_error"),
-          message = "The governed run ended without an AgentResult"
-        ))
+        reject(run_without_result_error())
       } else {
         state$resolve_result <- resolve
         state$reject_result <- reject

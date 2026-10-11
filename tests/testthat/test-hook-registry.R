@@ -640,7 +640,7 @@ test_that("fire() stays synchronous when no callback returns a promise", {
   )
 
   expect_false(promises::is.promising(result))
-  expect_true(S7::S7_inherits(result, HookResultPreToolUse))
+  expect_s7_class(result, HookResultPreToolUse)
 })
 
 test_that("fire() returns a promise of the result when a callback returns a promise", {
@@ -659,7 +659,7 @@ test_that("fire() returns a promise of the result when a callback returns a prom
     context = list()
   ))
 
-  expect_true(S7::S7_inherits(result, HookResultPreToolUse))
+  expect_s7_class(result, HookResultPreToolUse)
   expect_equal(result@permission, "deny")
   expect_equal(result@reason, "later")
 })
@@ -756,7 +756,7 @@ test_that("a rejected promise is recorded, and denies for PreToolUse", {
     tool_input = list(),
     context = list()
   ))
-  expect_true(S7::S7_inherits(denied, HookResultPreToolUse))
+  expect_s7_class(denied, HookResultPreToolUse)
   expect_equal(denied@permission, "deny")
   expect_match(denied@reason, "^Hook error:")
   expect_length(registry$last_errors(), 1L)
@@ -826,4 +826,14 @@ test_that("a promise that does not settle in time counts as no answer and is rec
   ))
   expect_equal(denied@permission, "deny")
   expect_length(pre_registry$last_errors(), 1L)
+})
+
+test_that("the hook timeout is a deputy error as well as a hook timeout", {
+  never <- promises::promise(function(resolve, reject) NULL)
+  timed_out <- tryCatch(
+    resolve_async_value(hook_promise_timeout(never, 0.05, "Stop")),
+    error = identity
+  )
+  expect_s3_class(timed_out, "deputy_hook_timeout")
+  expect_s3_class(timed_out, "deputy_error")
 })
