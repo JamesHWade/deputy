@@ -36,16 +36,16 @@ NULL
 #' @param max_cost_usd Maximum estimated cost in US dollars. If the cost of a
 #'   response is unknown, the run stops with `"cost_unavailable"` rather than
 #'   guessing, unless `on_unknown_cost = "continue"`.
-#' @param on_unknown_cost What happens when `max_cost_usd` is set and the cost
-#'   of a response is unknown. `"stop"` (the default) ends the run with
-#'   `"cost_unavailable"`. `"continue"` lets the run go on, and checks the
-#'   limit against the cost that is known ([AgentUsage]'s `known_cost_usd`).
 #' @param on_exceed What happens when a limit is reached. `"stop"` (the
 #'   default) ends the run and returns an [AgentResult] whose `stop_reason`
 #'   names the limit, such as `"request_limit"`, `"tool_call_limit"` or
 #'   `"cost_limit"`. `"error"` ends the run the same way, then signals an error
 #'   that inherits from `deputy_budget` (see [deputy-errors]). The result is
 #'   still available from `$last_run()`.
+#' @param on_unknown_cost What happens when `max_cost_usd` is set and the cost
+#'   of a response is unknown. `"stop"` (the default) ends the run with
+#'   `"cost_unavailable"`. `"continue"` lets the run go on, and checks the
+#'   limit against the cost that is known ([AgentUsage]'s `known_cost_usd`).
 #'
 #' @return A `UsageLimits` object.
 #' @examples
@@ -80,11 +80,11 @@ UsageLimits <- S7::new_class(
       "max_cost_usd",
       S7::new_union(NULL, S7::class_double)
     ),
+    on_exceed = readonly_property("on_exceed", S7::class_character),
     on_unknown_cost = readonly_property(
       "on_unknown_cost",
       S7::class_character
-    ),
-    on_exceed = readonly_property("on_exceed", S7::class_character)
+    )
   ),
   constructor = function(
     max_requests = NULL,
@@ -93,11 +93,11 @@ UsageLimits <- S7::new_class(
     max_output_tokens = NULL,
     max_total_tokens = NULL,
     max_cost_usd = NULL,
-    on_unknown_cost = c("stop", "continue"),
-    on_exceed = c("stop", "error")
+    on_exceed = c("stop", "error"),
+    on_unknown_cost = c("stop", "continue")
   ) {
-    on_unknown_cost <- match.arg(on_unknown_cost)
     on_exceed <- match.arg(on_exceed)
+    on_unknown_cost <- match.arg(on_unknown_cost)
     value <- S7::new_object(
       S7::S7_object(),
       max_requests = validate_usage_limit(max_requests, "max_requests"),
@@ -119,8 +119,8 @@ UsageLimits <- S7::new_class(
         "max_cost_usd",
         integer = FALSE
       ),
-      on_unknown_cost = on_unknown_cost,
-      on_exceed = on_exceed
+      on_exceed = on_exceed,
+      on_unknown_cost = on_unknown_cost
     )
     freeze_value(value)
   }

@@ -11,8 +11,8 @@ UsageLimits(
   max_output_tokens = NULL,
   max_total_tokens = NULL,
   max_cost_usd = NULL,
-  on_unknown_cost = c("stop", "continue"),
-  on_exceed = c("stop", "error")
+  on_exceed = c("stop", "error"),
+  on_unknown_cost = c("stop", "continue")
 )
 }
 \arguments{
@@ -34,17 +34,17 @@ tokens are reported separately and aren't added again.}
 response is unknown, the run stops with \code{"cost_unavailable"} rather than
 guessing, unless \code{on_unknown_cost = "continue"}.}
 
-\item{on_unknown_cost}{What happens when \code{max_cost_usd} is set and the cost
-of a response is unknown. \code{"stop"} (the default) ends the run with
-\code{"cost_unavailable"}. \code{"continue"} lets the run go on, and checks the
-limit against the cost that is known (\link{AgentUsage}'s \code{known_cost_usd}).}
-
 \item{on_exceed}{What happens when a limit is reached. \code{"stop"} (the
 default) ends the run and returns an \link{AgentResult} whose \code{stop_reason}
 names the limit, such as \code{"request_limit"}, \code{"tool_call_limit"} or
 \code{"cost_limit"}. \code{"error"} ends the run the same way, then signals an error
 that inherits from \code{deputy_budget} (see \link{deputy-errors}). The result is
 still available from \verb{$last_run()}.}
+
+\item{on_unknown_cost}{What happens when \code{max_cost_usd} is set and the cost
+of a response is unknown. \code{"stop"} (the default) ends the run with
+\code{"cost_unavailable"}. \code{"continue"} lets the run go on, and checks the
+limit against the cost that is known (\link{AgentUsage}'s \code{known_cost_usd}).}
 }
 \value{
 A \code{UsageLimits} object.

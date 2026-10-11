@@ -564,3 +564,12 @@ test_that("usage prints the known cost only when the cost is unknown and positiv
   expect_no_match(known_zero_output, "known_cost_usd", fixed = TRUE)
   expect_no_match(default_output, "known_cost_usd", fixed = TRUE)
 })
+
+test_that("UsageLimits keeps on_exceed as its seventh argument", {
+  # on_unknown_cost was added later; a call written by position before it
+  # existed must still mean what it meant.
+  limits <- UsageLimits(NULL, NULL, NULL, NULL, NULL, NULL, "error")
+
+  expect_identical(limits$on_exceed, "error")
+  expect_identical(limits$on_unknown_cost, "stop")
+})
