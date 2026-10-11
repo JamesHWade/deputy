@@ -284,6 +284,50 @@ test_that("params for a copy of the lead's chat need a chat function", {
   expect_length(lead$sub_agent_defs, 2L)
 })
 
+test_that("a failed re-initialize leaves the lead's subagents and policy", {
+  chat <- create_mock_chat()
+  policy <- DelegationPolicy(chat = function(definition, context) {
+    create_mock_chat()
+  })
+  lead <- LeadAgent$new(
+    chat,
+    sub_agents = list(agent_definition("a", "A", "a")),
+    delegation_policy = policy,
+    system_prompt = "Lead."
+  )
+  prompt <- lead$get_system_prompt()
+  params <- ellmer::params(reasoning_effort = "low")
+
+  # Params on a copy of the lead's chat, with no chat function.
+  expect_error(
+    lead$initialize(
+      chat,
+      sub_agents = list(agent_definition("b", "B", "b", params = params))
+    ),
+    class = "deputy_delegation_binding"
+  )
+  # Two definitions with one name.
+  expect_error(
+    lead$initialize(
+      chat,
+      sub_agents = list(
+        agent_definition("c", "C", "c"),
+        agent_definition("c", "C", "c")
+      ),
+      delegation_max_bytes = 4096L
+    ),
+    "Duplicate"
+  )
+
+  expect_identical(
+    vapply(lead$sub_agent_defs, function(definition) definition$name, ""),
+    "a"
+  )
+  expect_identical(lead$.__enclos_env__$private$.delegation_policy, policy)
+  expect_identical(lead$.__enclos_env__$private$delegation_max_bytes, 65536L)
+  expect_identical(lead$get_system_prompt(), prompt)
+})
+
 test_that("definition params are validated, printed and kept by copies", {
   definition <- agent_definition(
     "a",

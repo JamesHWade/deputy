@@ -110,6 +110,28 @@ LeadAgent <- R6::R6Class(
       if (!is.null(private$.chat)) {
         check_conversation_initialization(self)
       }
+      # A failed re-initialize leaves the lead as it was. Agent$initialize()
+      # puts back the Agent's own fields, but from a snapshot taken after the
+      # lead has assigned its own below, so the lead restores those itself.
+      lead_fields <- c(
+        ".delegation_buffer",
+        ".delegation_disclosure",
+        ".delegation_policy",
+        "delegation_sources",
+        "delegation_scope",
+        "delegation_max_bytes",
+        ".sub_agent_defs"
+      )
+      previous <- if (!is.null(private$.chat)) {
+        mget(lead_fields, envir = private, ifnotfound = list(NULL))
+      }
+      completed <- FALSE
+      on.exit(
+        if (!completed && !is.null(previous)) {
+          list2env(previous, envir = private)
+        },
+        add = TRUE
+      )
       check_incoming_conversation(chat)
       if (!S7::S7_inherits(delegation_policy, DelegationPolicy)) {
         delegation_binding_abort(
@@ -185,6 +207,8 @@ LeadAgent <- R6::R6Class(
         approval_dir = approval_dir,
         trusted_results = trusted_results
       )
+      completed <- TRUE
+      invisible(self)
     },
 
     #' @description
