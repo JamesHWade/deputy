@@ -149,3 +149,95 @@ test_that("a PostModelRequest hook that fails does not stop the run", {
   expect_identical(errors[[1]]$event, "PostModelRequest")
   expect_match(errors[[1]]$error, "hook broke")
 })
+
+# The type and a validator that passes only a positive count, for the
+# structured requests below.
+count_type <- function() {
+  ellmer::type_from_schema(
+    '{"type":"object","properties":{"count":{"type":"integer"}},"required":["count"],"additionalProperties":false}'
+  )
+}
+
+test_that("a structured request waits for a PostModelRequest hook's promise", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply('{"count":0}', stream = FALSE),
+    runtime_reply('{"count":1}', stream = FALSE)
+  ))
+  agent <- Agent$new(runtime_chat(server))
+  log <- character()
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context) {
+      promises::then(later_value(NULL, 0.1), function(value) {
+        log <<- c(
+          log,
+          paste("hook settled, requests", length(server$requests()))
+        )
+        value
+      })
+    }
+  ))
+
+  value <- agent$chat_structured(
+    "extract",
+    type = count_type(),
+    max_corrections = 1,
+    validate = function(value) {
+      log <<- c(log, paste("validated", value$count))
+      value$count > 0
+    }
+  )
+
+  expect_identical(value, list(count = 1L))
+  expect_identical(
+    log,
+    c(
+      "hook settled, requests 1",
+      "validated 0",
+      "hook settled, requests 2",
+      "validated 1"
+    )
+  )
+})
+
+test_that("an interrupt while a structured request's PostModelRequest hook is pending ends the run there", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply('{"count":0}', stream = FALSE),
+    runtime_reply('{"count":1}', stream = FALSE)
+  ))
+  agent <- Agent$new(runtime_chat(server))
+  validated <- 0L
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context) {
+      later::later(function() agent$interrupt("enough"), 0.05)
+      later_value(NULL, 0.3)
+    }
+  ))
+
+  resolve_async_value(
+    agent$chat_structured_async(
+      "extract",
+      type = count_type(),
+      max_corrections = 1,
+      validate = function(value) {
+        validated <<- validated + 1L
+        value$count > 0
+      }
+    ),
+    max_polls = 500L
+  )
+
+  result <- agent$last_run()
+  expect_length(server$requests(), 1L)
+  expect_identical(validated, 0L)
+  expect_identical(result$stop_reason, "enough")
+  expect_s7_class(result$ending, RunEndingStopped)
+  expect_false(agent$.__enclos_env__$private$run_active)
+})
