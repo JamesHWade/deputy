@@ -18,7 +18,10 @@ NULL
 #' waits for it, up to the hook's `promise_timeout`. A promise that has not
 #' settled by then counts as no answer and is recorded as a hook error. A
 #' rejected promise is handled the same way. `Notification` and `ConfigChange`
-#' hooks are not waited for.
+#' hooks are not waited for. A promise from a `Stop` or `SessionEnd` hook is
+#' waited for when the run ends in its own course. When the run ends with an
+#' error or its stream is abandoned, and for a delegate batch, those hooks fire
+#' and are not waited for.
 #'
 #' @section Events:
 #'
@@ -40,8 +43,11 @@ NULL
 #' * `SessionStart(context)`: at the start of each run.
 #' * `UserPromptSubmit(prompt, context)`: at the start of each run, after
 #'   `SessionStart`.
-#' * `Stop(reason, context)`: at the end of each run.
-#' * `SessionEnd(reason, context)`: at the end of each run, after `Stop`.
+#' * `Stop(reason, context)`: at the end of each run. Its `context` also
+#'   carries `ending`, the run's [RunEnding] as it stands, and
+#'   `stop_hook_active`.
+#' * `SessionEnd(reason, context)`: at the end of each run, after `Stop`. Its
+#'   `context` also carries `ending`.
 #' * `SubagentStart(agent_name, task, context)`: when a subagent starts a
 #'   delegated task.
 #' * `SubagentStop(agent_name, task, result, context)`: when a subagent
