@@ -328,6 +328,10 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       if (isTRUE(state$ended)) {
         return(invisible(NULL))
       }
+      # The last turn is read before the reason is settled, as the finishing
+      # code always did: a Chat may deliver a pending tool result when its
+      # last turn is read, and a hook's stop from that result counts.
+      tryCatch(private$.chat$last_turn(), error = function(e) NULL)
       if (isTRUE(private$should_stop) && identical(state$reason, "complete")) {
         state$reason <- private$stop_reason_from_hook %||%
           "hook_requested_stop"
