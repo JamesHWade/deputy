@@ -1,0 +1,277 @@
+test_that("a tool waits for a PreToolUse hook's promise", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  log <- character()
+  agent$register_tool(ellmer::tool(
+    function() {
+      log <<- c(log, "tool")
+      "probed"
+    },
+    name = "probe",
+    description = "Probe."
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PreToolUse",
+    callback = function(tool_name, tool_input, context) {
+      promises::then(later_value(NULL, 0.1), function(value) {
+        log <<- c(log, "hook")
+        value
+      })
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("task"), max_polls = 500L)
+
+  expect_identical(log, c("hook", "tool"))
+  expect_identical(trimws(result$response), "final answer")
+})
+
+test_that("a PreToolUse hook's promised denial rejects the call", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  ran <- FALSE
+  agent$register_tool(ellmer::tool(
+    function() {
+      ran <<- TRUE
+      "probed"
+    },
+    name = "probe",
+    description = "Probe."
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PreToolUse",
+    callback = function(tool_name, tool_input, context) {
+      later_value(
+        HookResultPreToolUse(permission = "deny", reason = "no"),
+        0.1
+      )
+    }
+  ))
+
+  # ellmer warns that the rejected call failed; that warning is the point here.
+  result <- suppressWarnings(resolve_async_value(
+    agent$run_async("task"),
+    max_polls = 500L
+  ))
+
+  expect_false(ran)
+  expect_identical(result$stop_reason, "complete")
+  permissions <- Filter(
+    function(event) identical(event$type, "permission"),
+    agent$last_run()$events
+  )
+  expect_identical(permissions[[1]]$decision, "deny")
+})
+
+test_that("a PreToolUse hook's promised stop stops the run", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  ran <- FALSE
+  agent$register_tool(ellmer::tool(
+    function() {
+      ran <<- TRUE
+      "probed"
+    },
+    name = "probe",
+    description = "Probe."
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PreToolUse",
+    callback = function(tool_name, tool_input, context) {
+      later_value(
+        HookResultPreToolUse(
+          permission = "deny",
+          reason = "Critical security violation",
+          continue = FALSE
+        ),
+        0.1
+      )
+    }
+  ))
+
+  result <- suppressWarnings(resolve_async_value(
+    agent$run_async("task"),
+    max_polls = 500L
+  ))
+
+  expect_false(ran)
+  expect_identical(result$stop_reason, "hook_requested_stop")
+  expect_length(server$requests(), 1L)
+})
+
+test_that("a PreToolUse hook whose promise rejects or times out denies the call", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  run_with_hook <- function(hook_promise, promise_timeout = 60) {
+    server <- local_runtime_server(list(
+      runtime_reply(tool = "probe", arguments = list()),
+      runtime_reply("final answer")
+    ))
+    agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+    ran <- FALSE
+    agent$register_tool(ellmer::tool(
+      function() {
+        ran <<- TRUE
+        "probed"
+      },
+      name = "probe",
+      description = "Probe."
+    ))
+    agent$add_hook(HookMatcher(
+      event = "PreToolUse",
+      promise_timeout = promise_timeout,
+      callback = function(tool_name, tool_input, context) hook_promise
+    ))
+    result <- suppressWarnings(resolve_async_value(
+      agent$run_async("task"),
+      max_polls = 500L
+    ))
+    list(agent = agent, result = result, ran = ran)
+  }
+
+  rejected <- run_with_hook(promises::promise(function(resolve, reject) {
+    later::later(function() reject(simpleError("hook broke")), 0.05)
+  }))
+  expect_false(rejected$ran)
+  expect_identical(rejected$result$stop_reason, "complete")
+  expect_identical(
+    Filter(
+      function(event) identical(event$type, "permission"),
+      rejected$agent$last_run()$events
+    )[[1]]$decision,
+    "deny"
+  )
+  expect_match(rejected$agent$hooks$last_errors()[[1]]$error, "hook broke")
+
+  timed_out <- run_with_hook(
+    later_value(NULL, 0.5),
+    promise_timeout = 0.05
+  )
+  expect_false(timed_out$ran)
+  expect_identical(
+    Filter(
+      function(event) identical(event$type, "permission"),
+      timed_out$agent$last_run()$events
+    )[[1]]$decision,
+    "deny"
+  )
+  expect_length(timed_out$agent$hooks$last_errors(), 1L)
+})
+
+test_that("an interrupt while a PreToolUse hook is pending keeps the tool from running", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  ran <- FALSE
+  agent$register_tool(ellmer::tool(
+    function() {
+      ran <<- TRUE
+      "probed"
+    },
+    name = "probe",
+    description = "Probe."
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PreToolUse",
+    callback = function(tool_name, tool_input, context) later_value(NULL, 0.2)
+  ))
+  later::later(function() agent$interrupt("user_cancelled"), 0.05)
+
+  result <- suppressWarnings(resolve_async_value(
+    agent$run_async("task"),
+    max_polls = 500L
+  ))
+
+  expect_false(ran)
+  expect_identical(result$stop_reason, "user_cancelled")
+})
+
+test_that("a PermissionRequest hook's promised allow lets a denied call through", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  sandbox <- withr::local_tempdir(pattern = "deputy-promise-allow-")
+  root <- file.path(sandbox, "root")
+  outside <- file.path(sandbox, "outside")
+  dir.create(root)
+  dir.create(outside)
+  target <- file.path(normalizePath(outside, mustWork = TRUE), "approved.txt")
+
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "write_file",
+      arguments = list(path = target, content = "approved")
+    ),
+    runtime_reply("done")
+  ))
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = list(tool_write_file),
+    permissions = permissions_standard(root),
+    working_dir = root
+  )
+  agent$add_hook(HookMatcher(
+    "PermissionRequest",
+    function(tool_name, tool_input, permission_result, context) {
+      later_value(PermissionResultAllow(), 0.1)
+    }
+  ))
+  suppressWarnings(resolve_async_value(
+    agent$run_async("Write outside the root with approval."),
+    max_polls = 500L
+  ))
+
+  expect_null(runtime_events(agent, "tool_end")[[1]]$tool_error)
+  expect_identical(readLines(target), "approved")
+})
+
+test_that("plain-value tool hooks keep the tool events in order", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  agent$register_tool(ellmer::tool(
+    function() "probed",
+    name = "probe",
+    description = "Probe."
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PreToolUse",
+    callback = function(tool_name, tool_input, context) NULL
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PostToolUse",
+    callback = function(tool_name, tool_result, tool_error, context) NULL
+  ))
+
+  agent$run_sync("task")
+
+  types <- vapply(agent$last_run()$events, function(event) event$type, "")
+  tool_types <- types[types %in% c("tool_start", "permission", "tool_end")]
+  expect_identical(tool_types, c("tool_start", "permission", "tool_end"))
+})
