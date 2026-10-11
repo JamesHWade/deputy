@@ -299,6 +299,118 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       )
     },
 
+    # Settles the run's reason, usage, cost and limit, the facts a Stop hook
+    # reads. Called from the run's body before Stop and from
+    # finish_callback_run(); each block checks what an earlier call set.
+    settle_run = function(state) {
+      if (isTRUE(private$should_stop) && identical(state$reason, "complete")) {
+        state$reason <- private$stop_reason_from_hook %||%
+          "hook_requested_stop"
+      }
+      incomplete_tool_call <-
+        private$current_tool_calls > private$current_tool_results
+      private$finalize_pending_checkpoints()
+      usage <- private$current_run_usage()
+      state$usage <- usage
+      state$cost <- tryCatch(self$cost(), error = function(e) NULL)
+      if (!is.null(state$cost) && is.na(usage$cost_usd)) {
+        state$cost$total <- NA_real_
+        state$cost$complete <- FALSE
+        state$cost$missing <- max(1L, state$cost$missing %||% 0L)
+      }
+      private$last_run_usage <- usage
+      limits <- private$current_usage_limits
+      if (
+        identical(state$reason, "complete") &&
+          isTRUE(incomplete_tool_call)
+      ) {
+        state$reason <- "provider_error"
+        private$notify(
+          "Provider stream ended before a tool result arrived.",
+          level = "warning",
+          code = "provider_error",
+          usage = usage
+        )
+      }
+      if (identical(state$reason, "complete") && !is.null(limits)) {
+        limit_status <- tree_usage_status(
+          self,
+          require_followup = FALSE
+        ) %||%
+          usage_limit_status(usage, limits)
+        if (!is.null(limit_status)) {
+          private$last_limit_status <- limit_status
+          state$reason <- limit_status$reason
+          private$notify(
+            usage_limit_message(limit_status),
+            level = "warning",
+            code = limit_status$reason,
+            usage = usage,
+            limit = limit_status$limit
+          )
+        }
+      }
+      if (
+        is.null(private$last_limit_status) &&
+          !is.null(limits$max_cost_usd) &&
+          is.finite(usage$cost_usd) &&
+          usage$cost_usd >= limits$max_cost_usd * 0.9
+      ) {
+        private$notify(
+          paste0(
+            "Approaching run cost limit: ",
+            format_cost(usage$cost_usd),
+            " / ",
+            format_cost(limits$max_cost_usd)
+          ),
+          level = "warning",
+          code = "cost_limit_warning",
+          usage = usage,
+          max_cost_usd = limits$max_cost_usd
+        )
+        cli::cli_warn(
+          "Approaching run cost limit: {format_cost(usage$cost_usd)} / {format_cost(limits$max_cost_usd)}"
+        )
+      }
+      invisible(NULL)
+    },
+
+    # The run's RunEnding as it stands. Built from the same facts for the
+    # hooks that read it and for the run's result.
+    run_ending_now = function(state) {
+      turns <- private$.chat$get_turns()
+      last_turn <- if (length(turns) > state$turns_before) {
+        tryCatch(private$.chat$last_turn(), error = function(e) NULL)
+      }
+      finish_reason <- tryCatch(last_turn@finish_reason, error = function(e) {
+        NULL
+      })
+      run_ending_for(
+        state$reason,
+        by = if (isTRUE(private$should_stop)) {
+          private$stop_requested_by
+        },
+        limit_status = private$last_limit_status,
+        finish_reason = finish_reason,
+        error = state$run_error$condition,
+        phase = state$run_error$phase
+      )
+    },
+
+    # Fires "Stop" or "SessionEnd" for the run and returns what fire_hook
+    # returned.
+    fire_end_hook = function(event, state) {
+      private$fire_hook(
+        event,
+        reason = state$reason,
+        context = private$hook_context(
+          cost = self$cost(),
+          usage = state$usage,
+          run_id = state$active_run_id
+        )
+      )
+    },
+
     # Terminal accounting for a callback-driven run: settles the stop reason,
     # fires Stop/SessionEnd, records
     # run-scoped usage and cost on `state`, and releases the active run.
@@ -337,96 +449,12 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             private$.chat$last_turn(),
             error = function(e) NULL
           )
-          if (
-            isTRUE(private$should_stop) && identical(state$reason, "complete")
-          ) {
-            state$reason <- private$stop_reason_from_hook %||%
-              "hook_requested_stop"
-          }
-          incomplete_tool_call <-
-            private$current_tool_calls > private$current_tool_results
-          private$finalize_pending_checkpoints()
-          usage <- private$current_run_usage()
-          state$usage <- usage
-          state$cost <- tryCatch(self$cost(), error = function(e) NULL)
-          if (!is.null(state$cost) && is.na(usage$cost_usd)) {
-            state$cost$total <- NA_real_
-            state$cost$complete <- FALSE
-            state$cost$missing <- max(1L, state$cost$missing %||% 0L)
-          }
-          private$last_run_usage <- usage
+          private$settle_run(state)
+          usage <- state$usage
           limits <- private$current_usage_limits
-          if (
-            identical(state$reason, "complete") &&
-              isTRUE(incomplete_tool_call)
-          ) {
-            state$reason <- "provider_error"
-            private$notify(
-              "Provider stream ended before a tool result arrived.",
-              level = "warning",
-              code = "provider_error",
-              usage = usage
-            )
-          }
-          if (identical(state$reason, "complete") && !is.null(limits)) {
-            limit_status <- tree_usage_status(
-              self,
-              require_followup = FALSE
-            ) %||%
-              usage_limit_status(usage, limits)
-            if (!is.null(limit_status)) {
-              private$last_limit_status <- limit_status
-              state$reason <- limit_status$reason
-              private$notify(
-                usage_limit_message(limit_status),
-                level = "warning",
-                code = limit_status$reason,
-                usage = usage,
-                limit = limit_status$limit
-              )
-            }
-          }
-          if (
-            is.null(private$last_limit_status) &&
-              !is.null(limits$max_cost_usd) &&
-              is.finite(usage$cost_usd) &&
-              usage$cost_usd >= limits$max_cost_usd * 0.9
-          ) {
-            private$notify(
-              paste0(
-                "Approaching run cost limit: ",
-                format_cost(usage$cost_usd),
-                " / ",
-                format_cost(limits$max_cost_usd)
-              ),
-              level = "warning",
-              code = "cost_limit_warning",
-              usage = usage,
-              max_cost_usd = limits$max_cost_usd
-            )
-            cli::cli_warn(
-              "Approaching run cost limit: {format_cost(usage$cost_usd)} / {format_cost(limits$max_cost_usd)}"
-            )
-          }
           if (isTRUE(state$session_started)) {
-            private$fire_hook(
-              "Stop",
-              reason = state$reason,
-              context = private$hook_context(
-                cost = self$cost(),
-                usage = usage,
-                run_id = active_run_id
-              )
-            )
-            private$fire_hook(
-              "SessionEnd",
-              reason = state$reason,
-              context = private$hook_context(
-                cost = self$cost(),
-                usage = usage,
-                run_id = active_run_id
-              )
-            )
+            private$fire_end_hook("Stop", state)
+            private$fire_end_hook("SessionEnd", state)
           }
 
           if (length(state$response_parts) > 0L) {
@@ -449,19 +477,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
               turn_number = max(1L, usage$requests)
             ))
           }
-          finish_reason <- if (current_turn_count > state$turns_before) {
-            tryCatch(observed_last_turn@finish_reason, error = function(e) NULL)
-          }
-          state$ending <- run_ending_for(
-            state$reason,
-            by = if (isTRUE(private$should_stop)) {
-              private$stop_requested_by
-            },
-            limit_status = private$last_limit_status,
-            finish_reason = finish_reason,
-            error = state$run_error$condition,
-            phase = state$run_error$phase
-          )
+          state$ending <- private$run_ending_now(state)
           private$record_run_event(private$agent_event(
             "usage",
             usage = usage,
