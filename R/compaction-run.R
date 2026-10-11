@@ -50,8 +50,12 @@ governed_compaction_async <- coro::async(function(
     NULL,
     policy$fallback,
     TRUE,
-    estimated
+    estimated,
+    wait = TRUE
   )
+  if (promises::is.promising(plan)) {
+    plan <- coro::await(plan)
+  }
   if (!is.null(plan$result)) {
     return(plan$result)
   }
@@ -89,8 +93,12 @@ governed_compaction_async <- coro::async(function(
     generated$summary,
     generated$method,
     generated$usage,
-    generated$attempts
+    generated$attempts,
+    wait = TRUE
   )
+  if (promises::is.promising(result)) {
+    result <- coro::await(result)
+  }
   compaction_can_continue(agent)
   result
 })
@@ -324,7 +332,8 @@ compaction_summary_attempt_async <- coro::async(function(
     input_tokens = usage@input_tokens,
     output_tokens = usage@output_tokens,
     cached_tokens = usage@cached_tokens,
-    cost_usd = usage@cost_usd
+    cost_usd = usage@cost_usd,
+    known_cost_usd = usage@known_cost_usd
   )
   private$current_external_usage <- agent_usage_add(
     private$current_external_usage,

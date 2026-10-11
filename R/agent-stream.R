@@ -233,6 +233,9 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       state$stop_hook_active <- FALSE
       state$stop_hook_fired <- FALSE
       state$session_end_fired <- FALSE
+      state$result_promise <- NULL
+      state$resolve_result <- NULL
+      state$reject_result <- NULL
       state
     },
 
@@ -550,6 +553,20 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           }
         }
       )
+      # Settled after the agent is free, so a caller's then() can start the next run.
+      if (is.function(state$resolve_result)) {
+        if (!is.null(state$result)) {
+          state$resolve_result(state$result)
+        } else {
+          state$reject_result(
+            cleanup_error %||%
+              rlang::error_cnd(
+                class = "deputy_error",
+                message = "The governed run ended without an AgentResult"
+              )
+          )
+        }
+      }
       if (!is.null(cleanup_error)) {
         stop(cleanup_error)
       }
@@ -693,15 +710,28 @@ governed_run_stream <- coro::async_generator(function(
     add = TRUE
   )
   tryCatch(
-    initialize_agent_run(
-      agent,
-      stream_state,
-      messages,
-      run_limits,
-      effective_run_context,
-      controller,
-      stream_mode
-    ),
+    {
+      initialize_agent_run(
+        agent,
+        stream_state,
+        messages,
+        run_limits,
+        effective_run_context,
+        controller,
+        stream_mode,
+        start_hooks = FALSE
+      )
+      started <- fire_session_start(agent, stream_state)
+      if (promises::is.promising(started)) {
+        coro::await(started)
+      }
+      stream_state$session_started <- TRUE
+      submitted <- fire_prompt_submit(agent, stream_state, messages)
+      if (promises::is.promising(submitted)) {
+        coro::await(submitted)
+      }
+      check_initial_run_limits(agent, stream_state)
+    },
     error = function(error) {
       stream_state$reason <- "error"
       record_run_failure(agent, "initialization", error)

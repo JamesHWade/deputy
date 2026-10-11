@@ -20,7 +20,8 @@ initialize_agent_run <- function(
   run_context,
   controller = NULL,
   stream_mode = "content",
-  initial_usage = AgentUsage()
+  initial_usage = AgentUsage(),
+  start_hooks = TRUE
 ) {
   private <- agent$.__enclos_env__$private
   runtime_chat <- private$.chat
@@ -150,24 +151,47 @@ initialize_agent_run <- function(
     )
   }
 
+  if (isTRUE(start_hooks)) {
+    hook_unawaited(fire_session_start(agent, state))
+    state$session_started <- TRUE
+    hook_unawaited(fire_prompt_submit(agent, state, messages))
+    check_initial_run_limits(agent, state)
+  }
+
+  invisible(state)
+}
+
+# The SessionStart hook for a run. Returns what `fire_hook()` returned: a
+# value, or a promise when a callback returned one.
+fire_session_start <- function(agent, state) {
+  private <- agent$.__enclos_env__$private
   private$fire_hook(
     "SessionStart",
     context = private$hook_context(
       permissions = agent$permissions,
       provider = agent$provider(),
       tools_count = length(private$.chat$get_tools()),
-      run_id = active_run_id
+      run_id = state$active_run_id
     )
   )
-  state$session_started <- TRUE
+}
+
+# The UserPromptSubmit hook for a run's messages. Returns what `fire_hook()`
+# returned: a value, or a promise when a callback returned one.
+fire_prompt_submit <- function(agent, state, messages) {
+  private <- agent$.__enclos_env__$private
   private$fire_hook(
     "UserPromptSubmit",
     prompt = if (length(messages) == 1L) messages[[1L]] else messages,
     context = private$hook_context(
-      run_id = active_run_id
+      run_id = state$active_run_id
     )
   )
+}
 
+# Ends the run before its first request when its limits are already reached.
+check_initial_run_limits <- function(agent, state) {
+  private <- agent$.__enclos_env__$private
   initial_limit_status <- tree_usage_status(agent) %||%
     usage_limit_status(
       private$current_run_usage(),
@@ -178,6 +202,5 @@ initialize_agent_run <- function(
     private$mark_usage_limit(initial_limit_status)
     state$reason <- initial_limit_status$reason
   }
-
   invisible(state)
 }
