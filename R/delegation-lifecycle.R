@@ -210,6 +210,8 @@ lead_delegation_hook <- function(lead, id, event, definition = NULL) {
         collapse = "\n"
       )
       private$subagent_runs[[id]] <- current
+      # Advance the marker so a later copy does not repeat these messages.
+      previous_errors <<- length(errors)
     }
   }
   on.exit(copy_errors(), add = TRUE)

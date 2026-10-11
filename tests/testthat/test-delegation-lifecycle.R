@@ -464,3 +464,29 @@ test_that("a rejected SubagentStart promise is kept with the delegation", {
   expect_identical(runs$status, "completed")
   expect_match(runs$hook_error, "SubagentStart: fixture start promise failed")
 })
+
+test_that("a SubagentStart hook's error is kept once when a later hook answers with a promise", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    stop("first failed")
+  }))
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    later_value(NULL, 0.05)
+  }))
+
+  answer <- resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
+
+  expect_identical(jsonlite::fromJSON(answer)$answer, "a task")
+  hook_error <- lead$list_subagents()$hook_error
+  expect_identical(
+    lengths(regmatches(
+      hook_error,
+      gregexpr("first failed", hook_error, fixed = TRUE)
+    )),
+    1L
+  )
+})
