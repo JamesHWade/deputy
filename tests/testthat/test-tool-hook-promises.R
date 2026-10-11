@@ -731,3 +731,75 @@ test_that("a PreToolUse hook that asks to stop after its tool still lets the too
   expect_identical(ran, 1L)
   expect_identical(result$stop_reason, "last one")
 })
+
+test_that("a tool asked for after the run was stopped does not run", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  ran <- 0L
+  agent$register_tool(ellmer::tool(
+    function() {
+      ran <<- ran + 1L
+      "probed"
+    },
+    name = "probe",
+    description = "Probe."
+  ))
+  asked <- character()
+  agent$add_hook(HookMatcher(
+    "PreToolUse",
+    function(tool_name, tool_input, context) {
+      asked <<- c(asked, tool_name)
+      NULL
+    }
+  ))
+  # The response that asks for the tool has arrived; the host stops the run.
+  agent$add_hook(HookMatcher(
+    "PostModelRequest",
+    function(context) {
+      agent$interrupt("over budget")
+      NULL
+    }
+  ))
+
+  result <- suppressWarnings(agent$run_sync("task"))
+
+  expect_identical(ran, 0L)
+  expect_identical(asked, character())
+  expect_identical(result$stop_reason, "over budget")
+  expect_length(server$requests(), 1L)
+})
+
+test_that("a permission callback that interrupts the run keeps the tool from running", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  ran <- 0L
+  agent <- NULL
+  agent <- Agent$new(
+    runtime_chat(server),
+    permissions = Permissions(
+      web = TRUE,
+      can_use_tool = function(tool_name, tool_input, context) {
+        agent$interrupt("stop now")
+        PermissionResultAllow()
+      }
+    )
+  )
+  agent$register_tool(ellmer::tool(
+    function() {
+      ran <<- ran + 1L
+      "probed"
+    },
+    name = "probe",
+    description = "Probe."
+  ))
+
+  result <- suppressWarnings(agent$run_sync("task"))
+
+  expect_identical(ran, 0L)
+  expect_identical(result$stop_reason, "stop now")
+})
