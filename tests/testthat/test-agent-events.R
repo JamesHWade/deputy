@@ -125,6 +125,94 @@ test_that("cancellation during run initialization makes no provider request", {
   expect_identical(result$usage$requests, 0L)
 })
 
+test_that("an interrupt between stream_async() and its first pull stops the run when it starts", {
+  chat <- create_mock_chat(list("never sent"))
+  dispatched <- 0L
+  stream_async <- chat$stream_async
+  chat$stream_async <- function(...) {
+    dispatched <<- dispatched + 1L
+    stream_async(...)
+  }
+  agent <- Agent$new(chat = chat)
+
+  stream <- agent$stream_async("go")
+  expect_true(agent$interrupt("too late"))
+  collect_async_stream(stream)
+
+  expect_identical(dispatched, 0L)
+  result <- agent$last_run()
+  expect_identical(result$stop_reason, "too late")
+  expect_s7_class(result$ending, RunEndingStopped)
+  expect_identical(result$ending@by, "caller")
+})
+
+test_that("an interrupt with nothing running and no stream waiting still returns FALSE", {
+  agent <- Agent$new(create_mock_chat(list("done")))
+  expect_false(agent$interrupt("nothing to stop"))
+
+  collect_async_stream(agent$stream_async("go"))
+  expect_false(agent$interrupt("after the run"))
+})
+
+test_that("an interrupt before the first pull does not carry over to the next run", {
+  # The stopped run never asks the model, so the first reply is the second run's.
+  agent <- Agent$new(create_mock_chat(list("answer")))
+
+  first <- agent$stream_async("one")
+  expect_true(agent$interrupt("too late"))
+  collect_async_stream(first)
+  expect_identical(agent$last_run()$stop_reason, "too late")
+
+  second <- agent$stream_async("two")
+  expect_identical(
+    paste(unlist(collect_async_stream(second)), collapse = ""),
+    "answer"
+  )
+  expect_identical(agent$last_run()$stop_reason, "complete")
+})
+
+test_that("run_async() has no window before its first pull", {
+  agent <- Agent$new(create_mock_chat(list("never sent")))
+  promise <- agent$run_async("go")
+  expect_true(agent$interrupt("too late"))
+  result <- resolve_async_value(promise)
+  expect_identical(result$stop_reason, "too late")
+  expect_s7_class(result$ending, RunEndingStopped)
+  expect_identical(result$ending@by, "caller")
+  expect_identical(result$usage$requests, 0L)
+})
+
+test_that("an interrupt before the first pull stops a real provider run before any request", {
+  server <- local_runtime_server(list(runtime_reply("never sent")))
+  agent <- Agent$new(runtime_chat(server))
+
+  stream <- agent$stream_async("go")
+  expect_true(agent$interrupt("too late"))
+  collect_async_stream(stream)
+
+  expect_length(server$requests(), 0L)
+  result <- agent$last_run()
+  expect_identical(result$stop_reason, "too late")
+  expect_s7_class(result$ending, RunEndingStopped)
+  expect_identical(result$ending@by, "caller")
+})
+
+test_that("a stream that is never read does not leave an interrupt behind", {
+  agent <- Agent$new(create_mock_chat(list("answer")))
+
+  unread <- agent$stream_async("one")
+  expect_true(agent$interrupt("too late"))
+  rm(unread)
+  invisible(gc())
+
+  second <- agent$stream_async("two")
+  expect_identical(
+    paste(unlist(collect_async_stream(second)), collapse = ""),
+    "answer"
+  )
+  expect_identical(agent$last_run()$stop_reason, "complete")
+})
+
 test_that("interrupt stops native streams that ignore their controller", {
   chat <- create_mock_chat("unused")
   chunks <- c("one", "two", "three")

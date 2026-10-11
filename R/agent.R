@@ -1748,9 +1748,13 @@ Agent <- R6::R6Class(
     #' is stopped by closing its connection, which loses the server's session
     #' state.
     #'
+    #' A stream that has been made but not yet read has not started, so it is
+    #' stopped when it starts, without a model request.
+    #'
     #' @param reason Stop reason recorded on the run's `"stop"` event and
     #'   result.
-    #' @return `TRUE`, invisibly, if anything was running.
+    #' @return `TRUE`, invisibly, if anything was running or a stream made but
+    #'   not yet read was waiting to start; `FALSE` otherwise.
     interrupt = function(reason = "interrupted") {
       private$interrupt_run(reason)
     },
@@ -2743,6 +2747,9 @@ Agent <- R6::R6Class(
       should_stop = FALSE,
       stop_reason_from_hook = NULL,
       stop_requested_by = NULL,
+      # The state of the stream most recently made that has not started yet,
+      # so an interrupt before its first pull is kept for its start.
+      unstarted_run = NULL,
       # Promises of hooks the run does not wait for; see take_held_hooks().
       held_hooks = list(),
 
@@ -2818,6 +2825,11 @@ Agent <- R6::R6Class(
             interrupted
         }
         if (!isTRUE(private$run_active)) {
+          waiting <- private$unstarted_run
+          if (!is.null(waiting) && is.null(waiting$active_run_id)) {
+            waiting$interrupt_before_start <- as.character(reason[[1]])
+            return(invisible(TRUE))
+          }
           return(invisible(interrupted))
         }
         private$request_stream_stop(as.character(reason[[1]]), by = "caller")

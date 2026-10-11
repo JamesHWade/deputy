@@ -85,6 +85,12 @@ initialize_agent_run <- function(
   private$current_stream_content <-
     identical(stream_mode, "content")
   private$current_run_state <- state
+  if (identical(private$unstarted_run, state)) {
+    private$unstarted_run <- NULL
+  }
+  if (!is.null(state$interrupt_before_start)) {
+    private$request_stream_stop(state$interrupt_before_start, by = "caller")
+  }
   state$response_seen <- FALSE
   state$fallback_index <- private$.fallback_position
   state$request_number <- 0L
