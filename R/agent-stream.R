@@ -70,6 +70,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       force(extraction)
       limits <- normalize_usage_limits(limits)
       state <- private$new_callback_run_state()
+      private$unstarted_run <- state
       governed <- private$callback_run_stream(
         messages = messages,
         limits = limits,
@@ -236,6 +237,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       state$result_promise <- NULL
       state$resolve_result <- NULL
       state$reject_result <- NULL
+      state$interrupt_before_start <- NULL
       state
     },
 
@@ -582,6 +584,9 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
 
     finish_active_run = function() {
       tree_run_finished(self)
+      if (identical(private$unstarted_run, private$current_run_state)) {
+        private$unstarted_run <- NULL
+      }
       checkpoint_error <- NULL
       tryCatch(
         private$finalize_pending_checkpoints(),
