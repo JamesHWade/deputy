@@ -1,3 +1,45 @@
+test_that("an interrupt while a PermissionRequest hook is pending keeps the call denied", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  sandbox <- withr::local_tempdir(pattern = "deputy-promise-interrupt-")
+  root <- file.path(sandbox, "root")
+  outside <- file.path(sandbox, "outside")
+  dir.create(root)
+  dir.create(outside)
+  target <- file.path(normalizePath(outside, mustWork = TRUE), "approved.txt")
+
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "write_file",
+      arguments = list(path = target, content = "approved")
+    ),
+    runtime_reply("done")
+  ))
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = list(tool_write_file),
+    permissions = permissions_standard(root),
+    working_dir = root
+  )
+  agent$add_hook(HookMatcher(
+    "PermissionRequest",
+    function(tool_name, tool_input, permission_result, context) {
+      # The caller stops the run while the approval is still being decided.
+      later::later(function() agent$interrupt("stop now"), 0.05)
+      later_value(PermissionResultAllow(), 0.3)
+    }
+  ))
+  result <- suppressWarnings(resolve_async_value(
+    agent$run_async("Write outside the root with approval."),
+    max_polls = 500L
+  ))
+
+  expect_false(file.exists(target))
+  expect_identical(result$stop_reason, "stop now")
+  expect_length(server$requests(), 1L)
+})
+
 test_that("a tool waits for a PreToolUse hook's promise", {
   skip_if_not_installed("promises")
   skip_if_not_installed("later")
@@ -529,4 +571,62 @@ test_that("a PostToolUse hook that answers after its run failed changes nothing 
   expect_identical(hook_calls, 1L)
   expect_identical(second$stop_reason, "complete")
   expect_identical(second$response, "second run done")
+})
+
+test_that("a stop that arrives while a PermissionRequest hook is pending wins over its allow", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  # A stream that does not end when the run is stopped: it waits for the
+  # request callback as ellmer does, then runs the tool unless it was
+  # rejected. So the run is still active when the hook answers.
+  callbacks <- new.env(parent = emptyenv())
+  callbacks$request <- function(request) invisible(NULL)
+  ran <- FALSE
+  rejection <- NULL
+  chat <- create_mock_chat()
+  chat$on_tool_request <- function(callback) callbacks$request <- callback
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    coro::async_generator(function() {
+      request <- ellmer::ContentToolRequest(
+        id = "pending-1",
+        name = "unlisted_tool",
+        arguments = list()
+      )
+      outcome <- tryCatch(
+        {
+          answered <- callbacks$request(request)
+          if (promises::is.promising(answered)) {
+            coro::await(answered)
+          }
+          NULL
+        },
+        ellmer_tool_reject = function(error) error
+      )
+      if (is.null(outcome)) {
+        ran <<- TRUE
+      } else {
+        rejection <<- conditionMessage(outcome)
+      }
+      coro::yield(ellmer::ContentText("after the tool"))
+    })()
+  }
+  agent <- Agent$new(chat = chat)
+  asked <- 0L
+  agent$add_hook(HookMatcher(
+    "PermissionRequest",
+    function(tool_name, tool_input, permission_result, context) {
+      asked <<- asked + 1L
+      later::later(function() agent$interrupt("stop now"), 0.05)
+      later_value(PermissionResultAllow(), 0.3)
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("go"), max_polls = 300L)
+
+  # The policy denied the call, so the hook was asked.
+  expect_identical(asked, 1L)
+  expect_false(ran)
+  expect_match(rejection, "stopped")
+  expect_identical(result$stop_reason, "stop now")
 })

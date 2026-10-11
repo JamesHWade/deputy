@@ -297,6 +297,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       }
 
       if (S7::S7_inherits(perm_result, PermissionResultDeny)) {
+        stopped_before <- isTRUE(private$should_stop)
         fired <- private$fire_hook(
           "PermissionRequest",
           tool_name = tool_name,
@@ -304,9 +305,15 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
           permission_result = perm_result,
           context = context
         )
+        waited <- promises::is.promising(fired)
         return(hook_then(fired, function(request_result) {
           if (run_over()) {
             ellmer::tool_reject("The run has ended.")
+          }
+          # A stop that arrived while the hook was pending wins over its
+          # answer: an allow must not run a call the caller has cancelled.
+          if (waited && !stopped_before && isTRUE(private$should_stop)) {
+            ellmer::tool_reject("The run was stopped.")
           }
           if (S7::S7_inherits(request_result, PermissionResultAllow)) {
             perm_result <- request_result
