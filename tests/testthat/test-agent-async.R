@@ -298,6 +298,39 @@ test_that("run_async reports clean interruption", {
   expect_identical(result$stop_reason, "user_cancelled")
 })
 
+test_that("a stopped run reports the cost of the requests that finished", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  # The first reply calls a tool; the second is held until the run is
+  # interrupted, so its cost is never reported.
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "read_file", arguments = list(path = "a.txt")),
+    fixture_gate(runtime_reply("never seen"), "second", open_after = 0.1)
+  ))
+  tool <- ellmer::tool(
+    function(path) "contents",
+    name = "read_file",
+    description = "Read a file",
+    arguments = list(path = ellmer::type_string("The file path"))
+  )
+  # The OpenAI name gives the model a price, so the finished request has a cost.
+  agent <- Agent$new(
+    runtime_chat(server, name = "OpenAI"),
+    tools = list(tool),
+    permissions = permissions_full()
+  )
+  timer <- server$when_gate("second", function() agent$interrupt())
+  result <- resolve_async_value(agent$run_async("read a.txt"))
+  timer()
+
+  expect_identical(result$stop_reason, "interrupted")
+  expect_identical(result$usage$requests, 2L)
+  expect_identical(result$usage$tool_calls, 1L)
+  expect_identical(result$usage$cost_usd, NA_real_)
+  expect_gt(result$usage$known_cost_usd, 0)
+})
+
 test_that("stream_async records usage on the shared callback state", {
   skip_if_not_installed("promises")
   skip_if_not_installed("later")

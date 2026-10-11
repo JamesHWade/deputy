@@ -144,7 +144,8 @@ test_that("usage property projections are independent plain records", {
       "output_tokens",
       "cached_tokens",
       "total_tokens",
-      "cost_usd"
+      "cost_usd",
+      "known_cost_usd"
     )
   )
   fields$total_tokens <- 1000
@@ -391,4 +392,168 @@ test_that("usage limit defaults use the native request limit", {
   expect_identical(limits$max_requests, 25L)
   expect_null(limits$max_cost_usd)
   expect_equal(limits$on_exceed, "stop")
+})
+
+test_that("AgentUsage carries the known cost", {
+  expect_identical(AgentUsage(cost_usd = 0.02)$known_cost_usd, 0.02)
+  expect_identical(AgentUsage(cost_usd = NA_real_)$known_cost_usd, 0)
+  expect_identical(
+    AgentUsage(cost_usd = NA_real_, known_cost_usd = 0.01)$known_cost_usd,
+    0.01
+  )
+  expect_error(
+    AgentUsage(cost_usd = NA_real_, known_cost_usd = -1),
+    "non-negative"
+  )
+  expect_error(
+    AgentUsage(cost_usd = NA_real_, known_cost_usd = NA_real_),
+    "non-negative"
+  )
+  # A known cost is the cost, so a supplied known part is ignored then.
+  expect_identical(
+    AgentUsage(cost_usd = 0.02, known_cost_usd = 0.05)$known_cost_usd,
+    0.02
+  )
+})
+
+test_that("usage saved before the known cost existed is rebuilt", {
+  props <- S7::props(AgentUsage(
+    requests = 2,
+    input_tokens = 10,
+    output_tokens = 5,
+    cost_usd = NA_real_,
+    known_cost_usd = 0.01
+  ))
+  props$total_tokens <- NULL
+  props$known_cost_usd <- NULL
+
+  usage <- do.call(AgentUsage, props)
+
+  expect_identical(usage$cost_usd, NA_real_)
+  expect_identical(usage$known_cost_usd, 0)
+})
+
+test_that("usage saved with the known cost is rebuilt with it", {
+  props <- S7::props(AgentUsage(
+    requests = 2,
+    input_tokens = 10,
+    output_tokens = 5,
+    cost_usd = NA_real_,
+    known_cost_usd = 0.01
+  ))
+  props$total_tokens <- NULL
+
+  usage <- do.call(AgentUsage, props)
+
+  expect_identical(usage$cost_usd, NA_real_)
+  expect_identical(usage$known_cost_usd, 0.01)
+  expect_identical(usage, approval_usage(S7::props(usage)))
+})
+
+test_that("a response with no cost leaves the others' cost known", {
+  turns <- list(
+    create_mock_assistant_turn(cost = 0.02),
+    create_mock_assistant_turn(cost = NA_real_),
+    create_mock_assistant_turn(cost = 0.03)
+  )
+  chat <- create_mock_chat()
+  chat$get_turns <- function() turns
+  chat$get_tokens <- function() {
+    data.frame(
+      input = rep(1, 3),
+      output = rep(1, 3),
+      cached_input = rep(0, 3),
+      cost = c(0.02, NA_real_, 0.03)
+    )
+  }
+
+  usage <- agent_usage_snapshot(chat)
+  conversation <- conversation_usage_snapshot(chat)
+
+  expect_identical(usage$cost_usd, NA_real_)
+  expect_equal(usage$known_cost_usd, 0.05)
+  expect_identical(conversation$cost_usd, NA_real_)
+  expect_equal(conversation$known_cost_usd, 0.05)
+})
+
+test_that("the difference and the sum of two usages keep the known cost", {
+  before <- AgentUsage(cost_usd = 0.02)
+  after <- AgentUsage(cost_usd = NA_real_, known_cost_usd = 0.05)
+
+  difference <- agent_usage_difference(after, before)
+
+  expect_identical(difference$cost_usd, NA_real_)
+  expect_equal(difference$known_cost_usd, 0.03)
+
+  total <- agent_usage_add(AgentUsage(cost_usd = 0.1), after)
+
+  expect_identical(total$cost_usd, NA_real_)
+  expect_equal(total$known_cost_usd, 0.15)
+})
+
+test_that("a difference taken from provider records keeps the known cost of the added ones", {
+  chat <- create_mock_chat()
+  turns <- list(create_mock_assistant_turn(cost = 0.02))
+  costs <- 0.02
+  chat$get_turns <- function() turns
+  chat$get_tokens <- function() {
+    data.frame(
+      input = rep(1, length(costs)),
+      output = rep(1, length(costs)),
+      cached_input = rep(0, length(costs)),
+      cost = costs
+    )
+  }
+  baseline <- agent_usage_snapshot(chat)
+  turns <- c(
+    turns,
+    list(create_mock_assistant_turn(cost = NA_real_)),
+    list(create_mock_assistant_turn(cost = 0.03))
+  )
+  costs <- c(costs, NA_real_, 0.03)
+  current <- agent_usage_snapshot(chat)
+
+  difference <- agent_usage_difference(current, baseline)
+
+  expect_identical(difference$cost_usd, NA_real_)
+  expect_equal(difference$known_cost_usd, 0.03)
+})
+
+test_that("a cost limit that goes on is enforced against the known cost", {
+  limits <- UsageLimits(max_cost_usd = 0.05, on_unknown_cost = "continue")
+
+  expect_null(usage_limit_status(
+    AgentUsage(cost_usd = NA_real_, known_cost_usd = 0.01),
+    limits
+  ))
+
+  status <- usage_limit_status(
+    AgentUsage(cost_usd = NA_real_, known_cost_usd = 0.06),
+    limits
+  )
+  expect_identical(status$reason, "cost_limit")
+  expect_identical(status$field, "max_cost_usd")
+  expect_equal(status$actual, 0.06)
+  expect_equal(status$limit, 0.05)
+
+  stopping <- UsageLimits(max_cost_usd = 0.05)
+  expect_identical(
+    usage_limit_status(
+      AgentUsage(cost_usd = NA_real_, known_cost_usd = 0.06),
+      stopping
+    )$reason,
+    "cost_unavailable"
+  )
+})
+
+test_that("usage prints the known cost only when the cost is unknown and positive", {
+  known_output <- capture_output(print(
+    AgentUsage(cost_usd = NA_real_, known_cost_usd = 0.01)
+  ))
+  known_zero_output <- capture_output(print(AgentUsage(cost_usd = NA_real_)))
+  default_output <- capture_output(print(AgentUsage(cost_usd = 0.01)))
+
+  expect_match(known_output, "known_cost_usd: ", fixed = TRUE)
+  expect_no_match(known_zero_output, "known_cost_usd", fixed = TRUE)
+  expect_no_match(default_output, "known_cost_usd", fixed = TRUE)
 })
