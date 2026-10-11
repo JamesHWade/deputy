@@ -54,7 +54,7 @@ Where each event waits:
 | `PreToolUse`, `PermissionRequest` | before the tool runs: ellmer awaits the request callback |
 | `PostToolUse`, `PostToolUseFailure` | before the next model request, and at the end of a pass: ellmer does not await the result callback, so Deputy holds the promise |
 | `PostModelRequest` | before the run goes on: ellmer awaits the request-end callback |
-| `SessionStart`, `UserPromptSubmit` | before the first model request |
+| `SessionStart`, `UserPromptSubmit` | before the first model request; in a delegate batch, before any task is admitted |
 | `SubagentStart`, `SubagentStop` | around the delegated run |
 | `PreCompact`, `PostCompact` | in automatic compaction; `$compact()` does not wait |
 | `Stop`, `SessionEnd` | when the run ends in its own course |
@@ -75,11 +75,11 @@ or `PermissionRequest` answer rejects the call, and a `PostToolUse` or
 ### Stop and SessionEnd fire from the run's body
 
 `finish_callback_run()` is split into settling the run (reason, usage, limit),
-firing the two hooks, and the terminal accounting. A run that ends in its body
-settles and fires both hooks there, where a coroutine can wait. A run that
-ends outside its body (an error signalled from the stream, an abandoned
-stream) and a delegate batch fire them from `finish_callback_run()` and do not
-wait, as before.
+firing the two hooks, and the terminal accounting. A run that ends in its
+body, a streamed run or a delegate batch, settles and fires both hooks there,
+where a coroutine can wait. A run that ends outside its body (an error
+signalled from the stream or the batch, an abandoned stream) fires them from
+`finish_callback_run()` and does not wait, as before.
 
 ### Stop may send the run on
 
@@ -90,7 +90,8 @@ once a hook has sent the run on, which is how a hook avoids doing so for ever;
 Deputy adds no cap of its own beyond the run's limits. `SessionEnd` fires
 once. The result's `response` is the last pass's text and its `turns` hold
 every pass. Only an answered run is sent on: one that was stopped, hit a
-limit, was cut off by the provider or failed ends as it stands.
+limit, was cut off by the provider or failed ends as it stands, and so does a
+delegate batch, which has no answer of its own.
 
 ### Limits, cost and the result beside the stream
 

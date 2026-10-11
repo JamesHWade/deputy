@@ -300,6 +300,16 @@ lead_parallel_delegate <- function(
       state$reason <- "complete"
     }
     completed <- TRUE
+    # The batch waits for its own Stop and SessionEnd hooks, as a streamed run
+    # does. A batch has no answer of its own, so Stop cannot send it on.
+    stopped <- private$stop_in_body(state)
+    if (promises::is.promising(stopped)) {
+      coro::await(stopped)
+    }
+    ended <- private$session_end_in_body(state)
+    if (promises::is.promising(ended)) {
+      coro::await(ended)
+    }
     private$finish_callback_run(state)
     list(
       mode = "stateless",

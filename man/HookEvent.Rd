@@ -32,10 +32,10 @@ A promise that is rejected, or has not settled in time, counts as no answer
 and is recorded as a hook error; for \code{PreToolUse} that denies the call.
 Deputy does not wait for \code{Notification} or \code{ConfigChange} hooks, for a hook
 fired by \verb{$compact()}, or for \code{Stop} and \code{SessionEnd} when a run ends with
-an error, its stream is abandoned, or the run is a delegate batch. With
-tools run concurrently, other tool calls of the same response may start or
-finish while a hook waits. If \verb{$interrupt()} is called while a hook waits,
-the run stops when the promise settles.
+an error or its stream is abandoned. With tools run concurrently, other
+tool calls of the same response may start or finish while a hook waits. If
+\verb{$interrupt()} is called while a hook waits, the run stops when the promise
+settles.
 }
 \section{Events}{
 

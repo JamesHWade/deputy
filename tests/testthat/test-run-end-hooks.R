@@ -1,6 +1,6 @@
-# Stop and SessionEnd fire from the run's body and wait for a promise. A run
-# that ends with an error, an abandoned stream and a delegate batch fire them
-# without waiting, as before.
+# Stop and SessionEnd fire from the run's body and wait for a promise, in a
+# streamed run and in a delegate batch. A run that ends with an error and an
+# abandoned stream fire them without waiting, as before.
 
 # A mock chat whose stream yields `text`, with a last turn to report.
 run_end_chat <- function(text = "done") {
@@ -314,7 +314,7 @@ test_that("a delegate batch fires Stop and SessionEnd once each, in order", {
   expect_identical(log, c("Stop", "SessionEnd"))
 })
 
-test_that("a delegate batch does not wait for a Stop or SessionEnd hook's promise", {
+test_that("a delegate batch waits for a Stop and a SessionEnd hook's promise", {
   skip_if_not_installed("promises")
   skip_if_not_installed("later")
 
@@ -322,24 +322,17 @@ test_that("a delegate batch does not wait for a Stop or SessionEnd hook's promis
   state$hold_a_until_b <- FALSE
   lead <- parallel_test_lead(state)
   log <- character()
-  settled <- character()
+  note <- function(label) log <<- c(log, label)
   for (event in c("Stop", "SessionEnd")) {
     local({
       name <- event
+      settle <- delayed_hook(note, paste(name, "settled"))
       lead$add_hook(HookMatcher(
         event = name,
         timeout = 0,
         callback = function(reason, context, ...) {
-          log <<- c(log, name)
-          promises::promise(function(resolve, reject) {
-            later::later(
-              function() {
-                settled <<- c(settled, name)
-                resolve(NULL)
-              },
-              0.3
-            )
-          })
+          note(paste(name, "fired"))
+          settle(reason, context)
         }
       ))
     })
@@ -351,8 +344,77 @@ test_that("a delegate batch does not wait for a Stop or SessionEnd hook's promis
   )))
 
   expect_identical(batch$status, c(a = "completed", b = "completed"))
-  expect_identical(log, c("Stop", "SessionEnd"))
-  expect_identical(settled, character())
+  expect_identical(
+    log,
+    c("Stop fired", "Stop settled", "SessionEnd fired", "SessionEnd settled")
+  )
+  expect_identical(batch$run$stop_reason, "complete")
+  expect_false(lead$.__enclos_env__$private$run_active)
+})
+
+test_that("an interrupt while a batch's Stop hook is pending ends the batch stopped", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  state$hold_a_until_b <- FALSE
+  lead <- parallel_test_lead(state)
+  endings <- list()
+  lead$add_hook(HookMatcher(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context, ...) {
+      later::later(function() lead$interrupt(), 0.01)
+      later_value(NULL, 0.05)
+    }
+  ))
+  lead$add_hook(HookMatcher(
+    event = "SessionEnd",
+    timeout = 0,
+    callback = function(reason, context, ...) {
+      endings[[length(endings) + 1L]] <<- context$ending
+      NULL
+    }
+  ))
+
+  batch <- resolve_async_value(lead$parallel_delegate_async(c(
+    a = "first",
+    b = "second"
+  )))
+
+  expect_identical(batch$status, c(a = "completed", b = "completed"))
+  expect_identical(batch$run$stop_reason, "interrupted")
+  expect_identical(batch$run$ending@by, "caller")
+  expect_length(endings, 1L)
+  expect_true(S7::S7_inherits(endings[[1L]], RunEndingStopped))
+})
+
+test_that("a Stop hook cannot send a delegate batch on", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  state$hold_a_until_b <- FALSE
+  lead <- parallel_test_lead(state)
+  stops <- 0L
+  lead$add_hook(HookMatcher(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context, ...) {
+      stops <<- stops + 1L
+      later_value(HookResultStop("Do it again."), 0.01)
+    }
+  ))
+
+  batch <- resolve_async_value(lead$parallel_delegate_async(c(
+    a = "first",
+    b = "second"
+  )))
+
+  expect_identical(stops, 1L)
+  expect_identical(state$started, c("a", "b"))
+  expect_identical(batch$run$stop_reason, "complete")
+  expect_identical(batch$run$usage$requests, 2L)
 })
 
 test_that("the approaching-cost warning is given once", {
