@@ -1137,3 +1137,30 @@ test_that("an interrupt while a compaction request's PostModelRequest hook is pe
   expect_identical(result$stop_reason, "enough")
   expect_false(agent$.__enclos_env__$private$run_active)
 })
+
+test_that("PostModelRequest fires for a compaction summary that is rejected as empty", {
+  server <- local_runtime_server(list(
+    runtime_reply(" "),
+    runtime_reply("Task response")
+  ))
+  agent <- Agent$new(
+    runtime_compaction_chat(server),
+    context_policy = ContextPolicy(max_tokens = 50, fallback = "text")
+  )
+  seen <- integer()
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context) {
+      seen <<- c(seen, context$request_number)
+      NULL
+    }
+  ))
+
+  result <- suppressWarnings(agent$run_sync("Continue"))
+
+  # The summary request got a response, so the hook is told of it, though
+  # the response was no use and the text fallback was taken.
+  expect_identical(agent$last_compaction()$method, "text")
+  expect_identical(result$usage$requests, 2L)
+  expect_identical(seen, c(1L, 2L))
+})

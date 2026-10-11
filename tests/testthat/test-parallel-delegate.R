@@ -512,3 +512,39 @@ test_that("a batch that goes on without a cost still gives its next subagent a b
   expect_identical(batch$run$usage$cost_usd, NA_real_)
   expect_equal(batch$run$usage$known_cost_usd, 0.002)
 })
+
+test_that("a batch stopped at its start prepares no subagent", {
+  state <- new.env(parent = emptyenv())
+  chat <- create_parallel_chat(state)
+  clones <- 0L
+  clone <- chat$clone
+  chat$clone <- function(...) {
+    clones <<- clones + 1L
+    clone(...)
+  }
+  lead <- LeadAgent$new(
+    chat,
+    sub_agents = lapply(c("a", "b"), function(name) {
+      agent_definition(name, paste("Responder", name), name)
+    })
+  )
+  lead$add_hook(HookMatcher(
+    event = "SessionStart",
+    timeout = 0,
+    callback = function(...) {
+      lead$interrupt("not today")
+      NULL
+    }
+  ))
+  clones_before <- clones
+
+  batch <- lead$parallel_delegate(c(a = "one", b = "two"))
+
+  expect_identical(clones, clones_before)
+  expect_identical(state$started, character())
+  expect_identical(batch$status, c(a = "not_started", b = "not_started"))
+  expect_identical(batch$run$stop_reason, "not today")
+  expect_named(batch$outcomes, c("a", "b"))
+  expect_false(lead$.__enclos_env__$private$run_active)
+  expect_length(lead$.__enclos_env__$private$active_subagents, 0L)
+})
