@@ -50,8 +50,12 @@ governed_compaction_async <- coro::async(function(
     NULL,
     policy$fallback,
     TRUE,
-    estimated
+    estimated,
+    wait = TRUE
   )
+  if (promises::is.promising(plan)) {
+    plan <- coro::await(plan)
+  }
   if (!is.null(plan$result)) {
     return(plan$result)
   }
@@ -89,8 +93,12 @@ governed_compaction_async <- coro::async(function(
     generated$summary,
     generated$method,
     generated$usage,
-    generated$attempts
+    generated$attempts,
+    wait = TRUE
   )
+  if (promises::is.promising(result)) {
+    result <- coro::await(result)
+  }
   compaction_can_continue(agent)
   result
 })
