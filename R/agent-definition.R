@@ -93,7 +93,9 @@ validate_agent_definition_params <- function(params) {
   if (inherits(validated, "error")) {
     cli_abort("{.arg params} is invalid: {conditionMessage(validated)}")
   }
-  validated[intersect(known, names(validated))]
+  # Names on a value (such as a named stop_sequences vector) mean nothing to
+  # the provider and would turn a YAML sequence into a mapping.
+  lapply(validated[intersect(known, names(validated))], unname)
 }
 
 copy_agent_definition <- function(definition, arg = "definition") {

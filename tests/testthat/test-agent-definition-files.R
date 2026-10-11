@@ -79,6 +79,17 @@ test_that("params round-trip through YAML and are written only when set", {
   expect_true("params:" %in% lines)
   expect_true("  reasoning_effort: low" %in% lines)
 
+  named <- agent_definition(
+    "research",
+    "Searches",
+    "Search.",
+    model = "openai/gpt-test",
+    params = ellmer::params(stop_sequences = c(first = "END", second = "STOP"))
+  )
+  expect_identical(named$params, list(stop_sequences = c("END", "STOP")))
+  agent_definition_write(named, path, overwrite = TRUE)
+  expect_identical(agent_definition_read(path), named)
+
   plain <- agent_definition("research", "Searches", "Search.")
   agent_definition_write(plain, path, overwrite = TRUE)
   expect_false(any(grepl("params", readLines(path), fixed = TRUE)))
