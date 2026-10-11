@@ -194,25 +194,25 @@ lead_delegation_hook <- function(lead, id, event, definition = NULL) {
   private <- lead$.__enclos_env__$private
   record <- private$subagent_runs[[id]]
   previous_errors <- length(lead$hooks$last_errors())
-  on.exit(
-    {
-      errors <- lead$hooks$last_errors()
-      if (length(errors) > previous_errors) {
-        messages <- vapply(
-          errors[seq.int(previous_errors + 1L, length(errors))],
-          function(error) paste0(error$event, ": ", error$error),
-          character(1)
-        )
-        current <- private$subagent_runs[[id]]
-        current$hook_error <- paste(
-          c(current$hook_error, messages),
-          collapse = "\n"
-        )
-        private$subagent_runs[[id]] <- current
-      }
-    },
-    add = TRUE
-  )
+  # A promise's error is recorded only when it settles, after this function
+  # has returned, so the copy runs again then.
+  copy_errors <- function() {
+    errors <- lead$hooks$last_errors()
+    if (length(errors) > previous_errors) {
+      messages <- vapply(
+        errors[seq.int(previous_errors + 1L, length(errors))],
+        function(error) paste0(error$event, ": ", error$error),
+        character(1)
+      )
+      current <- private$subagent_runs[[id]]
+      current$hook_error <- paste(
+        c(current$hook_error, messages),
+        collapse = "\n"
+      )
+      private$subagent_runs[[id]] <- current
+    }
+  }
+  on.exit(copy_errors(), add = TRUE)
   args <- list(
     event = event,
     agent_name = record$agent_name,
@@ -235,7 +235,14 @@ lead_delegation_hook <- function(lead, id, event, definition = NULL) {
   if (identical(event, "SubagentStop")) {
     args["result"] <- list(record$result)
   }
-  do.call(private$fire_hook, args)
+  fired <- do.call(private$fire_hook, args)
+  if (promises::is.promising(fired)) {
+    return(hook_then(fired, function(value) {
+      copy_errors()
+      value
+    }))
+  }
+  fired
 }
 
 # Both callers reserve usage before starting this promise. Always release it,
@@ -277,7 +284,10 @@ lead_run_delegation <- function(
           private$active_subagents[[id]] <- child
           lead_observe_status(lead, id, "running")
           started <- TRUE
-          lead_delegation_hook(lead, id, "SubagentStart", definition)
+          fired <- lead_delegation_hook(lead, id, "SubagentStart", definition)
+          if (promises::is.promising(fired)) {
+            coro::await(fired)
+          }
           if (
             !isTRUE(private$should_stop) &&
               is.null(private$subagent_runs[[id]]$cancel_reason)
@@ -314,7 +324,12 @@ lead_run_delegation <- function(
     )
     if (started) {
       tryCatch(
-        lead_delegation_hook(lead, id, "SubagentStop"),
+        {
+          fired <- lead_delegation_hook(lead, id, "SubagentStop")
+          if (promises::is.promising(fired)) {
+            coro::await(fired)
+          }
+        },
         error = function(condition) {
           error <<- condition
           record <- private$subagent_runs[[id]]
