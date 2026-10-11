@@ -554,9 +554,16 @@ approval_type_record <- function(value) {
 
 intersect_usage_limits <- function(left, right) {
   fields <- S7::props(left)
-  for (name in setdiff(names(fields), "on_exceed")) {
+  for (name in usage_limit_fields()) {
     values <- c(S7::prop(left, name), S7::prop(right, name))
     fields[name] <- list(if (length(values)) min(values) else NULL)
+  }
+  fields$on_unknown_cost <- if (
+    "stop" %in% c(left$on_unknown_cost, right$on_unknown_cost)
+  ) {
+    "stop"
+  } else {
+    "continue"
   }
   fields$on_exceed <- if ("error" %in% c(left$on_exceed, right$on_exceed)) {
     "error"

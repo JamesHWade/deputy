@@ -1110,6 +1110,8 @@ Agent <- R6::R6Class(
     #'   cancelled controller is reset when the new run starts.
     #' @param run_context Named list merged into the agent's `run_context` for
     #'   this run.
+    #' @param usage_limits [UsageLimits] for this run. `NULL` fields use the
+    #'   agent's limits.
     #' @return A generator.
     #' @param type Optional ellmer type for structured streaming, passed to
     #'   ellmer. If the provider can't stream structured output, use
@@ -1119,16 +1121,23 @@ Agent <- R6::R6Class(
       stream = c("text", "content"),
       controller = NULL,
       run_context = list(),
-      type = NULL
+      type = NULL,
+      usage_limits = NULL
     ) {
       stream <- match.arg(stream)
       effective_run_context <- merge_run_context(
         private$.run_context,
         run_context
       )
+      limits <- if (is.null(usage_limits)) {
+        self$usage_limits
+      } else {
+        merge_usage_limits(usage_limits, self$usage_limits)
+      }
+      limits <- normalize_usage_limits(limits)
       governed_run <- private$start_governed_stream(
         messages = rlang::list2(...),
-        limits = self$usage_limits,
+        limits = limits,
         run_context = effective_run_context,
         stream = stream,
         controller = controller,
@@ -1152,6 +1161,8 @@ Agent <- R6::R6Class(
     #'   cancelled controller is reset when the new run starts.
     #' @param run_context Named list merged into the agent's `run_context` for
     #'   this run.
+    #' @param usage_limits [UsageLimits] for this run. `NULL` fields use the
+    #'   agent's limits.
     #' @return An asynchronous generator suitable for `shinychat::chat_append()`.
     #' @param type Optional ellmer type for structured streaming, passed to
     #'   ellmer. If the provider can't stream structured output, use
@@ -1162,7 +1173,8 @@ Agent <- R6::R6Class(
       stream = c("text", "content"),
       controller = NULL,
       run_context = list(),
-      type = NULL
+      type = NULL,
+      usage_limits = NULL
     ) {
       tool_mode <- match.arg(tool_mode)
       stream <- match.arg(stream)
@@ -1170,9 +1182,15 @@ Agent <- R6::R6Class(
         private$.run_context,
         run_context
       )
+      limits <- if (is.null(usage_limits)) {
+        self$usage_limits
+      } else {
+        merge_usage_limits(usage_limits, self$usage_limits)
+      }
+      limits <- normalize_usage_limits(limits)
       governed_run <- private$start_governed_stream(
         messages = rlang::list2(...),
-        limits = self$usage_limits,
+        limits = limits,
         run_context = effective_run_context,
         tool_mode = tool_mode,
         stream = stream,
@@ -2615,7 +2633,13 @@ Agent <- R6::R6Class(
 
         do.call(
           UsageLimits,
-          c(remaining, list(on_exceed = limits$on_exceed))
+          c(
+            remaining,
+            list(
+              on_unknown_cost = limits$on_unknown_cost,
+              on_exceed = limits$on_exceed
+            )
+          )
         )
       },
 

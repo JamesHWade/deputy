@@ -140,7 +140,7 @@ S7::method(print, AgentEvent) <- function(x, ...) {
       } else if (S7::S7_inherits(value, UsageLimits)) {
         configured <- Filter(
           Negate(is.null),
-          S7::props(value)[setdiff(names(S7::props(value)), "on_exceed")]
+          S7::props(value)[usage_limit_fields()]
         )
         value <- paste0(
           paste(

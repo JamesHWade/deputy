@@ -467,6 +467,73 @@ test_that("stream_async reports terminal cost limits without tool calls", {
   expect_identical(stop_reason, "cost_limit")
 })
 
+test_that("stream_async() takes usage_limits for one run, merged over the agent's", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  cost <- 0
+  output_tokens <- 0
+  stop_reasons <- character()
+  chat <- create_mock_chat()
+  chat$get_tokens <- function() {
+    data.frame(
+      input = 1,
+      output = output_tokens,
+      cached_input = 0,
+      cost = cost
+    )
+  }
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    output_tokens <<- output_tokens + 2
+    coro::async_generator(function() {
+      coro::yield("reply")
+    })()
+  }
+  agent <- Agent$new(
+    chat = chat,
+    usage_limits = UsageLimits(max_output_tokens = 1000)
+  )
+  agent$add_hook(HookMatcher(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context) {
+      stop_reasons <<- c(stop_reasons, reason)
+      NULL
+    }
+  ))
+
+  expect_equal(
+    collect_async_stream(agent$stream_async(
+      "strict",
+      usage_limits = UsageLimits(max_output_tokens = 1)
+    )),
+    list("reply")
+  )
+  expect_identical(stop_reasons, "output_token_limit")
+
+  expect_equal(
+    collect_async_stream(agent$stream_async("generous")),
+    list("reply")
+  )
+  expect_identical(stop_reasons, c("output_token_limit", "complete"))
+})
+
+test_that("stream() takes usage_limits for one run", {
+  server <- local_runtime_server(list(runtime_reply("first")))
+  agent <- Agent$new(
+    runtime_chat(server),
+    usage_limits = UsageLimits(max_output_tokens = 1000)
+  )
+
+  coro::collect(agent$stream(
+    "strict",
+    usage_limits = UsageLimits(max_output_tokens = 1)
+  ))
+
+  expect_identical(agent$last_run()$stop_reason, "output_token_limit")
+  expect_identical(agent$usage_limits$max_output_tokens, 1000L)
+})
+
 test_that("stream_async enforces Agent usage_limits", {
   skip_if_not_installed("promises")
   skip_if_not_installed("later")
@@ -553,6 +620,42 @@ test_that("stream_async stops when a cost limit cannot be measured", {
     list("cost unavailable")
   )
   expect_identical(stop_reason, "cost_unavailable")
+})
+
+test_that("a stream with a cost limit and on_unknown_cost = 'continue' finishes when the cost is unknown", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  cost <- 0
+  stop_reason <- NULL
+  chat <- create_mock_chat()
+  chat$get_tokens <- function() {
+    data.frame(input = 1, output = 1, cached_input = 0, cost = cost)
+  }
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    cost <<- NA_real_
+    coro::async_generator(function() {
+      coro::yield("cost unknown")
+    })()
+  }
+  agent <- Agent$new(
+    chat = chat,
+    usage_limits = UsageLimits(max_cost_usd = 1, on_unknown_cost = "continue")
+  )
+  agent$add_hook(HookMatcher(
+    event = "Stop",
+    timeout = 0,
+    callback = function(reason, context) {
+      stop_reason <<- reason
+      NULL
+    }
+  ))
+
+  expect_equal(
+    collect_async_stream(agent$stream_async("unknown cost")),
+    list("cost unknown")
+  )
+  expect_identical(stop_reason, "complete")
 })
 
 test_that("stream_async does not start with no request budget", {
