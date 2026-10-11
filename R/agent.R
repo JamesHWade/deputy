@@ -2719,6 +2719,8 @@ Agent <- R6::R6Class(
       should_stop = FALSE,
       stop_reason_from_hook = NULL,
       stop_requested_by = NULL,
+      # Promises of hooks the run does not wait for; see take_held_hooks().
+      held_hooks = list(),
 
       # Pending executions retain cancellation even if registered tools change.
       active_owned_tools = list(),
