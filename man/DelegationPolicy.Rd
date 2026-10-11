@@ -56,9 +56,9 @@ subagent at a lower reasoning effort than the lead on a client you build.
 including its \code{model} and \code{params}, which the function decides how to
 use. \code{context} holds the delegation's IDs, the subagent's name and run
 context, the lead's \code{delegation_scope} as \code{scope}, and the working
-directory. Return a new chat each time, not the lead's chat or one
-already used by an agent. Deputy removes its turns, tools and tool
-callbacks and sets the subagent's system prompt and tools. Without it,
+directory. Return a chat no agent is using, not the lead's. The
+subagent runs on a copy of it, without its turns, tools and tool
+callbacks, and with its own system prompt and tools. Without it,
 Deputy copies the lead's chat or calls \code{\link[ellmer:chat]{ellmer::chat()}}, as the
 definition's \code{model} says.}
 }

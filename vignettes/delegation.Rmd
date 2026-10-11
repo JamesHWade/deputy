@@ -154,8 +154,8 @@ reasoning effort than the lead:
 ```{r}
 policy <- DelegationPolicy(
   chat = function(definition, context) {
-    ellmer::chat_openai(
-      model = "gpt-6-luna",
+    ellmer::chat(
+      "openai/gpt-6-luna",
       params = ellmer::params(
         reasoning_effort = definition$params$reasoning_effort
       )
@@ -165,9 +165,9 @@ policy <- DelegationPolicy(
 ```
 
 The function receives the definition, including its `model` and `params`, and
-the delegation's identifiers. It must return a new chat each time, not the
-lead's chat or one an agent already uses. Deputy removes the chat's turns,
-tools and tool callbacks before the subagent starts. If the function fails,
+the delegation's identifiers. It must return a chat no agent is using, not
+the lead's. The subagent runs on a copy of it, without its turns, tools and
+tool callbacks. If the function fails,
 the delegation fails before any request. It builds the chats for
 `$parallel_delegate()` too.
 

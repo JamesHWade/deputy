@@ -44,9 +44,9 @@ NULL
 #'   including its `model` and `params`, which the function decides how to
 #'   use. `context` holds the delegation's IDs, the subagent's name and run
 #'   context, the lead's `delegation_scope` as `scope`, and the working
-#'   directory. Return a new chat each time, not the lead's chat or one
-#'   already used by an agent. Deputy removes its turns, tools and tool
-#'   callbacks and sets the subagent's system prompt and tools. Without it,
+#'   directory. Return a chat no agent is using, not the lead's. The
+#'   subagent runs on a copy of it, without its turns, tools and tool
+#'   callbacks, and with its own system prompt and tools. Without it,
 #'   Deputy copies the lead's chat or calls [ellmer::chat()], as the
 #'   definition's `model` says.
 #' @details
@@ -237,8 +237,9 @@ begin_delegation_binding <- function(lead, definition, correlation, stateless) {
 }
 
 # Build a subagent's chat with the host's DelegationPolicy(chat = ) function.
-# The result is treated like a copy of the lead's chat: it must be its own,
-# unused client, and it starts without turns, tools or tool callbacks.
+# The result is treated like the lead's chat: it must be an unused ellmer
+# Chat, and the subagent runs on a deep copy without turns, tools or tool
+# callbacks.
 delegation_factory_chat <- function(lead, definition, correlation) {
   private <- lead$.__enclos_env__$private
   context <- list(
@@ -284,17 +285,26 @@ delegation_factory_chat <- function(lead, definition, correlation) {
       "The chat function must return a new chat, not one an agent already uses."
     )
   }
-  tryCatch(
-    clear_chat_tool_callbacks(chat, source = private$.chat),
+  # Work on a deep copy, as for the lead's chat: a host's `template$clone()`
+  # shares its callback managers with the template and every other shallow
+  # copy, and clearing them would strip another live subagent's callbacks.
+  copy <- tryCatch(
+    {
+      copy <- clone_governed_chat(chat)
+      clear_chat_tool_callbacks(copy, source = chat)
+      copy
+    },
     error = function(error) {
-      delegation_binding_abort(
-        "The chat function must return a chat that doesn't share the lead's callbacks."
+      abort_deputy(
+        "Could not copy the chat built for subagent {.val {definition$name}}.",
+        class = "delegation_binding",
+        parent = error
       )
     }
   )
-  chat$set_turns(list())
-  chat$set_tools(list())
-  chat
+  copy$set_turns(list())
+  copy$set_tools(list())
+  copy
 }
 
 release_delegation_binding <- function(lead, id) {

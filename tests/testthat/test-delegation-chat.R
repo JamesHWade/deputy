@@ -13,6 +13,14 @@ factory_chat <- function(
   chat$get_model_object <- function() {
     ellmer::Model(name = model, params = params)
   }
+  # Deputy runs the subagent on a copy, which keeps the client's settings, as
+  # an ellmer Chat's clone does.
+  chat$clone <- function(deep = FALSE) {
+    copy <- factory_chat(state, params, model, provider)
+    copy$set_turns(chat$get_turns())
+    copy$set_tools(chat$get_tools())
+    copy
+  }
   chat
 }
 
@@ -107,6 +115,32 @@ test_that("named param values are recorded without their names", {
     lead$get_subagent_contexts()[[1L]]$params,
     list(stop_sequences = "END")
   )
+})
+
+test_that("the subagent runs on a copy of the chat the function returns", {
+  server <- local_runtime_server(list(runtime_reply("Sub answer")))
+  template <- runtime_chat(server)
+  template$on_tool_request(function(request) NULL)
+  managers <- function(chat) {
+    chat$.__enclos_env__$private$callback_on_tool_request
+  }
+  returned <- NULL
+  state <- new.env(parent = emptyenv())
+  lead <- LeadAgent$new(
+    create_parallel_chat(state),
+    sub_agents = list(agent_definition("a", "A", "a")),
+    delegation_policy = DelegationPolicy(chat = function(definition, context) {
+      # A shallow clone shares its callback managers with the template.
+      returned <<- template$clone()
+      returned
+    })
+  )
+
+  expect_match(delegate_run(lead), "^Sub answer")
+  expect_identical(managers(returned), managers(template))
+  # Neither the template nor the chat handed back lost its callback.
+  expect_equal(managers(template)$count(), 1L)
+  expect_length(returned$get_turns(), 0L)
 })
 
 test_that("a chat function builds parallel_delegate() responders", {

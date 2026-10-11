@@ -592,6 +592,23 @@ test_that("answers keep labels apart and pass the person's own text", {
   expect_match(result, "\"selected\":[],\"other_text\":null", fixed = TRUE)
 })
 
+test_that("padding around a chosen label doesn't make it typed text", {
+  result <- interaction_answering_tool(list(
+    "Which outputs?" = c(" Text", "Slides  ", " Maps "),
+    "Which format?" = "YAML\n"
+  ))(interaction_shape_questions())
+
+  expect_identical(
+    interaction_answer(result, 1L),
+    list(
+      question = "Which outputs?",
+      selected = list("Text", "Slides"),
+      other_text = "Maps"
+    )
+  )
+  expect_identical(interaction_answer(result, 2L)$selected, list("YAML"))
+})
+
 test_that("the person's own text can take the place of a single label", {
   result <- interaction_answering_tool(list("Which format?" = "TOML"))(
     interaction_shape_questions()

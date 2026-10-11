@@ -361,10 +361,12 @@ ask_user_answers <- function(questions, answers) {
         " contains NA."
       ))
     }
-    values <- as.character(values)
-    values <- unique(values[nzchar(trimws(values))])
+    # Padding from a text input doesn't turn a chosen label into free text.
+    values <- trimws(as.character(values))
+    values <- unique(values[nzchar(values)])
     labels <- vapply(q[["options"]], function(o) o[["label"]], character(1))
-    other <- values[!values %in% labels]
+    chosen <- labels[trimws(labels) %in% values]
+    other <- values[!values %in% trimws(labels)]
     if (length(other) > 1L) {
       ask_user_answers_abort(paste0(
         "The handler gave ",
@@ -384,7 +386,7 @@ ask_user_answers <- function(questions, answers) {
     }
     list(
       question = text,
-      selected = labels[labels %in% values],
+      selected = chosen,
       other_text = if (length(other)) other else NULL
     )
   })
