@@ -136,21 +136,22 @@ graph_fire_hooks <- function(agent, event, tool_name = NULL, ...) {
     return(agent$hooks$fire(event, tool_name = tool_name, ...))
   }
   root <- delegation_tree_root(private$.delegation_tree)
+  args <- list(...)
   results <- lapply(c(ancestors, list(agent)), function(source) {
     registry <- source$hooks
-    before <- length(registry$last_errors())
-    value <- registry$fire(event, tool_name = tool_name, ...)
-    # A promise's error arrives later, so the bookkeeping runs once the value is known.
-    hook_then(value, function(value) {
-      errors <- registry$last_errors()
-      if (length(errors) > before) {
+    fire_with_errors(
+      registry,
+      function() {
+        do.call(registry$fire, c(list(event, tool_name = tool_name), args))
+      },
+      function(errors) {
         rp <- root$.__enclos_env__$private
         record <- rp$subagent_runs[[private$.delegation_id]]
         record$hook_error <- paste(
           c(
             record$hook_error,
             vapply(
-              errors[seq.int(before + 1L, length(errors))],
+              errors,
               function(x) paste0(x$event, ": ", x$error),
               character(1)
             )
@@ -159,8 +160,7 @@ graph_fire_hooks <- function(agent, event, tool_name = NULL, ...) {
         )
         rp$subagent_runs[[private$.delegation_id]] <- record
       }
-      value
-    })
+    )
   })
   if (any(vapply(results, promises::is.promising, logical(1)))) {
     return(promises::then(

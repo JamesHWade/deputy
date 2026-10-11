@@ -16,7 +16,9 @@ Each agent has its own registry in \code{agent$hooks}; add hooks with
     \item \href{#method-HookRegistry-add}{\code{HookRegistry$add()}}
     \item \href{#method-HookRegistry-get_hooks}{\code{HookRegistry$get_hooks()}}
     \item \href{#method-HookRegistry-fire}{\code{HookRegistry$fire()}}
+    \item \href{#method-HookRegistry-reserve_fire_id}{\code{HookRegistry$reserve_fire_id()}}
     \item \href{#method-HookRegistry-last_errors}{\code{HookRegistry$last_errors()}}
+    \item \href{#method-HookRegistry-errors_from}{\code{HookRegistry$errors_from()}}
     \item \href{#method-HookRegistry-clear_errors}{\code{HookRegistry$clear_errors()}}
     \item \href{#method-HookRegistry-count}{\code{HookRegistry$count()}}
     \item \href{#method-HookRegistry-print}{\code{HookRegistry$print()}}
@@ -114,10 +116,27 @@ callback returned a promise.
 }
 
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-HookRegistry-reserve_fire_id"></a>}}
+\if{latex}{\out{\hypertarget{method-HookRegistry-reserve_fire_id}{}}}
+\subsection{\code{HookRegistry$reserve_fire_id()}}{
+  Reserve the ID of the next \code{fire()} call, so that its errors can be
+found afterwards with \code{errors_from()}. Call it immediately before
+\code{fire()}.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HookRegistry$reserve_fire_id()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The ID, an integer.
+  }
+}
+
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-HookRegistry-last_errors"></a>}}
 \if{latex}{\out{\hypertarget{method-HookRegistry-last_errors}{}}}
 \subsection{\code{HookRegistry$last_errors()}}{
-  Get the errors raised by hook callbacks since the registry was created
+  Get the errors hook callbacks have raised since the registry was created
 or last cleared. Use it to check logging hooks, whose failures don't
 stop the run.
   \subsection{Usage}{
@@ -126,8 +145,32 @@ stop the run.
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    A list of records with \code{event}, \code{tool_name}, \code{error} and
-\code{timestamp}.
+    A list of records with \code{event}, \code{tool_name}, \code{error},
+\code{timestamp} and \code{fire_id}, the ID of the \code{fire()} call that raised
+the error.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-HookRegistry-errors_from"></a>}}
+\if{latex}{\out{\hypertarget{method-HookRegistry-errors_from}{}}}
+\subsection{\code{HookRegistry$errors_from()}}{
+  Get the errors raised by one \code{fire()} call, including those of promises
+that settled later.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{HookRegistry$errors_from(fire_id)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{fire_id}}{An ID from \code{reserve_fire_id()}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A list of records, as \code{last_errors()} returns.
   }
 }
 

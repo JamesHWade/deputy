@@ -315,6 +315,29 @@ hook_unawaited <- function(result) {
   if (promises::is.promising(result)) NULL else result
 }
 
+# Fires hooks on `registry` through `fire` (a function of no arguments) and
+# hands `record` the errors of that firing only: once for those raised before
+# `fire` returned, and again when a promised result settles. Other firings
+# pending against the same registry are not this one's.
+fire_with_errors <- function(registry, fire, record) {
+  fire_id <- registry$reserve_fire_id()
+  copied <- 0L
+  copy <- function() {
+    errors <- registry$errors_from(fire_id)
+    if (length(errors) > copied) {
+      record(errors[seq.int(copied + 1L, length(errors))])
+      copied <<- length(errors)
+    }
+    invisible(NULL)
+  }
+  value <- fire()
+  copy()
+  hook_then(value, function(value) {
+    copy()
+    value
+  })
+}
+
 # A promise that settles as `promise` does, or rejects after `seconds`.
 hook_promise_timeout <- function(promise, seconds, event) {
   promises::promise(function(resolve, reject) {
@@ -420,18 +443,49 @@ HookRegistry <- R6::R6Class(
         args <- c(list(tool_name = tool_name), args)
       }
 
-      private$fire_from(hooks, 1L, event, tool_name, args)
+      fire_id <- private$reserved_fire_id
+      private$reserved_fire_id <- NULL
+      if (is.null(fire_id)) {
+        private$fire_count <- private$fire_count + 1L
+        fire_id <- private$fire_count
+      }
+
+      private$fire_from(hooks, 1L, event, tool_name, args, fire_id)
     },
 
     #' @description
-    #' Get the errors raised by hook callbacks since the registry was created
+    #' Reserve the ID of the next `fire()` call, so that its errors can be
+    #' found afterwards with `errors_from()`. Call it immediately before
+    #' `fire()`.
+    #' @return The ID, an integer.
+    reserve_fire_id = function() {
+      private$fire_count <- private$fire_count + 1L
+      private$reserved_fire_id <- private$fire_count
+      private$reserved_fire_id
+    },
+
+    #' @description
+    #' Get the errors hook callbacks have raised since the registry was created
     #' or last cleared. Use it to check logging hooks, whose failures don't
     #' stop the run.
     #'
-    #' @return A list of records with `event`, `tool_name`, `error` and
-    #'   `timestamp`.
+    #' @return A list of records with `event`, `tool_name`, `error`,
+    #'   `timestamp` and `fire_id`, the ID of the `fire()` call that raised
+    #'   the error.
     last_errors = function() {
       private$hook_errors
+    },
+
+    #' @description
+    #' Get the errors raised by one `fire()` call, including those of promises
+    #' that settled later.
+    #' @param fire_id An ID from `reserve_fire_id()`.
+    #' @return A list of records, as `last_errors()` returns.
+    errors_from = function(fire_id) {
+      Filter(
+        function(error) identical(error$fire_id, fire_id),
+        private$hook_errors
+      )
     },
 
     #' @description
@@ -505,7 +559,7 @@ HookRegistry <- R6::R6Class(
       }
     },
 
-    hook_failed = function(event, tool_name, error) {
+    hook_failed = function(event, tool_name, error, fire_id) {
       error_message <- if (inherits(error, "condition")) {
         conditionMessage(error)
       } else {
@@ -517,7 +571,8 @@ HookRegistry <- R6::R6Class(
         event = event,
         tool_name = tool_name,
         error = error_message,
-        timestamp = Sys.time()
+        timestamp = Sys.time(),
+        fire_id = fire_id
       )
       private$hook_errors <- c(private$hook_errors, list(error_info))
 
@@ -554,12 +609,12 @@ HookRegistry <- R6::R6Class(
       NULL
     },
 
-    fire_from = function(hooks, index, event, tool_name, args) {
+    fire_from = function(hooks, index, event, tool_name, args, fire_id) {
       while (index <= length(hooks)) {
         hook <- hooks[[index]]
         result <- tryCatch(
           private$call_hook(hook, args),
-          error = function(e) private$hook_failed(event, tool_name, e)
+          error = function(e) private$hook_failed(event, tool_name, e, fire_id)
         )
         if (promises::is.promising(result)) {
           rest <- index + 1L
@@ -567,14 +622,14 @@ HookRegistry <- R6::R6Class(
             hook_promise_timeout(result, hook@promise_timeout, event),
             onFulfilled = function(value) value,
             onRejected = function(error) {
-              private$hook_failed(event, tool_name, error)
+              private$hook_failed(event, tool_name, error, fire_id)
             }
           )
           return(promises::then(settled, function(value) {
             if (!is.null(value)) {
               return(value)
             }
-            private$fire_from(hooks, rest, event, tool_name, args)
+            private$fire_from(hooks, rest, event, tool_name, args, fire_id)
           }))
         }
         if (!is.null(result)) {
@@ -595,6 +650,8 @@ HookRegistry <- R6::R6Class(
     },
     hooks = list(),
     hook_errors = list(),
+    fire_count = 0L,
+    reserved_fire_id = NULL,
     callr_warned = FALSE
   )
 )
