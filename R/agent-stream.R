@@ -570,11 +570,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           state$resolve_result(state$result)
         } else {
           state$reject_result(
-            cleanup_error %||%
-              rlang::error_cnd(
-                class = "deputy_error",
-                message = "The governed run ended without an AgentResult"
-              )
+            cleanup_error %||% run_without_result_error()
           )
         }
       }
