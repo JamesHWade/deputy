@@ -197,7 +197,16 @@ conversation_remaining <- function(limits, usage) {
     max(0, limit - used)
   })
   names(values) <- names(fields)
-  do.call(UsageLimits, c(values, list(on_exceed = limits$on_exceed)))
+  do.call(
+    UsageLimits,
+    c(
+      values,
+      list(
+        on_unknown_cost = limits$on_unknown_cost,
+        on_exceed = limits$on_exceed
+      )
+    )
+  )
 }
 
 continue_conversation <- function(

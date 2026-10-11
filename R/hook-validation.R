@@ -24,6 +24,7 @@ hook_callback_arguments <- list(
   PreCompact = c("turns_to_compact", "turns_to_keep", "context"),
   PostCompact = c("result", "context"),
   SessionStart = "context",
+  PostModelRequest = "context",
   SessionEnd = c("reason", "context")
 )
 

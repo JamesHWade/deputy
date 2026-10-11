@@ -17,8 +17,9 @@ NULL
 #'
 #' Limits passed to `Agent$new()` apply to every run. Limits passed to a single
 #' run take any `NULL` field from the agent's limits, so they can't remove a
-#' limit the agent sets. Subagent runs are also capped by what is left of the
-#' lead's budget.
+#' limit the agent sets. A single run keeps its own `on_exceed` and
+#' `on_unknown_cost`; the agent's values for those don't replace them. Subagent
+#' runs are also capped by what is left of the lead's budget.
 #'
 #' The object is read-only: read fields with `$` and create a new one to change
 #' a limit.
@@ -34,7 +35,11 @@ NULL
 #'   tokens are reported separately and aren't added again.
 #' @param max_cost_usd Maximum estimated cost in US dollars. If the cost of a
 #'   response is unknown, the run stops with `"cost_unavailable"` rather than
-#'   guessing.
+#'   guessing, unless `on_unknown_cost = "continue"`.
+#' @param on_unknown_cost What happens when `max_cost_usd` is set and the cost
+#'   of a response is unknown. `"stop"` (the default) ends the run with
+#'   `"cost_unavailable"`. `"continue"` lets the run go on without a cost check
+#'   for that response.
 #' @param on_exceed What happens when a limit is reached. `"stop"` (the
 #'   default) ends the run and returns an [AgentResult] whose `stop_reason`
 #'   names the limit, such as `"request_limit"`, `"tool_call_limit"` or
@@ -75,6 +80,10 @@ UsageLimits <- S7::new_class(
       "max_cost_usd",
       S7::new_union(NULL, S7::class_double)
     ),
+    on_unknown_cost = readonly_property(
+      "on_unknown_cost",
+      S7::class_character
+    ),
     on_exceed = readonly_property("on_exceed", S7::class_character)
   ),
   constructor = function(
@@ -84,8 +93,10 @@ UsageLimits <- S7::new_class(
     max_output_tokens = NULL,
     max_total_tokens = NULL,
     max_cost_usd = NULL,
+    on_unknown_cost = c("stop", "continue"),
     on_exceed = c("stop", "error")
   ) {
+    on_unknown_cost <- match.arg(on_unknown_cost)
     on_exceed <- match.arg(on_exceed)
     value <- S7::new_object(
       S7::S7_object(),
@@ -108,6 +119,7 @@ UsageLimits <- S7::new_class(
         "max_cost_usd",
         integer = FALSE
       ),
+      on_unknown_cost = on_unknown_cost,
       on_exceed = on_exceed
     )
     freeze_value(value)
@@ -122,10 +134,13 @@ S7::method(print, UsageLimits) <- function(x, ...) {
   cli::cat_line(cli::cli_format_method({
     cli::cli_text("<UsageLimits>")
     cli::cli_div(theme = list(div = list("margin-left" = 2)))
-    fields <- setdiff(names(S7::props(x)), "on_exceed")
-    for (field in fields) {
+    for (field in usage_limit_fields()) {
       value <- S7::prop(x, field)
       cli::cli_text("{field}: {value %||% \"unlimited\"}")
+    }
+    # The default is left out so that existing printed output does not change.
+    if (identical(x@on_unknown_cost, "continue")) {
+      cli::cli_text("on_unknown_cost: continue")
     }
     cli::cli_text("on_exceed: {x@on_exceed}")
   }))
@@ -470,6 +485,18 @@ validate_usage_limit <- function(value, name, integer = TRUE) {
   if (isTRUE(integer)) as.integer(value) else as.numeric(value)
 }
 
+# The properties of UsageLimits that are limits; the others are options.
+usage_limit_fields <- function() {
+  c(
+    "max_requests",
+    "max_tool_calls",
+    "max_input_tokens",
+    "max_output_tokens",
+    "max_total_tokens",
+    "max_cost_usd"
+  )
+}
+
 merge_usage_limits <- function(override, defaults) {
   if (!S7::S7_inherits(override, UsageLimits)) {
     cli::cli_abort("{.arg usage_limits} must be created with UsageLimits()")
@@ -479,8 +506,7 @@ merge_usage_limits <- function(override, defaults) {
   }
 
   resolved <- S7::props(override)
-  limit_fields <- setdiff(names(resolved), "on_exceed")
-  for (field in limit_fields) {
+  for (field in usage_limit_fields()) {
     if (is.null(resolved[[field]])) {
       resolved[field] <- list(S7::prop(defaults, field))
     }
@@ -733,6 +759,9 @@ usage_limit_status <- function(usage, limits, require_followup = FALSE) {
       next
     }
     if (identical(check$field, "max_cost_usd") && is.na(check$actual)) {
+      if (!identical(limits$on_unknown_cost, "stop")) {
+        next
+      }
       check$reason <- "cost_unavailable"
       check$label <- "estimated cost"
       check$limit <- limit

@@ -188,6 +188,19 @@ end_model_request <- function(agent, turn) {
     model = agent$get_model(),
     outcome = "response"
   ))
+  fired <- private$fire_hook(
+    "PostModelRequest",
+    context = private$hook_context(
+      usage = private$current_run_usage(),
+      usage_limits = private$current_usage_limits,
+      request_number = state$request_number,
+      run_id = state$active_run_id
+    )
+  )
+  # ellmer awaits this callback's promise, so the next request waits for it.
+  if (promises::is.promising(fired)) {
+    return(promises::then(fired, function(value) invisible(NULL)))
+  }
   invisible(NULL)
 }
 
