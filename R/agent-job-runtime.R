@@ -294,10 +294,7 @@ job_bind_agent <- function(agent, record) {
       entry <- private$owned_conversations[[tree$handles[[name]]]]
       member <- graph$members[[name]]
       if (
-        !identical(
-          S7::props(entry$limits),
-          S7::props(job_limits_value(member$limits))
-        ) ||
+        !identical(S7::props(entry$limits), member$limits) ||
           !identical(entry$max_runs, member$max_runs)
       ) {
         job_runtime_abort("The bound conversation allocation changed.")
