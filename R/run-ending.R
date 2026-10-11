@@ -322,11 +322,8 @@ run_ending_for <- function(
   }
   # Who asked is recorded when the stop is requested, and that wins: a reason
   # is an open string, so a hook or a caller may give one of deputy's own
-  # words. The word decides only when nobody was recorded. The exception is a
-  # parent's end, which reaches its child as an interrupt with this reason.
-  if (identical(reason, "parent_completed")) {
-    by <- "parent"
-  } else if (is.null(by)) {
+  # words. The word decides only when nobody was recorded.
+  if (is.null(by)) {
     known <- unname(run_ending_stop_reasons[reason])
     by <- if (!is.na(known)) known else "caller"
   }

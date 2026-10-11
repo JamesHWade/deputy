@@ -2795,9 +2795,13 @@ Agent <- R6::R6Class(
         normalize_usage_limits(limits)
       },
 
-      interrupt_run = function(reason, conversation_token = NULL) {
+      interrupt_run = function(
+        reason,
+        conversation_token = NULL,
+        by = "caller"
+      ) {
         check_conversation_access(self, conversation_token)
-        interrupted <- isTRUE(graph_cancel_descendants(self, reason))
+        interrupted <- isTRUE(graph_cancel_descendants(self, reason, by = by))
         for (id in names(private$active_subagents)) {
           interrupted <- isTRUE(self$interrupt_subagent(id, reason)) ||
             interrupted
@@ -2806,11 +2810,12 @@ Agent <- R6::R6Class(
         # whether or not a run is going now.
         for (waiting in private$unstarted_runs) {
           waiting$interrupt_before_start <- as.character(reason[[1]])
+          waiting$interrupt_before_start_by <- by
         }
         if (!isTRUE(private$run_active)) {
           return(invisible(interrupted || length(private$unstarted_runs) > 0L))
         }
-        private$request_stream_stop(as.character(reason[[1]]), by = "caller")
+        private$request_stream_stop(as.character(reason[[1]]), by = by)
         invisible(TRUE)
       },
 

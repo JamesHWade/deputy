@@ -86,7 +86,10 @@ initialize_agent_run <- function(
   private$current_run_state <- state
   private$release_unstarted_run(state)
   if (!is.null(state$interrupt_before_start)) {
-    private$request_stream_stop(state$interrupt_before_start, by = "caller")
+    private$request_stream_stop(
+      state$interrupt_before_start,
+      by = state$interrupt_before_start_by %||% "caller"
+    )
   }
   state$response_seen <- FALSE
   state$fallback_index <- private$.fallback_position

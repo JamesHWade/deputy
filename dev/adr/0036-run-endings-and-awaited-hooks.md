@@ -26,7 +26,8 @@ run. A run records who asked for a stop when the stop is requested, and that
 record wins over what the reason's word usually means, so a made-up reason,
 or one of Deputy's own words given by someone else, is still placed with its
 asker; the asker is credited only when the run's final reason is the one they
-gave.
+gave. A parent's end is recorded as the parent's when it reaches a child, so
+that case needs no rule of its own.
 
 A cut-off answer is read from ellmer's normalised `finish_reason` on the last
 assistant turn (`max_tokens`, `context_window`, `content_filter`). Its

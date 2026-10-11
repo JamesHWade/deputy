@@ -220,11 +220,81 @@ test_that("who asked for a stop is kept when the reason is one of deputy's own w
   # With nobody recorded, the word decides.
   expect_identical(run_ending_for("abandoned")$by, "abandoned")
   expect_identical(run_ending_for("hook_requested_stop")$by, "hook")
-  # A parent's end reaches its child as an interrupt with this reason.
+  # A parent's end reaches its child as a stop recorded as the parent's, so
+  # a caller who gives the same word is still the caller.
   expect_identical(
-    run_ending_for("parent_completed", by = "caller")$by,
+    run_ending_for("parent_completed", by = "parent")$by,
     "parent"
   )
+  expect_identical(
+    run_ending_for("parent_completed", by = "caller")$by,
+    "caller"
+  )
+  expect_identical(run_ending_for("parent_completed")$by, "parent")
+})
+
+test_that("a caller who interrupts with the parent's word is still the one who stopped the run", {
+  agent <- Agent$new(create_mock_chat(list("never sent")))
+
+  stream <- agent$stream_async("go")
+  expect_true(agent$interrupt("parent_completed"))
+  collect_async_stream(stream)
+
+  result <- agent$last_run()
+  expect_identical(result$stop_reason, "parent_completed")
+  expect_identical(result$ending@by, "caller")
+})
+
+test_that("a child stopped because its parent's run ended is stopped by the parent", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "launch"),
+    runtime_reply("root finished")
+  ))
+  delayed <- runtime_reply("late child")
+  attr(delayed, "fixture_delay") <- 0.15
+  child_server <- local_runtime_server(list(delayed))
+  root <- Agent$new(runtime_chat(root_server), permissions = permissions_full())
+  child <- Agent$new(
+    runtime_chat(child_server),
+    permissions = permissions_full()
+  )
+  pending <- NULL
+  handle <- NULL
+  root$register_tool(ellmer::tool(
+    function() {
+      pending <<- root$continue_agent_async(
+        handle,
+        "background child",
+        UsageLimits(max_requests = 1)
+      )
+      # What the root's run does for its descendants when it ends.
+      graph_cancel_descendants(root, "parent_completed", by = "parent")
+      "launched"
+    },
+    name = "launch",
+    description = "Launch retained child",
+    arguments = list()
+  ))
+  handles <- root$retain_agent_graph(
+    agents = list(child = child),
+    routes = list(),
+    usage_limits = UsageLimits(max_requests = 4),
+    max_depth = 1,
+    max_delegations = 2,
+    max_concurrency = 1
+  )
+  handle <- handles[[1L]]
+
+  root$run_sync("launch")
+  child_result <- resolve_async_value(pending)
+
+  expect_identical(child_result$stop_reason, "parent_completed")
+  expect_s7_class(child_result$ending, RunEndingStopped)
+  expect_identical(child_result$ending@by, "parent")
+  root$release_agent_graph()
 })
 
 test_that("a run that reaches a limit ends at that limit, with its figures", {

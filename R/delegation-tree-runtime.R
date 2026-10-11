@@ -81,7 +81,9 @@ graph_descendants <- function(root, id = NULL) {
   selected
 }
 
-graph_cancel_descendants <- function(agent, reason) {
+# Stops the runs below `agent`. `by` is who is recorded as having stopped
+# them: their caller, or the parent when it is the parent's run that ended.
+graph_cancel_descendants <- function(agent, reason, by = "caller") {
   private <- agent$.__enclos_env__$private
   tree <- private$.delegation_tree
   if (is.null(tree)) {
@@ -95,13 +97,13 @@ graph_cancel_descendants <- function(agent, reason) {
   ids <- setdiff(graph_descendants(root, id), id)
   interrupted <- FALSE
   for (child_id in rev(ids)) {
-    interrupted <- isTRUE(interrupt_delegation(root, child_id, reason)) ||
+    interrupted <- isTRUE(interrupt_delegation(root, child_id, reason, by)) ||
       interrupted
   }
   invisible(interrupted)
 }
 
-interrupt_delegation <- function(owner, id, reason) {
+interrupt_delegation <- function(owner, id, reason, by = "caller") {
   private <- owner$.__enclos_env__$private
   record <- private$subagent_runs[[id]]
   if (
@@ -114,12 +116,10 @@ interrupt_delegation <- function(owner, id, reason) {
   private$subagent_runs[[id]]$cancel_reason <- reason
   child <- private$active_subagents[[id]]
   if (!is.null(child)) {
-    if (!is.null(record$conversation_handle)) {
-      entry <- conversation_entry(owner, record$conversation_handle)
-      child$.__enclos_env__$private$interrupt_run(reason, entry$token)
-    } else {
-      child$interrupt(reason)
+    token <- if (!is.null(record$conversation_handle)) {
+      conversation_entry(owner, record$conversation_handle)$token
     }
+    child$.__enclos_env__$private$interrupt_run(reason, token, by = by)
   }
   invisible(TRUE)
 }

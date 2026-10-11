@@ -183,7 +183,13 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       private$should_stop <- TRUE
       private$stop_reason_from_hook <- reason
       private$stop_requested_by <- by
-      graph_cancel_descendants(self, reason)
+      # The runs below are stopped by their caller, this run, unless the stop
+      # is a parent's end coming down the tree.
+      graph_cancel_descendants(
+        self,
+        reason,
+        by = if (identical(by, "parent")) "parent" else "caller"
+      )
       cancel_active_mcp_tools(
         c(private$.chat$get_tools(), private$active_owned_tools),
         self,
@@ -466,7 +472,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
     # SessionEnd, fired from the body of a run once nothing can send it on.
     # Returns a promise when a callback returned one.
     session_end_in_body = function(state) {
-      graph_cancel_descendants(self, "parent_completed")
+      graph_cancel_descendants(self, "parent_completed", by = "parent")
       if (!isTRUE(state$session_started)) {
         return(NULL)
       }
@@ -488,7 +494,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
         return(invisible(NULL))
       }
       state$finished <- TRUE
-      graph_cancel_descendants(self, "parent_completed")
+      graph_cancel_descendants(self, "parent_completed", by = "parent")
       on.exit(finish_run_trace(state), add = TRUE)
       on.exit(remove_request_callbacks(private$.chat), add = TRUE)
       on.exit(
