@@ -609,6 +609,32 @@ test_that("padding around a chosen label doesn't make it typed text", {
   expect_identical(interaction_answer(result, 2L)$selected, list("YAML"))
 })
 
+test_that("labels are trimmed, so padded copies of one label are rejected", {
+  expect_questions_rejected(
+    interaction_question_with(
+      options = list(
+        list(label = "JSON", description = "Structured JSON"),
+        list(label = " JSON ", description = "The same, padded")
+      )
+    ),
+    "more than once"
+  )
+
+  seen <- NULL
+  tool <- tools_interactive(callback = function(questions, context) {
+    seen <<- questions[[1]]$options[[2]]$label
+    list("Which format?" = "YAML")
+  })[[1]]
+  result <- tool(interaction_question_with(
+    options = list(
+      list(label = "JSON", description = "Structured JSON"),
+      list(label = " YAML ", description = "Readable YAML")
+    )
+  ))
+  expect_identical(seen, "YAML")
+  expect_identical(interaction_answer(result)$selected, list("YAML"))
+})
+
 test_that("the person's own text can take the place of a single label", {
   result <- interaction_answering_tool(list("Which format?" = "TOML"))(
     interaction_shape_questions()

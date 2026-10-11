@@ -365,8 +365,8 @@ ask_user_answers <- function(questions, answers) {
     values <- trimws(as.character(values))
     values <- unique(values[nzchar(values)])
     labels <- vapply(q[["options"]], function(o) o[["label"]], character(1))
-    chosen <- labels[trimws(labels) %in% values]
-    other <- values[!values %in% trimws(labels)]
+    chosen <- labels[labels %in% values]
+    other <- values[!values %in% labels]
     if (length(other) > 1L) {
       ask_user_answers_abort(paste0(
         "The handler gave ",
@@ -645,8 +645,10 @@ validate_questions <- function(questions) {
           " must be an object with 'label' and 'description'."
         )
       }
+      # Labels are compared with answers after trimming, so they are stored
+      # trimmed and " JSON " can't sit beside "JSON".
       list(
-        label = ask_user_text(option, "label", at),
+        label = trimws(ask_user_text(option, "label", at)),
         description = ask_user_text(option, "description", at)
       )
     })
