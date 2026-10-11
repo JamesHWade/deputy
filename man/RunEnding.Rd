@@ -91,7 +91,8 @@ asked to stop it, \code{"approval"} for a run waiting for an approval,
 \code{"parent"} for a subagent whose lead finished, \code{"delegation"} for a batch
 whose subagents were stopped, and \code{"abandoned"} for a stream nobody read
 to its end. A reason you pass to \verb{$interrupt()} or return from a hook is
-kept in \code{reason}.
+kept in \code{reason}, and whoever gave it is credited in \code{by}, whatever the
+reason says.
 }
 }
 

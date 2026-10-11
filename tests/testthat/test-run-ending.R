@@ -202,6 +202,29 @@ test_that("a run a hook stops ends stopped by a hook", {
   expect_s7_class(run$ending, RunEndingStopped)
   expect_identical(run$ending$by, "hook")
   expect_identical(run$ending$reason, "enough")
+
+  # A hook may give one of deputy's own words as its reason. It is still the
+  # hook that stopped the run.
+  run <- run_with_hook_stop(stop_reason = "interrupted")
+  expect_identical(run$stop_reason, "interrupted")
+  expect_identical(run$ending$by, "hook")
+})
+
+test_that("who asked for a stop is kept when the reason is one of deputy's own words", {
+  # Recorded at the stop, so it wins over what the word usually means.
+  expect_identical(run_ending_for("interrupted", by = "hook")$by, "hook")
+  expect_identical(
+    run_ending_for("hook_requested_stop", by = "caller")$by,
+    "caller"
+  )
+  # With nobody recorded, the word decides.
+  expect_identical(run_ending_for("abandoned")$by, "abandoned")
+  expect_identical(run_ending_for("hook_requested_stop")$by, "hook")
+  # A parent's end reaches its child as an interrupt with this reason.
+  expect_identical(
+    run_ending_for("parent_completed", by = "caller")$by,
+    "parent"
+  )
 })
 
 test_that("a run that reaches a limit ends at that limit, with its figures", {

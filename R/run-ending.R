@@ -100,7 +100,8 @@ ending_optional_text <- function(value, arg) {
 #'   `"parent"` for a subagent whose lead finished, `"delegation"` for a batch
 #'   whose subagents were stopped, and `"abandoned"` for a stream nobody read
 #'   to its end. A reason you pass to `$interrupt()` or return from a hook is
-#'   kept in `reason`.
+#'   kept in `reason`, and whoever gave it is credited in `by`, whatever the
+#'   reason says.
 #'
 #' @param by Who or what stopped the run: one of `"caller"`, `"hook"`,
 #'   `"permission"`, `"approval"`, `"parent"`, `"delegation"` or
@@ -319,7 +320,15 @@ run_ending_for <- function(
   if (is.null(by) && reason %in% run_ending_failure_reasons) {
     return(RunEndingFailed(reason, error = error, phase = phase))
   }
-  known <- unname(run_ending_stop_reasons[reason])
-  by <- if (!is.na(known)) known else by %||% "caller"
+  # Who asked is recorded when the stop is requested, and that wins: a reason
+  # is an open string, so a hook or a caller may give one of deputy's own
+  # words. The word decides only when nobody was recorded. The exception is a
+  # parent's end, which reaches its child as an interrupt with this reason.
+  if (identical(reason, "parent_completed")) {
+    by <- "parent"
+  } else if (is.null(by)) {
+    known <- unname(run_ending_stop_reasons[reason])
+    by <- if (!is.na(known)) known else "caller"
+  }
   RunEndingStopped(by, reason = reason)
 }
