@@ -77,6 +77,7 @@ Collate:
     'agent-definition.R'
     'agent-job-runtime.R'
     'run-usage.R'
+    'run-ending.R'
     'agent-result.R'
     'callback-result.R'
     'approval-record.R'

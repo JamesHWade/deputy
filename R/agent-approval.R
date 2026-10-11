@@ -104,7 +104,7 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
         tool_input = request@arguments,
         reason = reason
       ))
-      private$request_stream_stop("approval_pending")
+      private$request_stream_stop("approval_pending", by = "approval")
       approval_abort(
         "Run suspended for approval.",
         class = "approval_pending",

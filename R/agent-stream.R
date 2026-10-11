@@ -93,7 +93,10 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           ) {
             state$reason <- "abandoned"
             try(
-              agent$.__enclos_env__$private$request_stream_stop("abandoned"),
+              agent$.__enclos_env__$private$request_stream_stop(
+                "abandoned",
+                by = "abandoned"
+              ),
               silent = TRUE
             )
             try(
@@ -170,9 +173,12 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       )
     },
 
-    request_stream_stop = function(reason) {
+    # `by` names who asked for the stop (see RunEnding). A stop with no `by`
+    # clears any earlier one, so a limit's stop is not credited to a caller.
+    request_stream_stop = function(reason, by = NULL) {
       private$should_stop <- TRUE
       private$stop_reason_from_hook <- reason
+      private$stop_requested_by <- by
       graph_cancel_descendants(self, reason)
       cancel_active_mcp_tools(
         c(private$.chat$get_tools(), private$active_owned_tools),
@@ -221,6 +227,8 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       state$limits <- NULL
       state$result <- NULL
       state$turns_before <- 0L
+      state$ending <- NULL
+      state$run_error <- NULL
       state
     },
 
@@ -240,6 +248,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       }
 
       AgentResult(
+        ending = state$ending,
         response = response,
         turns = private$.chat$get_turns(),
         cost = state$cost %||% self$cost(),
@@ -440,6 +449,19 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
               turn_number = max(1L, usage$requests)
             ))
           }
+          finish_reason <- if (current_turn_count > state$turns_before) {
+            tryCatch(observed_last_turn@finish_reason, error = function(e) NULL)
+          }
+          state$ending <- run_ending_for(
+            state$reason,
+            by = if (isTRUE(private$should_stop)) {
+              private$stop_requested_by
+            },
+            limit_status = private$last_limit_status,
+            finish_reason = finish_reason,
+            error = state$run_error$condition,
+            phase = state$run_error$phase
+          )
           private$record_run_event(private$agent_event(
             "usage",
             usage = usage,
@@ -450,7 +472,8 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             reason = state$reason,
             cost = state$cost,
             usage = usage,
-            limit = private$last_limit_status
+            limit = private$last_limit_status,
+            ending = state$ending
           ))
           private$commit_approval_state(
             if (identical(state$reason, "complete")) "completed" else "stopped",
@@ -482,6 +505,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       private$consecutive_tool_cycles <- 0L
       private$should_stop <- FALSE
       private$stop_reason_from_hook <- NULL
+      private$stop_requested_by <- NULL
       tryCatch(
         private$finish_active_run(),
         error = function(error) {
