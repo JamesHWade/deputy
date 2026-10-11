@@ -1,7 +1,9 @@
 # ADR-0033: Descendant tool activity in the shared conversation
 
 Status: accepted for implementation in #238. Builds on ADR-0017, ADR-0021,
-ADR-0022 and ADR-0032.
+ADR-0022 and ADR-0032. Amended 2026-10-11 (#252): hosts that run their own
+turn loop enable the presenter without a `chat_server()` value (see the last
+section).
 
 ## Context
 
@@ -158,3 +160,24 @@ provider's ID comes back.
   subagent panel and records.
 - Token-level streaming of descendants (posit-dev/shinychat#378) remains
   separate; the panel's partial-output preview is unchanged.
+
+## Hosts with their own turn loop
+
+Amended for #252. Some hosts don't use `chat_server()`: they call
+`lead$stream_async(stream = "content")` themselves, append the stream with
+`chat_append()`, and keep conversations with
+`chat_enable_history(id, client, on_save = , on_restore = )`. They have no
+`chat_server()` value to pass, and `chat_enable_history()` returns only a
+cancel function; its controller sits in shinychat 0.5.0's private session
+storage, which Deputy does not read.
+
+`chat` is therefore optional: `subagent_chat_activity(chat = NULL, lead,
+requester, interval)` (still the first argument, so positional calls keep
+working). Given a `chat`, the checks above apply unchanged. Without one, the
+lead is the subject and Deputy checks only that it is an Agent. Nothing else
+is needed, because the presenter already works on the consumer side: while
+it is enabled, cards merge into every `stream_async(stream = "content")` of
+the lead and into `get_turns()`, which is what `chat_enable_history()` records
+after each streamed reply. Streaming that generator into the chat, and letting
+the history save `lead$get_turns()`, is the host's part. The one-presenter
+rule, `stop()` and stopping when the session ends are unchanged.

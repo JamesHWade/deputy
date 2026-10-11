@@ -567,6 +567,17 @@ unserializes; restore checks envelope, scope (`delegation_scope` plus
 records or agents. `subagent_chat_server(conversation = )` follows the open
 conversation.
 
+Hosts with their own turn loop (they stream `lead$stream_async()` into the chat
+and keep conversations with `shinychat::chat_enable_history()`, whose
+controller is private in shinychat 0.5.0) leave out `chat` in both functions
+(#252). `subagent_chat_activity(lead = , requester = )` only checks the lead
+is an Agent. `subagent_chat_history(lead = , requester = , conversation_id = )`
+registers nothing and also returns `on_save`/`on_restore` for the host to pass
+to `chat_enable_history()`; the open conversation's ID comes from the
+`conversation_id` function, else `lead$conversation_id`, which the host sets
+before each reply (as `chat_server()` does) and before `on_restore` runs.
+Giving both `chat` and `conversation_id` is an error.
+
 ### Optional child chat panel
 
 `subagent_chat_ui()` / `subagent_chat_server()` compose read-only activity and

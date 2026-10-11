@@ -1,5 +1,15 @@
 # deputy (development version)
 
+* `subagent_chat_activity()` and `subagent_chat_history()` work in apps that
+  run the lead's replies themselves instead of through
+  `shinychat::chat_server()`. Leave out `chat`: subagent tool calls then appear
+  in the lead's `$stream_async()` stream that the app appends to its chat, and
+  `subagent_chat_history()` returns `on_save` and `on_restore` callbacks to
+  pass to `shinychat::chat_enable_history()`. Such an app sets
+  `lead$conversation_id` before each reply, as `chat_server()` does. Records
+  are kept under that ID unless you pass `conversation_id`, a function
+  returning the open conversation's ID (#252).
+
 * `DelegationPolicy()` gains `chat`, a function that builds each subagent's
   chat, so a host can choose a subagent's provider, credentials and request
   parameters, for example a lower reasoning effort than the lead's on its own
