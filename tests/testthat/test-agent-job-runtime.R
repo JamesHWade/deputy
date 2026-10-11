@@ -301,6 +301,23 @@ test_that("a rejected graph binding leaves every ledger unchanged", {
   expect_identical(job_graph_snapshot(restored), before)
 })
 
+test_that("a job graph saved before on_unknown_cost existed still binds", {
+  working_dir <- withr::local_tempdir(pattern = "deputy-job-legacy-")
+  source <- job_runtime_test_graph(working_dir, "legacy")
+  on.exit(try(source$release_agent_graph(), silent = TRUE), add = TRUE)
+  manifest <- job_agent_manifest(source)
+  for (name in names(manifest$graph$members)) {
+    manifest$graph$members[[name]]$limits$on_unknown_cost <- NULL
+  }
+  restored <- job_runtime_test_graph(working_dir, "legacy")
+  on.exit(try(restored$release_agent_graph(), silent = TRUE), add = TRUE)
+
+  expect_no_error(job_bind_agent(
+    restored,
+    list(status = "queued", manifest = manifest)
+  ))
+})
+
 test_that("rebinding cannot erase root-only work after history replacement", {
   working_dir <- withr::local_tempdir()
   root <- job_runtime_test_graph(working_dir, "advanced")

@@ -27,6 +27,15 @@ test_that("UsageLimits rejects invalid values", {
   expect_error(UsageLimits(on_exceed = "warn"), "should be one of")
 })
 
+test_that("UsageLimits takes on_unknown_cost and rejects other values", {
+  expect_identical(UsageLimits()$on_unknown_cost, "stop")
+  expect_identical(
+    UsageLimits(on_unknown_cost = "continue")$on_unknown_cost,
+    "continue"
+  )
+  expect_error(UsageLimits(on_unknown_cost = "maybe"), "should be one of")
+})
+
 test_that("per-run limits inherit unspecified agent defaults", {
   defaults <- UsageLimits(
     max_requests = 5,
@@ -48,6 +57,61 @@ test_that("per-run limits inherit unspecified agent defaults", {
   expect_identical(
     merge_usage_limits(UsageLimits(), UsageLimits()),
     UsageLimits()
+  )
+})
+
+test_that("a per-run limit keeps its own on_unknown_cost when merged", {
+  defaults <- UsageLimits(max_cost_usd = 0.25, on_unknown_cost = "stop")
+  override <- UsageLimits(max_tool_calls = 2, on_unknown_cost = "continue")
+
+  expect_identical(
+    merge_usage_limits(override, defaults)$on_unknown_cost,
+    "continue"
+  )
+  expect_identical(
+    merge_usage_limits(
+      UsageLimits(max_tool_calls = 2),
+      UsageLimits(on_unknown_cost = "continue")
+    )$on_unknown_cost,
+    "stop"
+  )
+})
+
+test_that("limits saved before on_unknown_cost existed are rebuilt with the default", {
+  props <- S7::props(UsageLimits(max_requests = 3L))
+  props$on_unknown_cost <- NULL
+
+  limits <- do.call(UsageLimits, props)
+
+  expect_identical(limits$max_requests, 3L)
+  expect_identical(limits$on_unknown_cost, "stop")
+})
+
+test_that("limits print on_unknown_cost only when it is not the default", {
+  default_output <- capture_output(print(UsageLimits(max_requests = 3)))
+  continue_output <- capture_output(print(
+    UsageLimits(max_requests = 3, on_unknown_cost = "continue")
+  ))
+
+  expect_no_match(default_output, "on_unknown_cost", fixed = TRUE)
+  expect_match(continue_output, "on_unknown_cost: continue", fixed = TRUE)
+})
+
+test_that("intersecting limits stops on an unknown cost when either side does", {
+  continues <- UsageLimits(max_cost_usd = 1, on_unknown_cost = "continue")
+  stops <- UsageLimits(max_requests = 3)
+
+  expect_identical(
+    intersect_usage_limits(continues, continues)$on_unknown_cost,
+    "continue"
+  )
+  expect_identical(
+    intersect_usage_limits(continues, stops)$on_unknown_cost,
+    "stop"
+  )
+  expect_identical(
+    intersect_usage_limits(stops, continues)$on_unknown_cost,
+    "stop"
   )
 })
 
@@ -310,6 +374,15 @@ test_that("cost limits fail closed when provider cost is unknown", {
   expect_identical(status$actual, NA_real_)
   expect_identical(status$limit, 1)
   expect_match(usage_limit_message(status), "cannot be enforced")
+})
+
+test_that("a cost limit with on_unknown_cost = 'continue' does not report an unknown cost", {
+  status <- usage_limit_status(
+    AgentUsage(cost_usd = NA_real_),
+    UsageLimits(max_cost_usd = 1, on_unknown_cost = "continue")
+  )
+
+  expect_null(status)
 })
 
 test_that("usage limit defaults use the native request limit", {

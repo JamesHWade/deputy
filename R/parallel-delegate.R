@@ -196,7 +196,8 @@ lead_parallel_delegate <- function(
           item$correlation,
           UsageLimits(
             max_requests = min(1L, item$definition$max_requests %||% 1L),
-            max_tool_calls = 0L
+            max_tool_calls = 0L,
+            on_unknown_cost = limits$on_unknown_cost
           ),
           stateless = TRUE
         ),
