@@ -62,6 +62,11 @@ An `interrupt()` that arrives while a hook's promise is pending takes effect
 when the promise settles: a pending tool does not start, and a pending `Stop`
 does not send the run on.
 
+A tool hook's promise can settle after its run is over, when the run failed
+while the hook was pending. Its answer then changes nothing: a `PreToolUse`
+or `PermissionRequest` answer rejects the call, and a `PostToolUse` or
+`PostToolUseFailure` answer is dropped, so it cannot stop a later run.
+
 ### Stop and SessionEnd fire from the run's body
 
 `finish_callback_run()` is split into settling the run (reason, usage, limit),
