@@ -233,6 +233,43 @@ test_that("a stream made after an interrupt starts as usual", {
   expect_identical(chat$dispatched(), 1L)
 })
 
+test_that("an interrupt during a run also stops a stream that is waiting to start", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  chat <- create_mock_chat(list("unused"))
+  dispatched <- 0L
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    dispatched <<- dispatched + 1L
+    coro::async_generator(function() {
+      coro::await(later_value(NULL, 0.05))
+      coro::yield("answer")
+    })()
+  }
+  agent <- Agent$new(chat = chat)
+
+  running <- agent$stream_async("one")
+  waiting <- agent$stream_async("two")
+  first_chunk <- running()
+  # Let the first run reach its model request before the interrupt.
+  for (i in 1:20) {
+    if (dispatched > 0L) {
+      break
+    }
+    later::run_now(0.01)
+  }
+  expect_identical(dispatched, 1L)
+  expect_true(agent$interrupt("enough"))
+  resolve_async_value(first_chunk)
+  collect_async_stream(running)
+  expect_identical(agent$last_run()$stop_reason, "enough")
+
+  collect_async_stream(waiting)
+  expect_identical(agent$last_run()$stop_reason, "enough")
+  expect_identical(agent$last_run()$usage$requests, 0L)
+  expect_identical(dispatched, 1L)
+})
+
 test_that("a clone does not hold the original's waiting streams", {
   chat <- counting_chat(list("answer"))
   agent <- Agent$new(chat = chat)

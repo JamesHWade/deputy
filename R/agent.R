@@ -2802,11 +2802,12 @@ Agent <- R6::R6Class(
           interrupted <- isTRUE(self$interrupt_subagent(id, reason)) ||
             interrupted
         }
+        # Every stream that is waiting to start is stopped when it starts,
+        # whether or not a run is going now.
+        for (waiting in private$unstarted_runs) {
+          waiting$interrupt_before_start <- as.character(reason[[1]])
+        }
         if (!isTRUE(private$run_active)) {
-          # Every stream that is waiting to start is stopped when it starts.
-          for (waiting in private$unstarted_runs) {
-            waiting$interrupt_before_start <- as.character(reason[[1]])
-          }
           return(invisible(interrupted || length(private$unstarted_runs) > 0L))
         }
         private$request_stream_stop(as.character(reason[[1]]), by = "caller")
