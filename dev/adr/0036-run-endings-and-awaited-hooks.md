@@ -22,9 +22,11 @@ it came from.
 `stop_reason == "complete"`. Every reason Deputy sets maps to exactly one
 ending in one internal function. A reason Deputy does not know, which can only
 have come from `interrupt(reason)` or a hook's `stop_reason`, is a stopped
-run. A run records who asked for a stop when the stop is requested, so a
-made-up reason is still placed with its asker; the asker is credited only when
-the run's final reason is the one they gave.
+run. A run records who asked for a stop when the stop is requested, and that
+record wins over what the reason's word usually means, so a made-up reason,
+or one of Deputy's own words given by someone else, is still placed with its
+asker; the asker is credited only when the run's final reason is the one they
+gave.
 
 A cut-off answer is read from ellmer's normalised `finish_reason` on the last
 assistant turn (`max_tokens`, `context_window`, `content_filter`). Its
@@ -59,8 +61,11 @@ Where each event waits:
 | `Notification`, `ConfigChange` | never |
 
 An `interrupt()` that arrives while a hook's promise is pending takes effect
-when the promise settles: a pending tool does not start, and a pending `Stop`
-does not send the run on.
+when the promise settles: a pending tool does not start, a denied call that a
+`PermissionRequest` hook then allows stays denied, `UserPromptSubmit` does not
+fire after a pending `SessionStart`, and a pending `Stop` does not send the
+run on. The one hook it cannot reach is `SessionEnd`: what that hook is told
+is how the run ended, and an interrupt that arrives then changes nothing.
 
 A tool hook's promise can settle after its run is over, when the run failed
 while the hook was pending. Its answer then changes nothing: a `PreToolUse`
@@ -84,7 +89,8 @@ and stream. `Stop` fires at every stop, with `context$stop_hook_active` set
 once a hook has sent the run on, which is how a hook avoids doing so for ever;
 Deputy adds no cap of its own beyond the run's limits. `SessionEnd` fires
 once. The result's `response` is the last pass's text and its `turns` hold
-every pass. A run that was stopped, hit a limit or failed is never sent on.
+every pass. Only an answered run is sent on: one that was stopped, hit a
+limit, was cut off by the provider or failed ends as it stands.
 
 ### Limits, cost and the result beside the stream
 
