@@ -54,6 +54,21 @@ test_that("HookResultPreCompact has correct structure", {
   expect_equal(result_with_summary$summary, "Custom summary")
 })
 
+test_that("HookResultStop holds one message and is read-only", {
+  result <- HookResultStop("Fix the table.")
+  expect_s7_class(result, HookResultStop)
+  expect_s7_class(result, HookResult)
+  expect_identical(result$message, "Fix the table.")
+  expect_named(S7::props(result), "message")
+  expect_error(S7::prop(result, "message") <- "other", "read-only")
+
+  expect_error(HookResultStop(""), "must not be empty")
+  expect_error(HookResultStop("  \n "), "must not be empty")
+  expect_error(HookResultStop(NA_character_))
+  expect_error(HookResultStop(c("a", "b")))
+  expect_error(HookResultStop(1))
+})
+
 test_that("callback result properties freeze decisions but retain output identity", {
   output <- new.env(parent = emptyenv())
   output$value <- "original"

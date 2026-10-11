@@ -940,6 +940,7 @@ governed_run_stream <- coro::async_generator(function(
     }
     # Stop and SessionEnd fire in the body only once the run has started a
     # session, as finish_callback_run() does for the other endings.
+    stop_answer <- NULL
     if (isTRUE(stream_state$session_started)) {
       agent$.__enclos_env__$private$settle_run(stream_state)
       stream_state$stop_hook_fired <- TRUE
@@ -953,7 +954,35 @@ governed_run_stream <- coro::async_generator(function(
       # An interrupt that arrived while the hook was pending takes effect now.
       agent$.__enclos_env__$private$settle_run(stream_state)
     }
-    # A Stop hook cannot send the run on yet: the run ends here.
+    # A Stop hook may send an answered run on. Nothing else is sent on: a run
+    # that was stopped, hit a limit or failed ends as it stands.
+    if (
+      S7::S7_inherits(stop_answer, HookResultStop) &&
+        identical(stream_state$reason, "complete") &&
+        !agent$.__enclos_env__$private$should_stop &&
+        is.null(structured)
+    ) {
+      stream_state$stop_hook_active <- TRUE
+      stream_state$stop_hook_fired <- FALSE
+      # The result's response is the last pass's text.
+      stream_state$response_parts <- character()
+      stream_state$structured_output <- NULL
+      stream <- tryCatch(
+        agent$.__enclos_env__$private$start_async_stream(
+          messages = list(stop_answer@message),
+          tool_mode = tool_mode,
+          stream = stream_mode,
+          controller = agent$.__enclos_env__$private$current_stream_controller,
+          structured = NULL,
+          stream_type = stream_type
+        ),
+        error = function(error) {
+          promises::promise_reject(error)
+        }
+      )
+      is_generator <- inherits(stream, "coro_generator_instance")
+      next
+    }
     break
   }
   graph_cancel_descendants(agent, "parent_completed")

@@ -43,11 +43,14 @@ NULL
 #' * `SessionStart(context)`: at the start of each run.
 #' * `UserPromptSubmit(prompt, context)`: at the start of each run, after
 #'   `SessionStart`.
-#' * `Stop(reason, context)`: at the end of each run. Its `context` also
-#'   carries `ending`, the run's [RunEnding] as it stands, and
-#'   `stop_hook_active`.
-#' * `SessionEnd(reason, context)`: at the end of each run, after `Stop`. Its
-#'   `context` also carries `ending`.
+#' * `Stop(reason, context)`: at each stop of a run. Its `context` also carries
+#'   `ending`, the run's [RunEnding] as it stands, and `stop_hook_active`, which
+#'   is `TRUE` when a hook has already sent this run on. A `Stop` hook may
+#'   return [HookResultStop()] to send an answered run on: the model is asked
+#'   again with its message, in the same run. Checking `stop_hook_active` stops
+#'   a hook from sending the run on for ever.
+#' * `SessionEnd(reason, context)`: once, when the run has ended. Its `context`
+#'   also carries `ending`.
 #' * `SubagentStart(agent_name, task, context)`: when a subagent starts a
 #'   delegated task.
 #' * `SubagentStop(agent_name, task, result, context)`: when a subagent
@@ -68,7 +71,7 @@ NULL
 #' result for `SubagentStop` and the [DeputyCompaction] for `PostCompact`. For
 #' `ConfigChange`, `key` is `"permission_mode"`.
 #'
-#' Four events use the callback's return value:
+#' Five events use the callback's return value:
 #'
 #' * `PreToolUse`: return [HookResultPreToolUse()] to allow or deny the call,
 #'   or to stop the run.
@@ -78,6 +81,12 @@ NULL
 #'   anyway, or [PermissionResultDeny()] to change the reason.
 #' * `PreCompact`: return [HookResultPreCompact()] to cancel compaction or to
 #'   supply your own summary.
+#' * `Stop`: return [HookResultStop()] to send the run on.
+#'
+#' A run that is sent on keeps its run id, its limits and its usage. The
+#' result's `response` is the last pass's text, and its `turns` hold every
+#' pass. A run that extracts structured output with `$chat_structured()` is not
+#' sent on.
 #'
 #' Other events ignore the return value. Returning `NULL` means "no decision".
 #'

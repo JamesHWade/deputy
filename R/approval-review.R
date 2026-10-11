@@ -108,8 +108,10 @@ approval_review_server <- function(
       session$onSessionEnded(function() {
         holder$refresh <- NULL
       })
+      # SessionEnd, not Stop: a run that is sent on stops more than once, and
+      # the view should refresh when the run has really ended.
       agent$add_hook(HookMatcher(
-        "Stop",
+        "SessionEnd",
         timeout = 0,
         callback = function(...) {
           if (is.function(holder$refresh)) {

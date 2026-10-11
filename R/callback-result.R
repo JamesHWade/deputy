@@ -26,7 +26,7 @@ validate_callback_text <- function(value, arg, optional = TRUE) {
 #' `HookResult` and `PermissionResult` are the parent classes of the values
 #' that hook and permission callbacks return. You don't create them directly;
 #' use [HookResultPreToolUse()], [HookResultPostToolUse()],
-#' [HookResultPreCompact()], [PermissionResultAllow()],
+#' [HookResultPreCompact()], [HookResultStop()], [PermissionResultAllow()],
 #' [PermissionResultDeny()] or [PermissionResultPending()]. To test which kind
 #' a value is, use `S7::S7_inherits(x, PermissionResult)`.
 #'
@@ -227,6 +227,49 @@ HookResultPreCompact <- S7::new_class(
       S7::S7_object(),
       continue = validate_callback_flag(continue, "continue"),
       summary = validate_callback_text(summary, "summary")
+    )
+    freeze_value(value)
+  }
+)
+
+#' Create a Stop hook result
+#'
+#' @description
+#' Return this from a Stop hook to send the run on: the model is asked again
+#' with `message`, in the same run.
+#'
+#' @param message The text the model is asked. It must not be empty.
+#' @seealso [CallbackResult] for reading result fields.
+#' @return A `HookResultStop` object.
+#'
+#' @examples
+#' # Ask the model to fix its answer
+#' HookResultStop("Fix the table.")
+#'
+#' # A hook that sends the run on once, and never again in the same run
+#' function(reason, context, ...) {
+#'   if (isTRUE(context$stop_hook_active)) {
+#'     return(NULL)
+#'   }
+#'   HookResultStop("Check the units and answer again.")
+#' }
+#'
+#' @export
+HookResultStop <- S7::new_class(
+  "HookResultStop",
+  parent = HookResult,
+  package = "deputy",
+  properties = list(
+    message = readonly_property("message", S7::class_character)
+  ),
+  constructor = function(message) {
+    message <- validate_callback_text(message, "message", optional = FALSE)
+    if (!nzchar(trimws(message))) {
+      cli_abort("{.arg message} must not be empty")
+    }
+    value <- S7::new_object(
+      S7::S7_object(),
+      message = message
     )
     freeze_value(value)
   }
