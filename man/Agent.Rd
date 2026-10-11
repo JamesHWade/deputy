@@ -1848,7 +1848,8 @@ is stopped by closing its connection, which loses the server's session
 state.
 
 A stream that has been made but not yet read has not started, so it is
-stopped when it starts, without a model request.
+stopped when it starts, without a model request. So is every other
+stream of this agent that is waiting to start.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$interrupt(reason = "interrupted")}

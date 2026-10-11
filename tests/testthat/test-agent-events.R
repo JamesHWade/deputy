@@ -171,6 +171,83 @@ test_that("an interrupt before the first pull does not carry over to the next ru
   expect_identical(agent$last_run()$stop_reason, "complete")
 })
 
+# A Chat that counts the requests it is asked to stream.
+counting_chat <- function(responses) {
+  chat <- create_mock_chat(responses)
+  count <- 0L
+  stream_async <- chat$stream_async
+  chat$stream_async <- function(...) {
+    count <<- count + 1L
+    stream_async(...)
+  }
+  chat$dispatched <- function() count
+  chat
+}
+
+test_that("an interrupt before any read stops every stream that is waiting to start", {
+  chat <- counting_chat(list("first answer", "second answer"))
+  agent <- Agent$new(chat = chat)
+
+  first <- agent$stream_async("one")
+  second <- agent$stream_async("two")
+  expect_true(agent$interrupt("too late"))
+
+  collect_async_stream(first)
+  expect_identical(agent$last_run()$stop_reason, "too late")
+  collect_async_stream(second)
+  expect_identical(agent$last_run()$stop_reason, "too late")
+  expect_identical(chat$dispatched(), 0L)
+  expect_false(agent$interrupt("nothing left"))
+})
+
+test_that("a stream dropped unread leaves the other waiting streams to an interrupt", {
+  chat <- counting_chat(list("first answer"))
+  agent <- Agent$new(chat = chat)
+
+  first <- agent$stream_async("one")
+  second <- agent$stream_async("two")
+  rm(second)
+  invisible(gc())
+  expect_true(agent$interrupt("too late"))
+
+  collect_async_stream(first)
+  expect_identical(agent$last_run()$stop_reason, "too late")
+  expect_identical(chat$dispatched(), 0L)
+})
+
+test_that("a stream made after an interrupt starts as usual", {
+  chat <- counting_chat(list("answer"))
+  agent <- Agent$new(chat = chat)
+
+  first <- agent$stream_async("one")
+  expect_true(agent$interrupt("too late"))
+  second <- agent$stream_async("two")
+
+  expect_identical(
+    paste(unlist(collect_async_stream(second)), collapse = ""),
+    "answer"
+  )
+  expect_identical(agent$last_run()$stop_reason, "complete")
+  collect_async_stream(first)
+  expect_identical(agent$last_run()$stop_reason, "too late")
+  expect_identical(chat$dispatched(), 1L)
+})
+
+test_that("a clone does not hold the original's waiting streams", {
+  chat <- counting_chat(list("answer"))
+  agent <- Agent$new(chat = chat)
+  stream <- agent$stream_async("one")
+
+  copy <- agent$clone()
+  expect_false(copy$interrupt("not mine"))
+
+  expect_identical(
+    paste(unlist(collect_async_stream(stream)), collapse = ""),
+    "answer"
+  )
+  expect_identical(agent$last_run()$stop_reason, "complete")
+})
+
 test_that("run_async() has no window before its first pull", {
   agent <- Agent$new(create_mock_chat(list("never sent")))
   promise <- agent$run_async("go")

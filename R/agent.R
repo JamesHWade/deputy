@@ -1738,7 +1738,8 @@ Agent <- R6::R6Class(
     #' state.
     #'
     #' A stream that has been made but not yet read has not started, so it is
-    #' stopped when it starts, without a model request.
+    #' stopped when it starts, without a model request. So is every other
+    #' stream of this agent that is waiting to start.
     #'
     #' @param reason Stop reason recorded on the run's `"stop"` event and
     #'   result.
@@ -2714,9 +2715,9 @@ Agent <- R6::R6Class(
       should_stop = FALSE,
       stop_reason_from_hook = NULL,
       stop_requested_by = NULL,
-      # The state of the stream most recently made that has not started yet,
-      # so an interrupt before its first pull is kept for its start.
-      unstarted_run = NULL,
+      # The states of the streams that were made and have not started yet, so
+      # an interrupt before their first pull is kept for their start.
+      unstarted_runs = list(),
       # Promises of hooks the run does not wait for; see take_held_hooks().
       held_hooks = list(),
 
@@ -2802,12 +2803,11 @@ Agent <- R6::R6Class(
             interrupted
         }
         if (!isTRUE(private$run_active)) {
-          waiting <- private$unstarted_run
-          if (!is.null(waiting) && is.null(waiting$active_run_id)) {
+          # Every stream that is waiting to start is stopped when it starts.
+          for (waiting in private$unstarted_runs) {
             waiting$interrupt_before_start <- as.character(reason[[1]])
-            return(invisible(TRUE))
           }
-          return(invisible(interrupted))
+          return(invisible(interrupted || length(private$unstarted_runs) > 0L))
         }
         private$request_stream_stop(as.character(reason[[1]]), by = "caller")
         invisible(TRUE)
@@ -2831,6 +2831,8 @@ Agent <- R6::R6Class(
         cloned <- private$.r6_clone(deep = TRUE)
         reg.finalizer(cloned, finalize_owned_conversations, onexit = TRUE)
         cloned$.__enclos_env__$private$active_owned_tools <- list()
+        # Streams waiting to start belong to the Agent that made them.
+        cloned$.__enclos_env__$private$unstarted_runs <- list()
         cloned$.__enclos_env__$private$rewire_chat_runtime()
         cloned$.__enclos_env__$private$.compaction_artifacts <- NULL
         # A clone, such as shinychat's title generator, shows no activity.

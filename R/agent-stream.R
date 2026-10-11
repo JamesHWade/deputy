@@ -70,7 +70,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       force(extraction)
       limits <- normalize_usage_limits(limits)
       state <- private$new_callback_run_state()
-      private$unstarted_run <- state
+      private$hold_unstarted_run(state)
       governed <- private$callback_run_stream(
         messages = messages,
         limits = limits,
@@ -90,13 +90,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
         function(environment) {
           # A stream dropped before it was read is no longer waiting to start,
           # so an interrupt has nothing of it to stop.
-          waiting <- agent$.__enclos_env__$private
-          if (
-            is.null(state$active_run_id) &&
-              identical(waiting$unstarted_run, state)
-          ) {
-            waiting$unstarted_run <- NULL
-          }
+          agent$.__enclos_env__$private$release_unstarted_run(state)
           if (
             !isTRUE(state$finished) &&
               !is.null(state$active_run_id)
@@ -624,6 +618,22 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       invisible(NULL)
     },
 
+    # A stream that was made waits to start until it is first read. The agent
+    # holds the state of each one, so an interrupt reaches them all.
+    hold_unstarted_run = function(state) {
+      private$unstarted_runs <- c(private$unstarted_runs, list(state))
+      invisible(NULL)
+    },
+
+    # The stream has started, was refused, or was dropped unread.
+    release_unstarted_run = function(state) {
+      private$unstarted_runs <- Filter(
+        function(waiting) !identical(waiting, state),
+        private$unstarted_runs
+      )
+      invisible(NULL)
+    },
+
     # Promises of hooks that ellmer does not wait for. Taking them empties the list.
     take_held_hooks = function() {
       held <- private$held_hooks
@@ -633,9 +643,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
 
     finish_active_run = function() {
       tree_run_finished(self)
-      if (identical(private$unstarted_run, private$current_run_state)) {
-        private$unstarted_run <- NULL
-      }
+      private$release_unstarted_run(private$current_run_state)
       checkpoint_error <- NULL
       tryCatch(
         private$finalize_pending_checkpoints(),

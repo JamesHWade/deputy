@@ -53,7 +53,7 @@ Where each event waits:
 |---|---|
 | `PreToolUse`, `PermissionRequest` | before the tool runs: ellmer awaits the request callback |
 | `PostToolUse`, `PostToolUseFailure` | before the next model request, and at the end of a pass: ellmer does not await the result callback, so Deputy holds the promise |
-| `PostModelRequest` | before the run goes on: ellmer awaits the request-end callback |
+| `PostModelRequest` | before the run goes on: ellmer awaits the request-end callback, and Deputy waits itself for a structured request, which ellmer's callbacks miss |
 | `SessionStart`, `UserPromptSubmit` | before the first model request; in a delegate batch, before any task is admitted |
 | `SubagentStart`, `SubagentStop` | around the delegated run |
 | `PreCompact`, `PostCompact` | in automatic compaction; `$compact()` does not wait |
@@ -108,7 +108,8 @@ delegate batch, which has no answer of its own.
   (the agent is running, or another Agent holds its Chat) has no result, so
   its promise is rejected with the error the stream gave.
 - An `interrupt()` between `stream_async()` and the stream's first pull stops
-  the run when it starts.
+  the run when it starts. The Agent holds every stream that is waiting to
+  start, so one interrupt reaches them all; a clone holds none.
 
 ## Alternatives considered
 

@@ -84,9 +84,7 @@ initialize_agent_run <- function(
   private$current_stream_content <-
     identical(stream_mode, "content")
   private$current_run_state <- state
-  if (identical(private$unstarted_run, state)) {
-    private$unstarted_run <- NULL
-  }
+  private$release_unstarted_run(state)
   if (!is.null(state$interrupt_before_start)) {
     private$request_stream_stop(state$interrupt_before_start, by = "caller")
   }
@@ -169,9 +167,7 @@ refuse_unstarted_run <- function(agent, state, error) {
   private <- agent$.__enclos_env__$private
   state$finished <- TRUE
   state$start_error <- error
-  if (identical(private$unstarted_run, state)) {
-    private$unstarted_run <- NULL
-  }
+  private$release_unstarted_run(state)
   if (is.function(state$reject_result)) {
     state$reject_result(error)
   }
