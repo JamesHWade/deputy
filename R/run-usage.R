@@ -167,10 +167,10 @@ S7::method(print, UsageLimits) <- function(x, ...) {
 #'   aren't added to `total_tokens`.
 #' @param cost_usd Estimated cost in US dollars, or `NA_real_` if the cost of
 #'   some responses is unknown.
-#' @param known_cost_usd The cost of the responses whose cost is known. It
-#'   equals `cost_usd` when that is known, and is a lower bound when `cost_usd`
-#'   is `NA_real_`. `NULL` (the default) means `cost_usd`, or `0` when that is
-#'   unknown. When `cost_usd` is known, the two must agree.
+#' @param known_cost_usd The cost of the responses whose cost is known. When
+#'   `cost_usd` is known this is ignored: the known cost is `cost_usd`. When
+#'   `cost_usd` is `NA_real_`, it is a lower bound and `NULL` (the default)
+#'   means `0`.
 #'
 #' @prop total_tokens `input_tokens + output_tokens`.
 #' @prop known_cost_usd The cost of the responses whose cost is known.
@@ -223,23 +223,14 @@ AgentUsage <- S7::new_class(
       "cost_usd",
       allow_unknown = TRUE
     )
-    if (is.null(known_cost_usd)) {
-      known_cost_usd <- if (is.na(cost_usd)) 0 else cost_usd
+    # Like total_tokens, the known cost is derived when the cost is known, so
+    # a supplied value is ignored rather than allowed to disagree with it.
+    known_cost_usd <- if (!is.na(cost_usd)) {
+      cost_usd
+    } else if (is.null(known_cost_usd)) {
+      0
     } else {
-      known_cost_usd <- validate_agent_usage_value(
-        known_cost_usd,
-        "known_cost_usd"
-      )
-      # A known cost is the whole cost, so a different known part is a bug in
-      # the caller's accounting, not a value to keep.
-      if (
-        !is.na(cost_usd) &&
-          !isTRUE(all.equal(known_cost_usd, cost_usd, tolerance = 1e-12))
-      ) {
-        cli::cli_abort(
-          "{.arg known_cost_usd} must equal {.arg cost_usd} when the cost is known"
-        )
-      }
+      validate_agent_usage_value(known_cost_usd, "known_cost_usd")
     }
     value <- S7::new_object(
       S7::S7_object(),

@@ -409,9 +409,10 @@ test_that("AgentUsage carries the known cost", {
     AgentUsage(cost_usd = NA_real_, known_cost_usd = NA_real_),
     "non-negative"
   )
-  expect_error(
-    AgentUsage(cost_usd = 0.02, known_cost_usd = 0.01),
-    "known_cost_usd"
+  # A known cost is the cost, so a supplied known part is ignored then.
+  expect_identical(
+    AgentUsage(cost_usd = 0.02, known_cost_usd = 0.05)$known_cost_usd,
+    0.02
   )
 })
 
