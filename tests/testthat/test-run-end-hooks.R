@@ -444,3 +444,29 @@ test_that("Stop and SessionEnd hooks that return plain values see the same order
     c("Stop", "SessionEnd")
   )
 })
+
+test_that("an interrupt while a SessionEnd hook is pending does not change how the run ended", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  told <- list()
+  agent <- Agent$new(chat = run_end_chat())
+  agent$hooks$add(HookMatcher(
+    event = "SessionEnd",
+    timeout = 0,
+    callback = function(reason, context, ...) {
+      told$reason <<- reason
+      told$ending <<- context$ending
+      # The run has ended; a stop that arrives now has nothing left to stop.
+      later::later(function() agent$interrupt("too late"), 0.05)
+      later_value(NULL, 0.2)
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("go"), max_polls = 300L)
+
+  expect_identical(told$reason, "complete")
+  expect_identical(result$stop_reason, "complete")
+  expect_s7_class(result$ending, RunEndingAnswered)
+  expect_identical(result$ending, told$ending)
+})

@@ -243,6 +243,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       state$stop_hook_active <- FALSE
       state$stop_hook_fired <- FALSE
       state$session_end_fired <- FALSE
+      state$ended <- FALSE
       state$result_promise <- NULL
       state$resolve_result <- NULL
       state$reject_result <- NULL
@@ -321,6 +322,12 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
     # reads. Called from the run's body before Stop and from
     # finish_callback_run(); each block checks what an earlier call set.
     settle_run = function(state) {
+      # Once SessionEnd has been told how the run ended, that is how it
+      # ended: a stop that arrives while that hook is pending has nothing
+      # left to stop.
+      if (isTRUE(state$ended)) {
+        return(invisible(NULL))
+      }
       if (isTRUE(private$should_stop) && identical(state$reason, "complete")) {
         state$reason <- private$stop_reason_from_hook %||%
           "hook_requested_stop"
@@ -1054,6 +1061,7 @@ governed_run_stream <- coro::async_generator(function(
   graph_cancel_descendants(agent, "parent_completed")
   if (isTRUE(stream_state$session_started)) {
     stream_state$session_end_fired <- TRUE
+    stream_state$ended <- TRUE
     ended <- agent$.__enclos_env__$private$fire_end_hook(
       "SessionEnd",
       stream_state
