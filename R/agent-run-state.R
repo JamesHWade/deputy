@@ -159,6 +159,25 @@ initialize_agent_run <- function(
   invisible(state)
 }
 
+# A stream that fails before its run has an ID leaves no result and nothing
+# to finish. It is no longer waiting to start, and whoever holds the promise
+# of its result is told why.
+refuse_unstarted_run <- function(agent, state, error) {
+  if (!is.null(state$active_run_id) || isTRUE(state$finished)) {
+    return(invisible(NULL))
+  }
+  private <- agent$.__enclos_env__$private
+  state$finished <- TRUE
+  state$start_error <- error
+  if (identical(private$unstarted_run, state)) {
+    private$unstarted_run <- NULL
+  }
+  if (is.function(state$reject_result)) {
+    state$reject_result(error)
+  }
+  invisible(NULL)
+}
+
 # The hooks at a run's start: SessionStart, then UserPromptSubmit, then the
 # check of limits the run has already reached. Returns a promise when a
 # callback returned one, for the run to wait on.

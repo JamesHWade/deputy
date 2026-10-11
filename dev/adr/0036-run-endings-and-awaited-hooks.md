@@ -104,7 +104,9 @@ delegate batch, which has no answer of its own.
   a subagent's budget and a retained conversation's budget all read it.
 - `PostModelRequest` fires after each model request with the run's usage.
 - `stream_result(stream)` gives a promise of the run's `AgentResult`. It
-  resolves however the run ended.
+  resolves however the run ended. A stream refused before its run has an ID
+  (the agent is running, or another Agent holds its Chat) has no result, so
+  its promise is rejected with the error the stream gave.
 - An `interrupt()` between `stream_async()` and the stream's first pull stops
   the run when it starts.
 

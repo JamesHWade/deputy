@@ -758,13 +758,21 @@ governed_run_stream <- coro::async_generator(function(
   stream_type,
   conversation_token
 ) {
-  check_conversation_lease(agent, conversation_token)
-  if (isTRUE(agent$.__enclos_env__$private$run_active)) {
-    cli::cli_abort(
-      "This agent already has an active run",
-      class = c("deputy_run_active", "deputy_error")
-    )
-  }
+  tryCatch(
+    {
+      check_conversation_lease(agent, conversation_token)
+      if (isTRUE(agent$.__enclos_env__$private$run_active)) {
+        cli::cli_abort(
+          "This agent already has an active run",
+          class = c("deputy_run_active", "deputy_error")
+        )
+      }
+    },
+    error = function(error) {
+      refuse_unstarted_run(agent, stream_state, error)
+      rlang::cnd_signal(error)
+    }
+  )
 
   on.exit(
     agent$.__enclos_env__$private$finish_callback_run(stream_state),
@@ -788,6 +796,8 @@ governed_run_stream <- coro::async_generator(function(
     },
     error = function(error) {
       stream_state$reason <- "error"
+      # A Chat another Agent holds refuses the run before it has an ID.
+      refuse_unstarted_run(agent, stream_state, error)
       record_run_failure(agent, "initialization", error)
       rlang::cnd_signal(error)
     }

@@ -513,6 +513,8 @@ run_without_result_error <- function() {
 #' the run has finished, however it ended: a run that was stopped, hit a limit
 #' or failed resolves too, and its `ending` says which. Draining the stream is
 #' still what makes the run go; a stream that is never read never resolves.
+#' The promise is rejected only when there is no result to give: the run could
+#' not start, as when the agent was already running, or finishing it failed.
 #'
 #' @param stream A stream returned by `Agent$stream_async()`.
 #' @return A promise of an [AgentResult].
@@ -539,7 +541,7 @@ stream_result <- function(stream) {
       if (!is.null(state$result)) {
         resolve(state$result)
       } else if (isTRUE(state$finished)) {
-        reject(run_without_result_error())
+        reject(state$start_error %||% run_without_result_error())
       } else {
         state$resolve_result <- resolve
         state$reject_result <- reject

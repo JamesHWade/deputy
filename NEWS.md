@@ -44,7 +44,7 @@
 
 * `stream_result()` takes the stream that `$stream_async()` returned and gives
   a promise of that run's `AgentResult`. It resolves when the run has
-  finished, however it ended.
+  finished, however it ended, and is rejected when the run could not start.
 
 * `$interrupt()` called after `$stream_async()` but before the stream is first
   read now stops the run when it starts. It was ignored, and the run started.
