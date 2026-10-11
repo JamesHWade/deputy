@@ -565,7 +565,8 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       summary,
       fallback,
       automatic,
-      estimated_tokens
+      estimated_tokens,
+      wait = FALSE
     ) {
       automatic <- compaction_automatic(automatic)
       estimated_tokens <- validate_usage_limit(
@@ -643,9 +644,9 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         plan$estimated_tokens <- estimated_tokens
         plan
       }
-      # Only the automatic path runs in a coroutine that can wait for a
-      # promise; a manual compact() cannot, so a promise counts as no answer.
-      if (isTRUE(automatic)) {
+      # Only governed_compaction_async() can wait for a promise. Every other
+      # caller, including compact() whatever its `automatic`, gets no answer.
+      if (isTRUE(wait)) {
         hook_then(hook_result, planned)
       } else {
         planned(hook_unawaited(hook_result))
@@ -657,7 +658,8 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       summary,
       method,
       summary_usage,
-      attempts = list()
+      attempts = list(),
+      wait = FALSE
     ) {
       # Reject a stale automatic plan before writing any catalog or artifact.
       private$.conversation_state$check_plan(private$.chat, plan)
@@ -811,7 +813,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           automatic = isTRUE(plan$automatic)
         )
       )
-      if (isTRUE(plan$automatic)) {
+      if (isTRUE(wait)) {
         return(hook_then(fired, function(ignored) result))
       }
       result

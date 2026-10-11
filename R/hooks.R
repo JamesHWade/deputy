@@ -43,10 +43,10 @@ NULL
 #' * `SubagentStop(agent_name, task, result, context)`: when a subagent
 #'   finishes.
 #' * `PreCompact(turns_to_compact, turns_to_keep, context)`: before older
-#'   turns are summarised. A manual `compact()` does not wait for a promise
-#'   from this hook.
-#' * `PostCompact(result, context)`: after compaction. A manual `compact()`
-#'   does not wait for a promise from this hook.
+#'   turns are summarised. `$compact()` does not wait for a promise from this
+#'   hook.
+#' * `PostCompact(result, context)`: after compaction. `$compact()` does not
+#'   wait for a promise from this hook.
 #' * `Notification(message, context)`: when the agent reports something, such
 #'   as a denied call.
 #' * `ConfigChange(key, old_value, new_value, context)`: when

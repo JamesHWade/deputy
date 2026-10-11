@@ -972,6 +972,66 @@ test_that("a manual compact() does not wait for a PreCompact hook's promise", {
   expect_identical(agent$last_compaction()$method, "custom")
 })
 
+test_that("compact(automatic = TRUE) does not wait for a PreCompact hook's promise either", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(runtime_reply("Task response")))
+  chat <- runtime_compaction_chat(server)
+  chat$set_turns(list(
+    ellmer::UserTurn("Previous task"),
+    ellmer::AssistantTurn("Previous response")
+  ))
+  agent <- Agent$new(chat)
+  agent$add_hook(HookMatcher(
+    event = "PreCompact",
+    timeout = 0,
+    callback = function(turns_to_compact, turns_to_keep, context) {
+      later_value(HookResultPreCompact(continue = FALSE))
+    }
+  ))
+
+  manual <- agent$compact(
+    keep_last = 0,
+    summary = "Automatic label continuation",
+    automatic = TRUE
+  )
+
+  expect_s7_class(manual, DeputyCompaction)
+  expect_identical(manual$method, "custom")
+  expect_identical(agent$last_compaction()$method, "custom")
+})
+
+test_that("compact(automatic = TRUE) does not wait for a PostCompact hook's promise either", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(runtime_reply("Task response")))
+  chat <- runtime_compaction_chat(server)
+  chat$set_turns(list(
+    ellmer::UserTurn("Previous task"),
+    ellmer::AssistantTurn("Previous response")
+  ))
+  agent <- Agent$new(chat)
+  agent$add_hook(HookMatcher(
+    event = "PostCompact",
+    timeout = 0,
+    callback = function(result, context) {
+      later_value(NULL)
+    }
+  ))
+
+  manual <- agent$compact(
+    keep_last = 0,
+    summary = "Automatic label continuation",
+    automatic = TRUE
+  )
+
+  expect_s7_class(manual, DeputyCompaction)
+  expect_identical(manual$method, "custom")
+})
+
+
 test_that("compaction IDs distinguish automatic no-ops from manual work after a run", {
   server <- local_runtime_server(list(runtime_reply("Task complete")))
   chat <- runtime_compaction_chat(server)
