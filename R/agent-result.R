@@ -495,3 +495,47 @@ S7::method(print, AgentResult) <- function(x, ...) {
   }))
   invisible(x)
 }
+
+#' Get the result of a streamed run
+#'
+#' @description
+#' `stream_result()` takes the stream that [Agent]`$stream_async()` returned
+#' and gives a promise of that run's [AgentResult]. The promise resolves when
+#' the run has finished, however it ended: a run that was stopped, hit a limit
+#' or failed resolves too, and its `ending` says which. Draining the stream is
+#' still what makes the run go; a stream that is never read never resolves.
+#'
+#' @param stream A stream returned by `Agent$stream_async()`.
+#' @return A promise of an [AgentResult].
+#' @examples
+#' \dontrun{
+#' stream <- agent$stream_async(input$message)
+#' stream_result(stream)$then(function(result) {
+#'   showNotification(paste("Run ended:", class(result$ending)[[1]]))
+#' })
+#' }
+#' @export
+stream_result <- function(stream) {
+  state <- attr(stream, "deputy_run_state", exact = TRUE)
+  if (!is.environment(state)) {
+    cli_abort(
+      "{.arg stream} must be a stream returned by {.code Agent$stream_async()}"
+    )
+  }
+  if (is.null(state$result_promise)) {
+    state$result_promise <- promises::promise(function(resolve, reject) {
+      if (!is.null(state$result)) {
+        resolve(state$result)
+      } else if (isTRUE(state$finished)) {
+        reject(rlang::error_cnd(
+          class = c("deputy_error"),
+          message = "The governed run ended without an AgentResult"
+        ))
+      } else {
+        state$resolve_result <- resolve
+        state$reject_result <- reject
+      }
+    })
+  }
+  state$result_promise
+}
