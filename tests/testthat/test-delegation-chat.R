@@ -134,7 +134,8 @@ test_that("a failing or invalid chat function stops the delegation first", {
   returns <- list(
     function(state, lead_chat) stop("gateway down"),
     function(state, lead_chat) "not a chat",
-    function(state, lead_chat) lead_chat
+    function(state, lead_chat) lead_chat,
+    function(state, lead_chat) Agent$new(chat = factory_chat(state))
   )
   for (build in returns) {
     state <- new.env(parent = emptyenv())
@@ -154,6 +155,25 @@ test_that("a failing or invalid chat function stops the delegation first", {
     expect_identical(state$started, character())
     expect_identical(lead$list_subagents()$stop_reason, "setup_error")
   }
+
+  # Returning the lead itself (an Agent is also a "Chat") must not clear it.
+  state <- new.env(parent = emptyenv())
+  lead <- LeadAgent$new(
+    create_parallel_chat(state),
+    sub_agents = list(agent_definition("a", "A", "a")),
+    delegation_policy = DelegationPolicy(chat = function(definition, context) {
+      lead
+    })
+  )
+  lead$set_turns(list(create_mock_user_turn("KEEP")))
+  tools <- names(lead$get_tools())
+  failure <- tryCatch(delegate_run(lead), error = identity)
+  expect_s3_class(failure, "deputy_delegation_binding")
+  expect_identical(
+    ellmer::contents_text(lead$get_turns()[[1L]]),
+    "KEEP"
+  )
+  expect_identical(names(lead$get_tools()), tools)
 
   # A chat another agent already runs on can't be handed to a subagent.
   state <- new.env(parent = emptyenv())

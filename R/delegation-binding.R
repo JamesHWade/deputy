@@ -263,7 +263,9 @@ delegation_factory_chat <- function(lead, definition, correlation) {
       )
     }
   )
-  if (!inherits(chat, "Chat")) {
+  # An Agent also carries the "Chat" class; clearing it below would wipe
+  # that agent's conversation and tools.
+  if (!inherits(chat, "Chat") || inherits(chat, "Agent")) {
     delegation_binding_abort("The chat function must return an ellmer Chat.")
   }
   owned <- tryCatch(
