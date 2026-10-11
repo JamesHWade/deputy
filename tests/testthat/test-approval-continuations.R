@@ -1054,3 +1054,48 @@ test_that("an exhausted allowance still permits a correlated denial without anot
   expect_s3_class(result_turn, "ellmer::UserTurn")
   expect_identical(result_turn@contents[[1L]]@request@id, "call_b")
 })
+
+test_that("a resumed approval waits for a current hook's promised denial", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  fixture <- local_approval_runtime()
+  resumed <- fixture$make_agent()
+  resumed$add_hook(HookMatcher(event = "PreToolUse", callback = function(...) {
+    later_value(
+      HookResultPreToolUse(
+        permission = "deny",
+        reason = "Current hook refuses"
+      ),
+      0.05
+    )
+  }))
+
+  resumed$resume_approval(fixture$path, "approve")
+
+  expect_identical(fixture$effects$values, "a")
+  result <- approval_wire_results(fixture$server$requests()[[2L]])[[2L]]
+  expect_identical(result$tool_call_id, "call_b")
+  expect_match(result$content, "Current hook refuses")
+})
+
+test_that("a resumed approval waits for a current hook's promised allow", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  fixture <- local_approval_runtime()
+  resumed <- fixture$make_agent()
+  effects_at_answer <- NULL
+  resumed$add_hook(HookMatcher(event = "PreToolUse", callback = function(...) {
+    promises::then(later_value(NULL, 0.05), function(value) {
+      effects_at_answer <<- fixture$effects$values
+      value
+    })
+  }))
+
+  resumed$resume_approval(fixture$path, "approve")
+
+  # The approved operation had not run when the hook answered.
+  expect_identical(effects_at_answer, "a")
+  expect_identical(fixture$effects$values, c("a", "b"))
+})
