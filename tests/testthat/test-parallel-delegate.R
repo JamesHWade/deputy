@@ -377,3 +377,22 @@ test_that("released ellmer Chats preserve transport and isolate runtime callback
     expect_identical(input$resolved_evidence, list())
   }
 })
+
+test_that("a delegate batch fires SessionStart and UserPromptSubmit as before", {
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  fired <- character()
+  lead$add_hook(HookMatcher("SessionStart", callback = function(...) {
+    fired <<- c(fired, "SessionStart")
+    NULL
+  }))
+  lead$add_hook(HookMatcher("UserPromptSubmit", callback = function(...) {
+    fired <<- c(fired, "UserPromptSubmit")
+    NULL
+  }))
+
+  batch <- lead$parallel_delegate(c(a = "one", b = "two"))
+
+  expect_identical(batch$status, c(a = "completed", b = "completed"))
+  expect_identical(fired, c("SessionStart", "UserPromptSubmit"))
+})

@@ -693,15 +693,28 @@ governed_run_stream <- coro::async_generator(function(
     add = TRUE
   )
   tryCatch(
-    initialize_agent_run(
-      agent,
-      stream_state,
-      messages,
-      run_limits,
-      effective_run_context,
-      controller,
-      stream_mode
-    ),
+    {
+      initialize_agent_run(
+        agent,
+        stream_state,
+        messages,
+        run_limits,
+        effective_run_context,
+        controller,
+        stream_mode,
+        start_hooks = FALSE
+      )
+      started <- fire_session_start(agent, stream_state)
+      if (promises::is.promising(started)) {
+        coro::await(started)
+      }
+      stream_state$session_started <- TRUE
+      submitted <- fire_prompt_submit(agent, stream_state, messages)
+      if (promises::is.promising(submitted)) {
+        coro::await(submitted)
+      }
+      check_initial_run_limits(agent, stream_state)
+    },
     error = function(error) {
       stream_state$reason <- "error"
       record_run_failure(agent, "initialization", error)

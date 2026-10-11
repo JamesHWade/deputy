@@ -167,8 +167,13 @@ S7::method(print, UsageLimits) <- function(x, ...) {
 #'   aren't added to `total_tokens`.
 #' @param cost_usd Estimated cost in US dollars, or `NA_real_` if the cost of
 #'   some responses is unknown.
+#' @param known_cost_usd The cost of the responses whose cost is known. When
+#'   `cost_usd` is known this is ignored: the known cost is `cost_usd`. When
+#'   `cost_usd` is `NA_real_`, it is a lower bound and `NULL` (the default)
+#'   means `0`.
 #'
 #' @prop total_tokens `input_tokens + output_tokens`.
+#' @prop known_cost_usd The cost of the responses whose cost is known.
 #' @return An `AgentUsage` object.
 #' @examples
 #' AgentUsage(
@@ -192,7 +197,8 @@ AgentUsage <- S7::new_class(
     output_tokens = readonly_property("output_tokens", S7::class_double),
     cached_tokens = readonly_property("cached_tokens", S7::class_double),
     total_tokens = readonly_property("total_tokens", S7::class_double),
-    cost_usd = readonly_property("cost_usd", S7::class_double)
+    cost_usd = readonly_property("cost_usd", S7::class_double),
+    known_cost_usd = readonly_property("known_cost_usd", S7::class_double)
   ),
   constructor = function(
     requests = 0L,
@@ -200,7 +206,8 @@ AgentUsage <- S7::new_class(
     input_tokens = 0,
     output_tokens = 0,
     cached_tokens = 0,
-    cost_usd = 0
+    cost_usd = 0,
+    known_cost_usd = NULL
   ) {
     requests <- validate_agent_usage_value(requests, "requests", integer = TRUE)
     tool_calls <- validate_agent_usage_value(
@@ -216,6 +223,15 @@ AgentUsage <- S7::new_class(
       "cost_usd",
       allow_unknown = TRUE
     )
+    # Like total_tokens, the known cost is derived when the cost is known, so
+    # a supplied value is ignored rather than allowed to disagree with it.
+    known_cost_usd <- if (!is.na(cost_usd)) {
+      cost_usd
+    } else if (is.null(known_cost_usd)) {
+      0
+    } else {
+      validate_agent_usage_value(known_cost_usd, "known_cost_usd")
+    }
     value <- S7::new_object(
       S7::S7_object(),
       requests = requests,
@@ -224,7 +240,8 @@ AgentUsage <- S7::new_class(
       output_tokens = output_tokens,
       cached_tokens = cached_tokens,
       total_tokens = input_tokens + output_tokens,
-      cost_usd = cost_usd
+      cost_usd = cost_usd,
+      known_cost_usd = known_cost_usd
     )
     freeze_value(value)
   }
@@ -271,15 +288,17 @@ provider_cost_summary <- function(tokens, expected_records = NULL) {
   }
   unavailable <- is.na(costs) | !is.finite(costs)
   missing <- sum(unavailable)
+  known <- sum(costs[!unavailable])
   if (missing > 0L) {
     return(list(
       total = NA_real_,
+      known = known,
       complete = FALSE,
       missing = as.integer(missing)
     ))
   }
 
-  list(total = sum(costs), complete = TRUE, missing = 0L)
+  list(total = sum(costs), known = known, complete = TRUE, missing = 0L)
 }
 
 provider_usage_summary <- function(chat) {
@@ -353,6 +372,7 @@ provider_usage_summary_for <- function(chat, turns, ellmer_tokens) {
     output = token_sum("output"),
     cached = token_sum("cached_input"),
     total = cost$total,
+    known = cost$known,
     complete = cost$complete,
     missing = cost$missing,
     cost_records = cost_records
@@ -454,6 +474,11 @@ S7::method(print, AgentUsage) <- function(x, ...) {
     cli::cli_text("tokens: {x@total_tokens}")
     cli::cli_text("cached_tokens: {x@cached_tokens}")
     cli::cli_text("cost_usd: {format_cost(x@cost_usd)}")
+    # Shown only when it says something the cost line does not, so existing
+    # printed output does not change.
+    if (is.na(x@cost_usd) && x@known_cost_usd > 0) {
+      cli::cli_text("known_cost_usd: {format_cost(x@known_cost_usd)}")
+    }
   }))
   invisible(x)
 }
@@ -532,7 +557,8 @@ agent_usage_snapshot <- function(chat) {
     input_tokens = summary$input,
     output_tokens = summary$output,
     cached_tokens = summary$cached,
-    cost_usd = summary$total
+    cost_usd = summary$total,
+    known_cost_usd = summary$known
   )
   attr(usage, "provider_cost_records") <- summary$cost_records
   attr(usage, "provider_usage_totals") <- unlist(
@@ -560,6 +586,7 @@ conversation_usage_summary <- function(chat, compacted_turns = list()) {
     output = summary$output + earlier_total("output"),
     cached = summary$cached + earlier_total("cached_input"),
     total = if (complete) summary$total + earlier_cost$total else NA_real_,
+    known = summary$known + earlier_cost$known,
     complete = complete,
     missing = summary$missing + earlier_cost$missing,
     cost_records = c(earlier$cost, summary$cost_records)
@@ -578,7 +605,8 @@ conversation_usage_snapshot <- function(
     input_tokens = summary$input,
     output_tokens = summary$output,
     cached_tokens = summary$cached,
-    cost_usd = summary$total
+    cost_usd = summary$total,
+    known_cost_usd = summary$known
   )
   attr(usage, "provider_cost_records") <- summary$cost_records
   attr(usage, "provider_usage_totals") <- unlist(
@@ -626,16 +654,19 @@ agent_usage_difference <- function(
   if (!is.null(requests)) {
     request_difference <- max(request_difference, requests)
   }
+  known <- non_negative(current$known_cost_usd - baseline$known_cost_usd)
   cost <- if (!is.null(current_costs) && !is.null(baseline_costs)) {
     if (length(current_costs) < length(baseline_costs)) {
       NA_real_
     } else if (length(current_costs) > length(baseline_costs)) {
       first <- length(baseline_costs) + 1L
       added <- current_costs[first:length(current_costs)]
-      provider_cost_summary(
+      added_cost <- provider_cost_summary(
         data.frame(cost = added),
         expected_records = request_difference
-      )$total
+      )
+      known <- added_cost$known
+      added_cost$total
     } else {
       current_totals <- attr(
         current,
@@ -652,6 +683,7 @@ agent_usage_difference <- function(
       if (isTRUE(provider_changed)) {
         non_negative(current$cost_usd - baseline$cost_usd)
       } else if (request_difference == 0L) {
+        known <- 0
         0
       } else {
         NA_real_
@@ -671,7 +703,8 @@ agent_usage_difference <- function(
     cached_tokens = non_negative(
       current$cached_tokens - baseline$cached_tokens
     ),
-    cost_usd = cost
+    cost_usd = cost,
+    known_cost_usd = known
   )
 }
 
@@ -682,7 +715,8 @@ agent_usage_add <- function(left, right) {
     input_tokens = left$input_tokens + right$input_tokens,
     output_tokens = left$output_tokens + right$output_tokens,
     cached_tokens = left$cached_tokens + right$cached_tokens,
-    cost_usd = left$cost_usd + right$cost_usd
+    cost_usd = left$cost_usd + right$cost_usd,
+    known_cost_usd = left$known_cost_usd + right$known_cost_usd
   )
 }
 
@@ -700,7 +734,8 @@ preserve_run_usage <- function(agent, usage) {
     input_tokens = usage@input_tokens,
     output_tokens = usage@output_tokens,
     cached_tokens = usage@cached_tokens,
-    cost_usd = usage@cost_usd
+    cost_usd = usage@cost_usd,
+    known_cost_usd = usage@known_cost_usd
   )
   private$current_outer_requests <- 0L
   private$current_usage_baseline <- agent_usage_snapshot(private$.chat)
@@ -759,13 +794,15 @@ usage_limit_status <- function(usage, limits, require_followup = FALSE) {
       next
     }
     if (identical(check$field, "max_cost_usd") && is.na(check$actual)) {
-      if (!identical(limits$on_unknown_cost, "stop")) {
-        next
+      if (identical(limits$on_unknown_cost, "stop")) {
+        check$reason <- "cost_unavailable"
+        check$label <- "estimated cost"
+        check$limit <- limit
+        return(check)
       }
-      check$reason <- "cost_unavailable"
-      check$label <- "estimated cost"
-      check$limit <- limit
-      return(check)
+      # The run goes on, so the limit is enforced against the cost that is
+      # known: a lower bound, and the limit can only be reached by it.
+      check$actual <- usage$known_cost_usd
     }
     exceeded <- check$actual > limit ||
       (isTRUE(check$reached) && check$actual >= limit)
