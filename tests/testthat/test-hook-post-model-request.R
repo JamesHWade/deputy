@@ -104,6 +104,34 @@ test_that("the next model request waits for a PostModelRequest hook's promise", 
   expect_identical(trimws(result$response), "final answer")
 })
 
+test_that("an interrupt while a PostModelRequest hook is pending ends the run before the next request", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  agent$register_tool(ellmer::tool(
+    function() "probed",
+    name = "probe",
+    description = "Probe."
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context) {
+      later::later(function() agent$interrupt("enough"), 0.05)
+      later_value(NULL, 0.3)
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("task"), max_polls = 500L)
+
+  expect_length(server$requests(), 1L)
+  expect_identical(result$stop_reason, "enough")
+})
+
 test_that("a PostModelRequest hook that fails does not stop the run", {
   server <- local_runtime_server(list(runtime_reply("answer")))
   agent <- Agent$new(runtime_chat(server))

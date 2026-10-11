@@ -372,6 +372,24 @@ test_that("direct delegation can be interrupted without an active lead run", {
   expect_identical(tail(lead$list_subagents()$status, 1L), "completed")
 })
 
+test_that("an interrupt while a SubagentStart hook is pending keeps the child from starting", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    later::later(function() lead$interrupt("before_request"), 0.05)
+    promises::promise(function(resolve, reject) {
+      later::later(function() resolve(NULL), 0.3)
+    })
+  }))
+  resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
+  expect_length(state$started, 0L)
+  expect_identical(lead$list_subagents()$status, "not_started")
+  expect_identical(lead$list_subagents()$stop_reason, "before_request")
+})
+
 test_that("direct start-hook cancellation prevents the first Subagent request", {
   state <- new.env(parent = emptyenv())
   lead <- parallel_test_lead(state)
