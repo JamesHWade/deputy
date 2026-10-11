@@ -553,6 +553,42 @@ test_that("a cost limit that goes on is enforced against the known cost", {
   )
 })
 
+test_that("what is left of a limit is worked out from the cost the limit is checked against", {
+  limits <- UsageLimits(
+    max_requests = 10,
+    max_cost_usd = 0.50,
+    on_unknown_cost = "continue"
+  )
+  reserved <- c(max_requests = 2, max_cost_usd = 0.10)
+
+  known <- usage_limits_remaining(
+    limits,
+    AgentUsage(requests = 3L, cost_usd = 0.20),
+    reserved
+  )
+  expect_identical(known$max_requests, 5)
+  expect_equal(known$max_cost_usd, 0.20)
+  expect_null(known$max_total_tokens)
+  expect_named(known, usage_limit_fields())
+
+  # An unknown cost the limits go on without: the known cost is what counts.
+  going_on <- usage_limits_remaining(
+    limits,
+    AgentUsage(requests = 3L, cost_usd = NA_real_, known_cost_usd = 0.15)
+  )
+  expect_equal(going_on$max_cost_usd, 0.35)
+
+  # An unknown cost the limits stop on leaves nothing that can be worked out.
+  stopping <- usage_limits_remaining(
+    UsageLimits(max_cost_usd = 0.50),
+    AgentUsage(cost_usd = NA_real_, known_cost_usd = 0.15)
+  )
+  expect_identical(stopping$max_cost_usd, NA_real_)
+
+  spent <- usage_limits_remaining(limits, AgentUsage(cost_usd = 0.75))
+  expect_identical(spent$max_cost_usd, 0)
+})
+
 test_that("usage prints the known cost only when the cost is unknown and positive", {
   known_output <- capture_output(print(
     AgentUsage(cost_usd = NA_real_, known_cost_usd = 0.01)

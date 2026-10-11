@@ -99,7 +99,9 @@ delegate batch, which has no answer of its own.
 - `UsageLimits(on_unknown_cost = "continue")` lets a run with a cost limit go
   on when a response has no cost. The limit is then enforced against
   `AgentUsage@known_cost_usd`, the cost of the responses whose cost is known:
-  equal to `cost_usd` when that is known, a lower bound when it is `NA`.
+  equal to `cost_usd` when that is known, a lower bound when it is `NA`. One
+  function says which cost a limit is checked against, and the limit check,
+  a subagent's budget and a retained conversation's budget all read it.
 - `PostModelRequest` fires after each model request with the run's usage.
 - `stream_result(stream)` gives a promise of the run's `AgentResult`. It
   resolves however the run ended.

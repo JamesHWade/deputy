@@ -380,18 +380,22 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
         }
       }
       # settle_run() runs again after a Stop hook, so the warning is guarded.
+      # It reads the cost the limit is checked against.
+      limited_cost <- if (!is.null(limits$max_cost_usd)) {
+        usage_against_limits(usage, limits)$max_cost_usd
+      }
       if (
         is.null(private$last_limit_status) &&
           !isTRUE(state$cost_warned) &&
-          !is.null(limits$max_cost_usd) &&
-          is.finite(usage$cost_usd) &&
-          usage$cost_usd >= limits$max_cost_usd * 0.9
+          !is.null(limited_cost) &&
+          is.finite(limited_cost) &&
+          limited_cost >= limits$max_cost_usd * 0.9
       ) {
         state$cost_warned <- TRUE
         private$notify(
           paste0(
             "Approaching run cost limit: ",
-            format_cost(usage$cost_usd),
+            format_cost(limited_cost),
             " / ",
             format_cost(limits$max_cost_usd)
           ),
@@ -401,7 +405,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           max_cost_usd = limits$max_cost_usd
         )
         cli::cli_warn(
-          "Approaching run cost limit: {format_cost(usage$cost_usd)} / {format_cost(limits$max_cost_usd)}"
+          "Approaching run cost limit: {format_cost(limited_cost)} / {format_cost(limits$max_cost_usd)}"
         )
       }
       invisible(NULL)

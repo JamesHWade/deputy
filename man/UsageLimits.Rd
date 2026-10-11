@@ -43,8 +43,9 @@ still available from \verb{$last_run()}.}
 
 \item{on_unknown_cost}{What happens when \code{max_cost_usd} is set and the cost
 of a response is unknown. \code{"stop"} (the default) ends the run with
-\code{"cost_unavailable"}. \code{"continue"} lets the run go on, and checks the
-limit against the cost that is known (\link{AgentUsage}'s \code{known_cost_usd}).}
+\code{"cost_unavailable"}. \code{"continue"} lets the run go on. The limit is then
+checked against the cost that is known (\link{AgentUsage}'s \code{known_cost_usd}),
+and a subagent's budget is what that leaves.}
 }
 \value{
 A \code{UsageLimits} object.

@@ -491,3 +491,24 @@ test_that("an interrupt while a batch's SessionStart hook is pending starts no s
   expect_identical(batch$run$ending@by, "caller")
   expect_false(lead$.__enclos_env__$private$run_active)
 })
+
+test_that("a batch that goes on without a cost still gives its next subagent a budget", {
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  # The failed request of `b` has no cost, so the batch's cost is unknown.
+  state$fail <- "b"
+
+  batch <- lead$parallel_delegate(
+    c(a = "first", b = "second", c = "third"),
+    max_active = 1,
+    usage_limits = UsageLimits(max_cost_usd = 0.5, on_unknown_cost = "continue")
+  )
+
+  expect_identical(
+    batch$status,
+    c(a = "completed", b = "failed", c = "completed")
+  )
+  expect_identical(batch$run$stop_reason, "delegation_error")
+  expect_identical(batch$run$usage$cost_usd, NA_real_)
+  expect_equal(batch$run$usage$known_cost_usd, 0.002)
+})

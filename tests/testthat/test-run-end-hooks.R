@@ -417,7 +417,9 @@ test_that("a Stop hook cannot send a delegate batch on", {
   expect_identical(batch$run$usage$requests, 2L)
 })
 
-test_that("the approaching-cost warning is given once", {
+# Runs one task on a Chat whose usage is `tokens` once the run has started,
+# and returns the cost warnings, the cost notices and the count of stops.
+cost_warning_run <- function(tokens, limits) {
   mock_chat <- create_mock_chat(responses = list("Response"))
   mock_chat$stream <- function(prompt = NULL) {
     yielded <- FALSE
@@ -438,12 +440,9 @@ test_that("the approaching-cost warning is given once", {
     if (token_reads == 1L) {
       return(data.frame(input = 0, output = 0, cached_input = 0, cost = 0))
     }
-    data.frame(input = 1000, output = 500, cached_input = 0, cost = 0.95)
+    tokens
   }
-  agent <- Agent$new(
-    chat = mock_chat,
-    usage_limits = UsageLimits(max_cost_usd = 1.00)
-  )
+  agent <- Agent$new(chat = mock_chat, usage_limits = limits)
   stops <- 0L
   agent$hooks$add(HookMatcher(
     event = "Stop",
@@ -466,17 +465,51 @@ test_that("the approaching-cost warning is given once", {
   ))
 
   warnings_raised <- character()
-  withCallingHandlers(
+  result <- withCallingHandlers(
     agent$run_sync("Test task"),
     warning = function(w) {
       warnings_raised <<- c(warnings_raised, conditionMessage(w))
       invokeRestart("muffleWarning")
     }
   )
+  list(
+    warnings = grep("cost limit", warnings_raised, value = TRUE),
+    notices = notices,
+    stops = stops,
+    result = result
+  )
+}
 
-  expect_length(grep("cost limit", warnings_raised), 1L)
-  expect_length(notices, 1L)
-  expect_identical(stops, 1L)
+test_that("the approaching-cost warning is given once", {
+  run <- cost_warning_run(
+    data.frame(input = 1000, output = 500, cached_input = 0, cost = 0.95),
+    UsageLimits(max_cost_usd = 1.00)
+  )
+
+  expect_length(run$warnings, 1L)
+  expect_length(run$notices, 1L)
+  expect_identical(run$stops, 1L)
+})
+
+test_that("a run that goes on without a cost is warned as its known cost nears the limit", {
+  run <- cost_warning_run(
+    # The first row is the usage before the run; the run adds a response with
+    # a cost and one without.
+    data.frame(
+      input = c(0, 1000, 10),
+      output = c(0, 500, 5),
+      cached_input = c(0, 0, 0),
+      cost = c(0, 0.95, NA)
+    ),
+    UsageLimits(max_cost_usd = 1.00, on_unknown_cost = "continue")
+  )
+
+  expect_identical(run$result$stop_reason, "complete")
+  expect_identical(run$result$usage$cost_usd, NA_real_)
+  expect_equal(run$result$usage$known_cost_usd, 0.95)
+  expect_length(run$warnings, 1L)
+  expect_match(run$warnings, "0.95", fixed = TRUE)
+  expect_length(run$notices, 1L)
 })
 
 test_that("Stop and SessionEnd hooks that return plain values see the same order of events as before", {
