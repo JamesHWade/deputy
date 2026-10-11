@@ -384,85 +384,94 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         keep.null = FALSE
       )
 
-      # Fire PostToolUse hooks
-      hook_result <- private$fire_hook(
-        "PostToolUse",
-        tool_name = extracted$tool_name,
-        tool_result = hook_tool_result,
-        tool_error = hook_tool_error,
-        context = context
-      )
+      # What follows a PostToolUse answer. The tool_end event reads the
+      # overrides this sets, so it waits for the hook too.
+      after_post_tool <- function(hook_result) {
+        # Check continue field in PostToolUse result
+        if (S7::S7_inherits(hook_result, HookResultPostToolUse)) {
+          private$tool_event_overrides[[record$tool_call_id]] <- list(
+            suppress_output = hook_result$suppress_output,
+            updated_tool_output = hook_result$updated_tool_output
+          )
+          if (!is.null(hook_result$additional_context)) {
+            private$append_hook_context(hook_result$additional_context)
+          }
+          if (!is.null(hook_result$continue) && !hook_result$continue) {
+            private$should_stop <- TRUE
+            private$stop_reason_from_hook <- hook_result$stop_reason %||%
+              "hook_requested_stop"
+            private$stop_requested_by <- "hook"
+          }
+        }
+        failed <- if (!is.null(hook_tool_error)) {
+          private$fire_hook(
+            "PostToolUseFailure",
+            tool_name = extracted$tool_name,
+            tool_result = hook_tool_result,
+            tool_error = hook_tool_error,
+            context = context
+          )
+        }
+        hook_then(failed, function(ignored) {
+          private$record_run_event(private$tool_end_event(extracted))
 
-      # Check continue field in PostToolUse result
-      if (S7::S7_inherits(hook_result, HookResultPostToolUse)) {
-        private$tool_event_overrides[[record$tool_call_id]] <- list(
-          suppress_output = hook_result$suppress_output,
-          updated_tool_output = hook_result$updated_tool_output
-        )
-        if (!is.null(hook_result$additional_context)) {
-          private$append_hook_context(hook_result$additional_context)
-        }
-        if (!is.null(hook_result$continue) && !hook_result$continue) {
-          private$should_stop <- TRUE
-          private$stop_reason_from_hook <- hook_result$stop_reason %||%
-            "hook_requested_stop"
-          private$stop_requested_by <- "hook"
-        }
+          record_state <- private$tool_call_records[[record$record_index]]
+          request_signature <- record_state$request_signature
+          cycle_signature <- if (is.null(request_signature)) {
+            NULL
+          } else {
+            tool_cycle_signature(
+              request_signature,
+              hook_tool_result,
+              hook_tool_error
+            )
+          }
+          if (is.null(cycle_signature)) {
+            private$last_tool_cycle_signature <- NULL
+            private$consecutive_tool_cycles <- 0L
+          } else {
+            loop <- advance_tool_loop(
+              signature = cycle_signature,
+              last_signature = private$last_tool_cycle_signature,
+              consecutive_calls = private$consecutive_tool_cycles
+            )
+            private$last_tool_cycle_signature <- loop$signature
+            private$consecutive_tool_cycles <- loop$consecutive_calls
+            if (isTRUE(loop$stalled) && !isTRUE(private$should_stop)) {
+              message <- paste0(
+                "Tool request `",
+                extracted$tool_name,
+                "` completed with the same result ",
+                loop$consecutive_calls,
+                " times without progress."
+              )
+              private$request_stream_stop("tool_loop")
+              private$notify(
+                message,
+                level = "warning",
+                code = "tool_loop",
+                tool_name = extracted$tool_name,
+                repeated = loop$consecutive_calls
+              )
+            }
+          }
+          invisible(NULL)
+        })
       }
 
-      if (!is.null(hook_tool_error)) {
+      pending <- hook_then(
         private$fire_hook(
-          "PostToolUseFailure",
+          "PostToolUse",
           tool_name = extracted$tool_name,
           tool_result = hook_tool_result,
           tool_error = hook_tool_error,
           context = context
-        )
+        ),
+        after_post_tool
+      )
+      if (promises::is.promising(pending)) {
+        private$held_hooks <- c(private$held_hooks, list(pending))
       }
-
-      private$record_run_event(private$tool_end_event(extracted))
-
-      record_state <- private$tool_call_records[[record$record_index]]
-      request_signature <- record_state$request_signature
-      cycle_signature <- if (is.null(request_signature)) {
-        NULL
-      } else {
-        tool_cycle_signature(
-          request_signature,
-          hook_tool_result,
-          hook_tool_error
-        )
-      }
-      if (is.null(cycle_signature)) {
-        private$last_tool_cycle_signature <- NULL
-        private$consecutive_tool_cycles <- 0L
-      } else {
-        loop <- advance_tool_loop(
-          signature = cycle_signature,
-          last_signature = private$last_tool_cycle_signature,
-          consecutive_calls = private$consecutive_tool_cycles
-        )
-        private$last_tool_cycle_signature <- loop$signature
-        private$consecutive_tool_cycles <- loop$consecutive_calls
-        if (isTRUE(loop$stalled) && !isTRUE(private$should_stop)) {
-          message <- paste0(
-            "Tool request `",
-            extracted$tool_name,
-            "` completed with the same result ",
-            loop$consecutive_calls,
-            " times without progress."
-          )
-          private$request_stream_stop("tool_loop")
-          private$notify(
-            message,
-            level = "warning",
-            code = "tool_loop",
-            tool_name = extracted$tool_name,
-            repeated = loop$consecutive_calls
-          )
-        }
-      }
-
       invisible(hook_tool_result)
     },
 

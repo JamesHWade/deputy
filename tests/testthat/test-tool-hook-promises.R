@@ -275,3 +275,130 @@ test_that("plain-value tool hooks keep the tool events in order", {
   tool_types <- types[types %in% c("tool_start", "permission", "tool_end")]
   expect_identical(tool_types, c("tool_start", "permission", "tool_end"))
 })
+
+test_that("the next model request waits for a PostToolUse hook's promise", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  agent$register_tool(ellmer::tool(
+    function() "probed",
+    name = "probe",
+    description = "Probe."
+  ))
+  seen <- integer()
+  agent$add_hook(HookMatcher(
+    event = "PostToolUse",
+    callback = function(tool_name, tool_result, tool_error, context) {
+      promises::then(later_value(NULL, 0.1), function(value) {
+        seen <<- c(seen, length(server$requests()))
+        value
+      })
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("task"), max_polls = 500L)
+
+  expect_identical(seen, 1L)
+  expect_identical(trimws(result$response), "final answer")
+})
+
+test_that("a PostToolUse hook's promised stop ends the run before the next request", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  agent$register_tool(ellmer::tool(
+    function() "probed",
+    name = "probe",
+    description = "Probe."
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PostToolUse",
+    callback = function(tool_name, tool_result, tool_error, context) {
+      later_value(
+        HookResultPostToolUse(continue = FALSE, stop_reason = "enough"),
+        0.1
+      )
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("task"), max_polls = 500L)
+
+  expect_length(server$requests(), 1L)
+  expect_identical(result$stop_reason, "enough")
+})
+
+test_that("a PostToolUse hook's promised output change reaches the tool_end event", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  agent$register_tool(ellmer::tool(
+    function() "secret",
+    name = "probe",
+    description = "Probe."
+  ))
+  agent$add_hook(HookMatcher(
+    event = "PostToolUse",
+    callback = function(tool_name, tool_result, tool_error, context) {
+      later_value(
+        HookResultPostToolUse(updated_tool_output = "redacted"),
+        0.1
+      )
+    }
+  ))
+
+  resolve_async_value(agent$run_async("task"), max_polls = 500L)
+
+  expect_identical(
+    runtime_events(agent, "tool_end")[[1]]$tool_result,
+    "redacted"
+  )
+})
+
+test_that("a PostToolUseFailure hook's promise is waited for before the next request", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  agent$register_tool(ellmer::tool(
+    function() stop("probe broke"),
+    name = "probe",
+    description = "Probe."
+  ))
+  seen <- integer()
+  agent$add_hook(HookMatcher(
+    event = "PostToolUseFailure",
+    callback = function(tool_name, tool_result, tool_error, context) {
+      promises::then(later_value(NULL, 0.1), function(value) {
+        seen <<- c(seen, length(server$requests()))
+        value
+      })
+    }
+  ))
+
+  result <- suppressWarnings(resolve_async_value(
+    agent$run_async("task"),
+    max_polls = 500L
+  ))
+
+  expect_identical(seen, 1L)
+  expect_identical(trimws(result$response), "final answer")
+})
