@@ -330,9 +330,9 @@ fire_with_errors <- function(registry, fire, record) {
     }
     invisible(NULL)
   }
-  value <- fire()
-  copy()
-  hook_then(value, function(value) {
+  # On exit, so the errors raised before `fire` threw are handed over too.
+  on.exit(copy(), add = TRUE)
+  hook_then(fire(), function(value) {
     copy()
     value
   })

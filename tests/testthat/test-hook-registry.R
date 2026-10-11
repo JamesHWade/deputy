@@ -923,3 +923,33 @@ test_that("a hook that fires the same registry again does not take the outer fir
   expect_match(outer_errors[[1]]$error, "outer failed")
   expect_length(registry$last_errors(), 2L)
 })
+
+test_that("a firing that throws still hands over the errors raised before it", {
+  registry <- HookRegistry$new()
+  registry$add(HookMatcher(
+    "PostToolUse",
+    function(tool_name, tool_result, tool_error, context) stop("hook broke")
+  ))
+  recorded <- list()
+
+  expect_error(
+    suppressMessages(fire_with_errors(
+      registry,
+      function() {
+        registry$fire(
+          "PostToolUse",
+          tool_name = "x",
+          tool_result = "r",
+          tool_error = NULL,
+          context = list()
+        )
+        stop("the caller failed")
+      },
+      function(errors) recorded <<- c(recorded, errors)
+    )),
+    "the caller failed"
+  )
+
+  expect_length(recorded, 1L)
+  expect_match(recorded[[1]]$error, "hook broke")
+})
