@@ -630,3 +630,104 @@ test_that("a stop that arrives while a PermissionRequest hook is pending wins ov
   expect_match(rejection, "stopped")
   expect_identical(result$stop_reason, "stop now")
 })
+
+test_that("a PreToolUse hook that interrupts the run keeps the tool from running", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  ran <- 0L
+  agent$register_tool(ellmer::tool(
+    function() {
+      ran <<- ran + 1L
+      "probed"
+    },
+    name = "probe",
+    description = "Probe."
+  ))
+  # The hook answers at once, with a plain value, having stopped the run.
+  agent$add_hook(HookMatcher(
+    "PreToolUse",
+    function(tool_name, tool_input, context) {
+      agent$interrupt("stop now")
+      NULL
+    }
+  ))
+
+  result <- suppressWarnings(agent$run_sync("task"))
+
+  expect_identical(ran, 0L)
+  expect_identical(result$stop_reason, "stop now")
+  expect_length(server$requests(), 1L)
+})
+
+test_that("a PermissionRequest hook that interrupts the run does not let its allow through", {
+  sandbox <- withr::local_tempdir(pattern = "deputy-sync-interrupt-")
+  root <- file.path(sandbox, "root")
+  outside <- file.path(sandbox, "outside")
+  dir.create(root)
+  dir.create(outside)
+  target <- file.path(normalizePath(outside, mustWork = TRUE), "approved.txt")
+
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "write_file",
+      arguments = list(path = target, content = "approved")
+    ),
+    runtime_reply("done")
+  ))
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = list(tool_write_file),
+    permissions = permissions_standard(root),
+    working_dir = root
+  )
+  agent$add_hook(HookMatcher(
+    "PermissionRequest",
+    function(tool_name, tool_input, permission_result, context) {
+      agent$interrupt("stop now")
+      PermissionResultAllow()
+    }
+  ))
+
+  result <- suppressWarnings(agent$run_sync(
+    "Write outside the root with approval."
+  ))
+
+  expect_false(file.exists(target))
+  expect_identical(result$stop_reason, "stop now")
+  expect_length(server$requests(), 1L)
+})
+
+test_that("a PreToolUse hook that asks to stop after its tool still lets the tool run", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "probe", arguments = list()),
+    runtime_reply("final answer")
+  ))
+  agent <- Agent$new(runtime_chat(server), permissions = permissions_full())
+  ran <- 0L
+  agent$register_tool(ellmer::tool(
+    function() {
+      ran <<- ran + 1L
+      "probed"
+    },
+    name = "probe",
+    description = "Probe."
+  ))
+  agent$add_hook(HookMatcher(
+    "PreToolUse",
+    function(tool_name, tool_input, context) {
+      HookResultPreToolUse(
+        "allow",
+        continue = FALSE,
+        stop_reason = "last one"
+      )
+    }
+  ))
+
+  result <- suppressWarnings(agent$run_sync("task"))
+
+  expect_identical(ran, 1L)
+  expect_identical(result$stop_reason, "last one")
+})

@@ -466,6 +466,43 @@ test_that("an interrupt while a SessionStart hook is pending keeps UserPromptSub
   expect_identical(result$stop_reason, "no")
 })
 
+test_that("a SessionStart hook that interrupts the run keeps UserPromptSubmit from firing", {
+  model_asked <- FALSE
+  submitted <- 0L
+  chat <- create_mock_chat()
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    model_asked <<- TRUE
+    coro::async_generator(function() {
+      coro::yield(ellmer::ContentText("Done"))
+    })()
+  }
+  agent <- Agent$new(chat = chat)
+  # The hook answers at once, with a plain value, having stopped the run.
+  agent$hooks$add(HookMatcher(
+    event = "SessionStart",
+    timeout = 0,
+    callback = function(context) {
+      agent$interrupt("no")
+      NULL
+    }
+  ))
+  agent$hooks$add(HookMatcher(
+    event = "UserPromptSubmit",
+    timeout = 0,
+    callback = function(prompt, context) {
+      submitted <<- submitted + 1L
+      NULL
+    }
+  ))
+
+  result <- agent$run_sync("Test task")
+
+  expect_identical(submitted, 0L)
+  expect_false(model_asked)
+  expect_identical(result$stop_reason, "no")
+  expect_identical(result$ending@by, "caller")
+})
+
 test_that("a run waits for a UserPromptSubmit hook's promise, after SessionStart", {
   skip_if_not_installed("promises")
   skip_if_not_installed("later")

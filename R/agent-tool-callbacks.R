@@ -283,13 +283,14 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
           tool_input = tool_input,
           context = context
         )
-        waited <- promises::is.promising(fired)
         hook_then(fired, function(hook_result) {
           if (run_over()) {
             ellmer::tool_reject("The run has ended.")
           }
-          # An interrupt that arrived while the hook was pending.
-          if (waited && !stopped_before && isTRUE(private$should_stop)) {
+          # A stop that came while the hook was being asked: an interrupt
+          # while its promise was pending, or one the callback made itself.
+          # A hook's own "stop after this tool" is asked for below.
+          if (!stopped_before && isTRUE(private$should_stop)) {
             ellmer::tool_reject("The run was stopped.")
           }
           after_pre_tool(hook_result)
@@ -305,14 +306,13 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
           permission_result = perm_result,
           context = context
         )
-        waited <- promises::is.promising(fired)
         return(hook_then(fired, function(request_result) {
           if (run_over()) {
             ellmer::tool_reject("The run has ended.")
           }
-          # A stop that arrived while the hook was pending wins over its
-          # answer: an allow must not run a call the caller has cancelled.
-          if (waited && !stopped_before && isTRUE(private$should_stop)) {
+          # A stop that came while the hook was being asked wins over its
+          # answer: an allow must not run a call that has been cancelled.
+          if (!stopped_before && isTRUE(private$should_stop)) {
             ellmer::tool_reject("The run was stopped.")
           }
           if (S7::S7_inherits(request_result, PermissionResultAllow)) {

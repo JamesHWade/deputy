@@ -32,8 +32,9 @@ NULL
 #' fired by `$compact()`, or for `Stop` and `SessionEnd` when a run ends with
 #' an error or its stream is abandoned. With tools run concurrently, other
 #' tool calls of the same response may start or finish while a hook waits. If
-#' `$interrupt()` is called while a hook waits, the run stops when the promise
-#' settles.
+#' `$interrupt()` is called while a hook waits, or by the callback itself, the
+#' run stops when the hook answers, and a tool it was asked about does not
+#' run.
 #'
 #' @section Events:
 #'

@@ -184,14 +184,12 @@ run_start_hooks <- function(agent, state, messages) {
   private <- agent$.__enclos_env__$private
   stopped_before <- isTRUE(private$should_stop)
   started <- fire_session_start(agent, state)
-  waited <- promises::is.promising(started)
   hook_then(started, function(value) {
     state$session_started <- TRUE
-    # A stop that arrived while SessionStart was pending takes effect now:
-    # the prompt is not submitted, and no later hook can hold the stop.
-    stopped_meanwhile <- waited &&
-      !stopped_before &&
-      isTRUE(private$should_stop)
+    # A stop that came while SessionStart was being asked takes effect now,
+    # whether its promise was pending or its callback made the stop: the
+    # prompt is not submitted, and no later hook can hold the stop.
+    stopped_meanwhile <- !stopped_before && isTRUE(private$should_stop)
     submitted <- if (!stopped_meanwhile) {
       fire_prompt_submit(agent, state, messages)
     }

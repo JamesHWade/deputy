@@ -68,6 +68,12 @@ fire after a pending `SessionStart`, and a pending `Stop` does not send the
 run on. The one hook it cannot reach is `SessionEnd`: what that hook is told
 is how the run ended, and an interrupt that arrives then changes nothing.
 
+The check is of a stop that came while the hook was being asked, not of
+whether it answered with a promise. So a callback that calls `interrupt()`
+itself and answers with a plain value stops the call it was asked about too.
+That is the one way a plain-value hook behaves differently from before, when
+the run was stopped and the tool still ran.
+
 A tool hook's promise can settle after its run is over, when the run failed
 while the hook was pending. Its answer then changes nothing: a `PreToolUse`
 or `PermissionRequest` answer rejects the call, and a `PostToolUse` or

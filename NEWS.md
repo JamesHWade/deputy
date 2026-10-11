@@ -18,6 +18,11 @@
   hooks, and `$compact()`, don't wait. An `$interrupt()` that arrives while a
   hook's promise is pending takes effect when the promise settles.
 
+* A `PreToolUse` or `PermissionRequest` callback that calls `$interrupt()`
+  itself now stops the tool call it was asked about, and a `SessionStart`
+  callback that does so keeps `UserPromptSubmit` from firing. The run was
+  stopped before, but the tool still ran.
+
 * A `Stop` hook may return `HookResultStop(message)` to send an answered run
   on: the model is asked again with `message` in the same run, with the same
   run ID, limits, usage and stream. `Stop` now fires at each stop of a run,

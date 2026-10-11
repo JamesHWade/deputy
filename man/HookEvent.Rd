@@ -34,8 +34,9 @@ Deputy does not wait for \code{Notification} or \code{ConfigChange} hooks, for a
 fired by \verb{$compact()}, or for \code{Stop} and \code{SessionEnd} when a run ends with
 an error or its stream is abandoned. With tools run concurrently, other
 tool calls of the same response may start or finish while a hook waits. If
-\verb{$interrupt()} is called while a hook waits, the run stops when the promise
-settles.
+\verb{$interrupt()} is called while a hook waits, or by the callback itself, the
+run stops when the hook answers, and a tool it was asked about does not
+run.
 }
 \section{Events}{
 

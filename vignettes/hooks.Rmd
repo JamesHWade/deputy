@@ -248,8 +248,9 @@ wait happens depends on the event:
 
 If you call `agent$interrupt()` while a hook is waiting, the run stops when
 the hook's promise settles: a tool that was waiting doesn't run, and a `Stop`
-hook's answer no longer sends the run on. A hook that returns a plain value
-behaves exactly as it always has.
+hook's answer no longer sends the run on. The same goes for a callback that
+calls `agent$interrupt()` itself: the tool it was asked about doesn't run.
+Otherwise a hook that returns a plain value behaves as it always has.
 
 ## Built-in hooks
 
