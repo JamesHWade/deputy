@@ -746,6 +746,16 @@ answers arrive as the next user message; delegated children reject deferral.
 process-wide fallback for single-Agent scripts; do not use it for Shiny or
 other concurrent hosts.
 
+`ask_user` declares `questions` as a typed array with `convert = FALSE`; a
+string (JSON text, a path or a URL) is rejected, never parsed or read.
+`validate_questions()` rejects bad questions with `tool_reject()` and
+normalizes them before any handler runs. Handlers return a named list keyed
+by exact question text, each value a character vector; `ask_user_answers()`
+splits it into `selected` labels and at most one `other_text`, and a bad
+shape is a handler error. Answered results are JSON (`ask_user_json()`:
+`selected` always an array, `other_text` null), the same for the delegated
+`human_input` tool; deferred results are unchanged (#218).
+
 ### Conversation R workers
 
 `RSession$new(agent)` owns a lazy persistent trusted callr worker; register

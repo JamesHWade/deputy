@@ -24,6 +24,21 @@
 * `DelegationManifest` records the `provider` and `params` each subagent
   started with, beside its model, and moves to schema version 2.
 
+* `ask_user` takes its questions as a typed array, not as JSON text; a string
+  goes back to the model with a request to send the array. Questions are
+  checked before anyone is asked: 1 to 4 questions with different texts, 2 to
+  4 options with different labels, a header of at most 12 characters, and
+  every text a non-empty string. A question that breaks a rule goes back to
+  the model with what to fix, rather than failing with an R error. A handler
+  returns a named list keyed by each question's exact text, each value a
+  character vector holding the chosen labels and at most one answer the
+  person typed; an ordinary question takes one of these. The model receives,
+  for each question in order, `selected` (an array of the chosen labels) and
+  `other_text` (what the person typed, or `null`), and a tool called from R
+  returns that JSON text. Answers in any other shape are a handler error. At
+  the console, option numbers that don't match an option, such as `1.5` or
+  `9`, are asked for again (#218).
+
 * `LeadAgent$register_sub_agent(replace = TRUE)` no longer adds a newline to
   the lead's system prompt each time it's called. Replacing a definition with
   an identical one leaves the prompt unchanged, so the provider's prompt cache
