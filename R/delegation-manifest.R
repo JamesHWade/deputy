@@ -28,8 +28,7 @@ NULL
 #'   settings, with hashes that identify them. Callbacks are not recorded.
 #' @param size `text_bytes`, `manifest_bytes` and `estimated_tokens` (`NULL`
 #'   when unknown). The token count is an estimate, not a billed count.
-#' @param schema_version Format version, `2L`. Records saved with version
-#'   `1L`, which have no `provider` or `params`, can still be rebuilt.
+#' @param schema_version Format version; must be `2L`.
 #' @details
 #' To store a manifest, save `S7::props(x)` (plain lists) and rebuild it with
 #' `do.call(DelegationManifest, record)`. A manifest includes the task and
@@ -74,7 +73,7 @@ DelegationManifest <- S7::new_class(
       !is.numeric(schema_version) ||
         length(schema_version) != 1L ||
         is.na(schema_version) ||
-        !schema_version %in% c(1, 2) ||
+        schema_version != 2 ||
         !is.null(attributes(schema_version))
     ) {
       delegation_input_abort(
@@ -82,18 +81,12 @@ DelegationManifest <- S7::new_class(
         "Unsupported delegation manifest schema."
       )
     }
-    if (schema_version == 1 && (!identical(provider, "") || length(params))) {
-      delegation_input_abort(
-        "invalid",
-        "Version 1 delegation manifests have no provider or params."
-      )
-    }
     if (!is.list(params) || (length(params) && is.null(names(params)))) {
       delegation_input_abort("invalid", "params must be a named list.")
     }
     value <- S7::new_object(
       S7::S7_object(),
-      schema_version = as.integer(schema_version),
+      schema_version = 2L,
       input = S7::props(do.call(DelegationInput, input)),
       definition = normalize_run_context(definition),
       sources = lapply(sources, normalize_run_context),
@@ -197,14 +190,12 @@ prepare_delegation_manifest <- function(lead, definition, prepared, child) {
     params = delegation_chat_params(child)
   )
   # Hash the declarative source separately from executable tool closures.
-  # Params join the hash only when set, so earlier IDs stay the same.
-  fields$definition$id <- delegation_digest(c(
-    list(
-      definition = fields$definition,
-      model = fields$model,
-      tools = fields$tools
-    ),
-    if (length(fields$params)) list(params = fields$params)
+  fields$definition$id <- delegation_digest(list(
+    definition = fields$definition,
+    provider = fields$provider,
+    model = fields$model,
+    params = fields$params,
+    tools = fields$tools
   ))
   # Canonical constructor output is the export representation. Include the
   # count itself until its decimal width stabilizes.
@@ -265,17 +256,14 @@ redact_delegation_manifest <- function(manifest) {
         "context_policy_id"
       )],
       list(
-        binding = manifest$policies$binding[intersect(
-          c(
-            "resource_mode",
-            "hooks",
-            "permissions",
-            "approval",
-            "human_input",
-            "chat",
-            "cleanup"
-          ),
-          names(manifest$policies$binding)
+        binding = manifest$policies$binding[c(
+          "resource_mode",
+          "hooks",
+          "permissions",
+          "approval",
+          "human_input",
+          "chat",
+          "cleanup"
         )]
       )
     ),

@@ -275,7 +275,7 @@ test_that("definition params are validated, printed and kept by copies", {
   )
 })
 
-test_that("version 1 manifests still rebuild", {
+test_that("manifests rebuild from their records", {
   state <- new.env(parent = emptyenv())
   lead <- LeadAgent$new(
     create_parallel_chat(state),
@@ -286,13 +286,6 @@ test_that("version 1 manifests still rebuild", {
   record <- S7::props(manifest)
   expect_identical(do.call(DelegationManifest, record), manifest)
 
-  legacy <- record[setdiff(names(record), c("provider", "params"))]
-  legacy$schema_version <- 1L
-  rebuilt <- do.call(DelegationManifest, legacy)
-  expect_identical(rebuilt$schema_version, 1L)
-  expect_identical(rebuilt$provider, "")
-  expect_identical(rebuilt$params, list())
-
-  legacy$params <- list(reasoning_effort = "low")
-  expect_error(do.call(DelegationManifest, legacy), "Version 1")
+  record$schema_version <- 1L
+  expect_error(do.call(DelegationManifest, record), "Unsupported")
 })

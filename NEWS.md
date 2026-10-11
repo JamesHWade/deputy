@@ -22,8 +22,7 @@
   chat needs a `DelegationPolicy(chat = )` function (#237).
 
 * `DelegationManifest` records the `provider` and `params` each subagent
-  started with, beside its model, and moves to schema version 2. Saved
-  version 1 records still rebuild.
+  started with, beside its model, and moves to schema version 2.
 
 * `LeadAgent$register_sub_agent(replace = TRUE)` no longer adds a newline to
   the lead's system prompt each time it's called. Replacing a definition with

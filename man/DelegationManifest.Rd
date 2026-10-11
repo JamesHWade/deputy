@@ -52,8 +52,7 @@ when unknown). The token count is an estimate, not a billed count.}
 \item{params}{The request parameters set with \code{\link[ellmer:params]{ellmer::params()}} on the
 subagent's chat, such as \code{reasoning_effort}; \code{extra_args} are left out.}
 
-\item{schema_version}{Format version, \code{2L}. Records saved with version
-\code{1L}, which have no \code{provider} or \code{params}, can still be rebuilt.}
+\item{schema_version}{Format version; must be \code{2L}.}
 }
 \value{
 A \code{DelegationManifest} object.

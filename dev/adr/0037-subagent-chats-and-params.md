@@ -37,17 +37,14 @@ a factory, Deputy hands params to the factory inside the definition and neither
 merges nor overrides; the manifest records what the Chat actually carries.
 
 Deputy YAML stays version 1 with an optional `params` mapping (scalars, and a
-string sequence for `stop_sequences`). It is written only when non-empty, so
-files without params remain readable by earlier versions; earlier versions
-reject a file that has it as an unknown field.
+string sequence for `stop_sequences`), written only when non-empty.
 
 `DelegationManifest` moves to schema 2 with `provider` (the provider's name)
 and `params` (standard params read through the public `get_model_object()`,
-without `extra_args`). Version-1 records still construct, with an empty
-provider and params. `policies$binding$chat` records `"host factory"` or
-`"default"`; the function itself is never recorded, and credentials never are.
-The definition ID digest includes params only when present, so existing IDs are
-unchanged.
+without `extra_args`); version-1 records are no longer accepted. The
+definition ID digest covers provider and params. `policies$binding$chat`
+records `"host factory"` or `"default"`; the function itself is never recorded,
+and credentials never are.
 
 ## Consequences
 

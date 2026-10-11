@@ -141,7 +141,7 @@ agent_definition_write <- function(
   )) {
     if (!is.null(spec[[field]])) spec[[field]] <- unname(as.list(spec[[field]]))
   }
-  # Files without parameters stay readable by versions that predate them.
+  # Leave empty params out of the file, like any other unset field.
   if (length(spec$params) == 0L) {
     spec$params <- NULL
   } else if (!is.null(spec$params$stop_sequences)) {
