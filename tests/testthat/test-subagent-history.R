@@ -1927,3 +1927,383 @@ test_that("subagent_chat_history() checks its arguments", {
     }
   )
 })
+
+# Apps that run the lead's replies themselves -------------------------------
+
+# A Shiny session whose app streams `lead`'s replies into the chat itself and
+# keeps conversations with `chat_enable_history()`, as an app without
+# `chat_server()` does. The app numbers its own conversations: a reply in an
+# empty conversation starts a new one, and each conversation's ID is saved
+# with it and set again when it is reopened (by `reopen(values)`, which reads
+# the saved ID by default). With `explicit`, Deputy reads the open
+# conversation's ID from the app instead of from `lead$conversation_id`.
+host_history_session <- function(
+  lead,
+  store,
+  body,
+  explicit = FALSE,
+  reopen = function(values) values$host_conversation,
+  prefix = "host-"
+) {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("shinychat", "0.5.0")
+  skip_if_not_installed("bslib")
+  skip_if_not_installed("commonmark")
+  skip_if_not_installed("xml2")
+  host <- new.env()
+  host$id <- NULL
+  host$count <- 0L
+  host$replies <- 0L
+  host$seen <- list()
+  shiny::testServer(
+    function(input, output, session) {
+      user <- function() "viewer"
+      host$activity <- subagent_chat_activity(lead = lead, requester = user)
+      host$saver <- subagent_chat_history(
+        lead = lead,
+        requester = user,
+        conversation_id = if (explicit) function() host$id
+      )
+      shinychat::chat_enable_history(
+        "chat",
+        lead,
+        on_save = function(values) {
+          values$host_conversation <- host$id
+          host$saver$on_save(values)
+        },
+        on_restore = function(values) {
+          host$id <- reopen(values)
+          if (!explicit) {
+            lead$conversation_id <- host$id
+          }
+          host$saver$on_restore(values)
+        },
+        options = shinychat::history_options(
+          restore_mode = "none",
+          store = store,
+          scope = "test",
+          title = NULL
+        )
+      )
+      shiny::observeEvent(input$chat_user_input, {
+        if (!length(lead$get_turns())) {
+          host$count <- host$count + 1L
+          host$id <- paste0(prefix, host$count)
+        }
+        lead$conversation_id <- host$id
+        stream <- lead$stream_async(input$chat_user_input, stream = "content")
+        # Keep what the app hands to the chat.
+        shown <- coro::async_generator(function() {
+          for (chunk in coro::await_each(stream)) {
+            host$seen[[length(host$seen) + 1L]] <- chunk
+            coro::yield(chunk)
+          }
+        })
+        promises::then(shinychat::chat_append("chat", shown()), function(x) {
+          host$replies <- host$replies + 1L
+        })
+      })
+    },
+    {
+      session$flushReact()
+      body(session, host)
+    }
+  )
+  host
+}
+
+host_history_submit <- function(session, host, text) {
+  before <- host$replies
+  session$setInputs(chat_user_input = text)
+  history_wait(session, function() host$replies > before)
+  host$id
+}
+
+# The record shinychat saved for the conversation the app calls `host_id`.
+host_history_record <- function(store, host_id) {
+  for (record in store$saved) {
+    if (identical(record$values$host_conversation, host_id)) {
+      return(record)
+    }
+  }
+  NULL
+}
+
+test_that("subagent_chat_history() without a chat saves through the app's history", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  lead <- history_lead(history_root_server(), history_sales_server(), counter)
+  host_history_session(lead, store, function(session, host) {
+    expect_identical(host_history_submit(session, host, "Revenue?"), "host-1")
+    # The subagent's call reached the chat in the stream the app consumed,
+    # and is in the lead's turns, which shinychat saves.
+    shown <- Filter(is_activity_content, host$seen)
+    expect_length(shown, 2L)
+    expect_s3_class(shown[[1L]], "ellmer::ContentToolRequest")
+    expect_identical(shown[[1L]]@name, "call_measure")
+    expect_s3_class(shown[[2L]], "ellmer::ContentToolResult")
+    turns <- unlist(lapply(lead$get_turns(), function(turn) turn@contents))
+    expect_length(Filter(is_activity_content, turns), 2L)
+    status <- host$saver$status()
+    expect_identical(status$conversation_id, "host-1")
+    expect_identical(status$saved, 1L)
+    expect_null(status$error)
+    expect_identical(host$saver$conversation_id(), "host-1")
+    expect_length(host$saver$restored(), 1L)
+  })
+  expect_null(lead$.__enclos_env__$private$.activity)
+  expect_identical(counter$calls, 1L)
+  record <- host_history_record(store, "host-1")
+  saved <- record$values$deputy_subagents
+  expect_identical(saved$format, "deputy_conversation_subagents")
+  expect_identical(saved$conversation_id, "host-1")
+  children <- history_parse(saved$data)$history$children
+  expect_length(children, 1L)
+  expect_identical(
+    children[[1L]]$outcome$runtime$host_conversation_id,
+    "host-1"
+  )
+
+  # A new session and a lead that can't reach a model.
+  restored_lead <- history_lead(NULL, NULL, counter)
+  host_history_session(restored_lead, store, function(session, host) {
+    expect_null(host$saver$restored())
+    session$setInputs(chat_history_select = list(id = record$id))
+    session$flushReact()
+    expect_identical(restored_lead$conversation_id, "host-1")
+    status <- host$saver$status()
+    expect_identical(status$conversation_id, "host-1")
+    expect_identical(status$saved, 1L)
+    expect_null(status$error)
+    views <- host$saver$restored()
+    expect_length(views, 1L)
+    view <- views[[1L]]
+    expect_identical(view$outcome$runtime$agent_name, "sales")
+    expect_identical(view$outcome$runtime$host_conversation_id, "host-1")
+    expect_identical(view$retention$execution, "read_only")
+    expect_identical(view$retention$transcript, "included")
+    result <- history_results(view$turns)[[1L]]
+    expect_identical(result@extra$display$title, "Ran a trusted calculation")
+    # The cards are back in the shown conversation only.
+    shown <- unlist(lapply(restored_lead$get_turns(), function(t) t@contents))
+    context <- unlist(lapply(
+      restored_lead$get_context_turns(),
+      function(t) t@contents
+    ))
+    expect_true(any(vapply(shown, is_activity_content, logical(1))))
+    expect_false(any(vapply(context, is_activity_content, logical(1))))
+    # Restoring creates no live subagent and runs nothing.
+    expect_length(restored_lead$inspect_subagents("viewer"), 0L)
+  })
+  expect_identical(counter$calls, 1L)
+
+  # Records saved under another conversation are not read.
+  elsewhere <- history_lead(NULL, NULL, counter)
+  host_history_session(
+    elsewhere,
+    store,
+    function(session, host) {
+      session$setInputs(chat_history_select = list(id = record$id))
+      session$flushReact()
+      expect_null(host$saver$restored())
+      status <- host$saver$status()
+      expect_identical(status$conversation_id, "host-other")
+      expect_identical(status$saved, 0L)
+      expect_match(status$error, "could not be read")
+    },
+    reopen = function(values) "host-other"
+  )
+  expect_identical(counter$calls, 1L)
+})
+
+test_that("without a chat, each conversation saves only its own subagents", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  root <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "One?")),
+    runtime_reply("Lead: one."),
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Two?")),
+    runtime_reply("Lead: two.")
+  ))
+  sales <- local_runtime_server(list(
+    runtime_reply(tool = "call_measure"),
+    runtime_reply("One is 60."),
+    runtime_reply(tool = "call_measure"),
+    runtime_reply("Two is 60.")
+  ))
+  lead <- history_lead(root, sales, counter)
+  host_history_session(lead, store, function(session, host) {
+    expect_identical(host_history_submit(session, host, "One?"), "host-1")
+    session$setInputs(chat_history_new = 1L)
+    session$flushReact()
+    expect_identical(host_history_submit(session, host, "Two?"), "host-2")
+    views <- host$saver$restored()
+    expect_length(views, 1L)
+    expect_identical(views[[1L]]$outcome$runtime$host_conversation_id, "host-2")
+    # Reopening the first conversation reads its subagent instead.
+    one <- host_history_record(store, "host-1")
+    session$setInputs(chat_history_select = list(id = one$id))
+    session$flushReact()
+    expect_identical(lead$conversation_id, "host-1")
+    expect_identical(host$saver$status()$saved, 1L)
+    views <- host$saver$restored()
+    expect_length(views, 1L)
+    expect_identical(views[[1L]]$outcome$runtime$host_conversation_id, "host-1")
+  })
+  expect_identical(counter$calls, 2L)
+  for (id in c("host-1", "host-2")) {
+    saved <- host_history_record(store, id)$values$deputy_subagents
+    expect_identical(saved$conversation_id, id)
+    children <- history_parse(saved$data)$history$children
+    expect_length(children, 1L)
+    expect_identical(children[[1L]]$outcome$runtime$host_conversation_id, id)
+  }
+})
+
+test_that("subagent_chat_history() reads the open conversation from conversation_id", {
+  counter <- new.env()
+  counter$calls <- 0L
+  store <- HistoryTestStore$new(withr::local_tempdir())
+  lead <- history_lead(history_root_server(), history_sales_server(), counter)
+  host_history_session(
+    lead,
+    store,
+    function(session, host) {
+      expect_identical(host_history_submit(session, host, "Revenue?"), "app-1")
+      # The app's function decides which conversation is open, whatever the
+      # lead was last told.
+      lead$conversation_id <- "unrelated"
+      expect_identical(host$saver$conversation_id(), "app-1")
+      expect_identical(host$saver$status()$saved, 1L)
+      expect_length(host$saver$restored(), 1L)
+      # A save for another conversation leaves this one's subagent out.
+      host$id <- "app-2"
+      values <- host$saver$on_save(list(other = 1))
+      expect_identical(values$other, 1)
+      expect_identical(values$deputy_subagents$conversation_id, "app-2")
+      expect_length(
+        history_parse(values$deputy_subagents$data)$history$children,
+        0L
+      )
+      host$id <- "app-1"
+    },
+    explicit = TRUE,
+    prefix = "app-"
+  )
+  record <- host_history_record(store, "app-1")
+  expect_identical(record$values$deputy_subagents$conversation_id, "app-1")
+
+  # Reopened, the lead isn't told the conversation; the app's function is
+  # read instead.
+  restored_lead <- history_lead(NULL, NULL, counter)
+  host_history_session(
+    restored_lead,
+    store,
+    function(session, host) {
+      session$setInputs(chat_history_select = list(id = record$id))
+      session$flushReact()
+      expect_null(restored_lead$conversation_id)
+      expect_identical(host$saver$status()$conversation_id, "app-1")
+      views <- host$saver$restored()
+      expect_length(views, 1L)
+      expect_identical(
+        views[[1L]]$outcome$runtime$host_conversation_id,
+        "app-1"
+      )
+      expect_identical(views[[1L]]$retention$execution, "read_only")
+      expect_length(restored_lead$inspect_subagents("viewer"), 0L)
+    },
+    explicit = TRUE
+  )
+
+  # Records saved under another conversation are not read.
+  elsewhere <- history_lead(NULL, NULL, counter)
+  host_history_session(
+    elsewhere,
+    store,
+    function(session, host) {
+      session$setInputs(chat_history_select = list(id = record$id))
+      session$flushReact()
+      expect_null(host$saver$restored())
+      status <- host$saver$status()
+      expect_identical(status$conversation_id, "app-other")
+      expect_identical(status$saved, 0L)
+      expect_match(status$error, "could not be read")
+    },
+    explicit = TRUE,
+    reopen = function(values) "app-other"
+  )
+  expect_identical(counter$calls, 1L)
+})
+
+test_that("subagent_chat_history() without a chat checks its arguments", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("shinychat", "0.5.0")
+  skip_if_not_installed("bslib")
+  skip_if_not_installed("commonmark")
+  skip_if_not_installed("xml2")
+  lead <- Agent$new(
+    ellmer::chat_openai(credentials = function() "x", echo = "none"),
+    delegation_disclosure = history_disclosure()
+  )
+  viewer <- function() "viewer"
+  shiny::testServer(
+    function(input, output, session) {
+      chat <- shinychat::chat_server("chat", lead, history = FALSE)
+      expect_error(
+        subagent_chat_history(chat, lead, viewer, conversation_id = viewer),
+        "not both"
+      )
+      expect_error(subagent_chat_history(requester = viewer), "Agent")
+      expect_error(
+        subagent_chat_history(lead = "lead", requester = viewer),
+        "Agent"
+      )
+      expect_error(
+        subagent_chat_history(lead = lead, requester = "viewer"),
+        "function"
+      )
+      expect_error(
+        subagent_chat_history(lead = lead, requester = viewer, max_bytes = 10),
+        "at least 1024"
+      )
+      expect_error(
+        subagent_chat_history(
+          lead = lead,
+          requester = viewer,
+          conversation_id = "conv-a"
+        ),
+        "conversation_id"
+      )
+      # Given the chat, Deputy registers its callbacks there itself.
+      expect_named(
+        subagent_chat_history(chat, lead, viewer),
+        c("restored", "status", "conversation_id")
+      )
+      saver <- subagent_chat_history(lead = lead, requester = viewer)
+      expect_named(
+        saver,
+        c("restored", "status", "conversation_id", "on_save", "on_restore")
+      )
+      # No open conversation: nothing is saved, read or restored.
+      expect_null(saver$conversation_id())
+      expect_identical(saver$on_save(list(other = 1)), list(other = 1))
+      expect_null(saver$on_restore(list()))
+      expect_null(saver$restored())
+      expect_null(saver$status()$conversation_id)
+      # An ID that isn't one is reported as such.
+      odd <- subagent_chat_history(
+        lead = lead,
+        requester = viewer,
+        conversation_id = function() 1
+      )
+      expect_error(odd$status(), "conversation_id")
+      expect_identical(odd$on_save(list(other = 1)), list(other = 1))
+    },
+    {
+      session$flushReact()
+    }
+  )
+})

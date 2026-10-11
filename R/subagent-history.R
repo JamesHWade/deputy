@@ -733,8 +733,13 @@ subagent_history_read <- function(saved, lead, conversation_id, max_bytes) {
 
 # Callbacks ------------------------------------------------------------------
 
+# The open conversation's ID: shinychat's, given its chat, otherwise the one
+# the host reports.
 subagent_history_active_id <- function(state) {
-  shiny::isolate(state$chat$history$conversation_id())
+  if (!is.null(state$chat)) {
+    return(shiny::isolate(state$chat$history$conversation_id()))
+  }
+  host_conversation_id(shiny::isolate(state$open_id()))
 }
 
 subagent_history_save <- function(state, values) {
@@ -749,7 +754,7 @@ subagent_history_save <- function(state, values) {
   previous <- if (identical(state$conversation_id, id)) state$envelope
   saved <- tryCatch(
     {
-      if (!identical(state$chat$client, state$lead)) {
+      if (!is.null(state$chat) && !identical(state$chat$client, state$lead)) {
         cli::cli_abort("The chat no longer runs this lead.")
       }
       record <- subagent_history_record(state, id)
@@ -1157,16 +1162,61 @@ subagent_history_panel_child <- function(conversation, lead, live, id) {
 #' may no longer resolve. Needs shiny and shinychat (>= 0.5.0) with history
 #' enabled.
 #'
+#' @section Apps that run the lead's replies themselves:
+#' If your app streams the lead's replies into the chat itself instead of
+#' using [shinychat::chat_server()], and keeps conversations with
+#' [shinychat::chat_enable_history()], leave out `chat`. The returned list then
+#' also holds `on_save` and `on_restore`: pass them to `chat_enable_history()`.
+#' If you already have your own `on_save`, call this one from inside it and
+#' return what it returns; do the same with `on_restore`.
+#'
+#' Records are kept under the ID of the conversation open in the chat, which
+#' `chat_server()` otherwise looks after. Before each reply, set
+#' `lead$conversation_id` to the ID of the conversation the reply belongs to,
+#' as `chat_server()` does, so the subagents it starts are saved with that
+#' conversation. When a conversation is reopened, its ID must be the open one
+#' before `on_restore` runs: records saved under another ID are not read. By
+#' default the open conversation's ID is read from `lead$conversation_id`;
+#' pass `conversation_id` to read it from somewhere else. For example, keeping
+#' the ID with the conversation itself:
+#'
+#' ```r
+#' saved <- subagent_chat_history(lead = lead, requester = user)
+#' shinychat::chat_enable_history(
+#'   "chat",
+#'   lead,
+#'   on_save = function(values) {
+#'     values$conversation <- lead$conversation_id
+#'     saved$on_save(values)
+#'   },
+#'   on_restore = function(values) {
+#'     lead$conversation_id <- values$conversation
+#'     saved$on_restore(values)
+#'   }
+#' )
+#' shiny::observeEvent(input$chat_user_input, {
+#'   if (length(lead$get_turns()) == 0) {
+#'     lead$conversation_id <- new_conversation_id() # your own ID scheme
+#'   }
+#'   stream <- lead$stream_async(input$chat_user_input, stream = "content")
+#'   shinychat::chat_append("chat", stream)
+#' })
+#' ```
+#'
 #' @param chat The value returned by [shinychat::chat_server()] for the lead's
-#'   chat.
+#'   chat, or `NULL` (the default) when your app runs the lead's replies
+#'   itself.
 #' @param lead The [Agent] or [LeadAgent] given to `chat_server()` as its
-#'   client.
+#'   client, or whose replies your app streams into the chat.
 #' @param requester A function returning the current user, as your
 #'   [DelegationDisclosure] expects it.
 #' @param max_bytes Most bytes of records to save per conversation. Children
 #'   that don't fit, here or in the `max_bytes` of the lead's
 #'   `delegation_disclosure`, keep their outcome without their conversation,
 #'   or are left out, and `status()` counts them. Defaults to 16 MiB.
+#' @param conversation_id Only without `chat`: a function returning the ID of
+#'   the conversation open in the chat, or `NULL` when none is. Defaults to
+#'   reading `lead$conversation_id`.
 #' @return Invisibly, a list of functions:
 #'   * `restored(transcript = TRUE, delegation_id = NULL)`: the subagents
 #'     saved with the open conversation, as [delegation_history()] returns
@@ -1183,33 +1233,41 @@ subagent_history_panel_child <- function(conversation, lead, live, id) {
 #'     since), and any problem saving or reading it. A user the lead's
 #'     `delegation_disclosure` doesn't let see them gets no counts, and a note
 #'     saying so.
+#'   * `conversation_id()`: the open conversation's ID, or `NULL`.
+#'   * Without `chat`, also `on_save(values)` and `on_restore(values)`, the
+#'     callbacks for [shinychat::chat_enable_history()]. `on_save` returns
+#'     `values` with the conversation's records added.
 #' @seealso [subagent_chat_activity()] to show subagent tool calls in the
 #'   chat itself.
 #' @export
 subagent_chat_history <- function(
-  chat,
+  chat = NULL,
   lead,
   requester,
-  max_bytes = 16 * 1024^2
+  max_bytes = 16 * 1024^2,
+  conversation_id = NULL
 ) {
-  if (
-    !is.environment(chat) ||
-      !is.environment(chat$history) ||
-      !is.function(chat$history$on_save) ||
-      !is.function(chat$history$on_restore) ||
-      !is.function(chat$history$conversation_id)
-  ) {
-    cli::cli_abort(
-      "{.arg chat} must be the value returned by {.fn shinychat::chat_server}."
-    )
+  if (missing(lead)) {
+    lead <- NULL
   }
-  if (!inherits(lead, "Agent") || !identical(chat$client, lead)) {
-    cli::cli_abort(
-      "{.arg lead} must be the Agent that {.arg chat} runs as its client."
-    )
+  if (!is.null(chat) && !is.null(conversation_id)) {
+    cli::cli_abort(c(
+      "Give {.arg chat} or {.arg conversation_id}, not both.",
+      "i" = "With {.arg chat}, the open conversation's ID comes from its history."
+    ))
   }
+  subagent_chat_check_lead(
+    chat,
+    lead,
+    c("on_save", "on_restore", "conversation_id")
+  )
   if (!is.function(requester)) {
     cli::cli_abort("{.arg requester} must be a function.")
+  }
+  if (!is.null(conversation_id) && !is.function(conversation_id)) {
+    cli::cli_abort(
+      "{.arg conversation_id} must be a function returning the open conversation's ID."
+    )
   }
   max_bytes <- context_policy_whole_number(max_bytes, "max_bytes")
   if (is.null(max_bytes) || max_bytes < 1024) {
@@ -1217,6 +1275,7 @@ subagent_chat_history <- function(
   }
   state <- new.env(parent = emptyenv())
   state$chat <- chat
+  state$open_id <- conversation_id %||% function() lead$conversation_id
   state$lead <- lead
   state$requester <- requester
   state$max_bytes <- as.double(max_bytes)
@@ -1226,15 +1285,23 @@ subagent_chat_history <- function(
   state$kept <- NULL
   state$error <- NULL
   state$error_scope <- NULL
-  chat$history$on_save(function(values) subagent_history_save(state, values))
-  chat$history$on_restore(function(values) {
-    subagent_history_restore(state, values)
-  })
-  invisible(list(
+  on_save <- function(values) subagent_history_save(state, values)
+  on_restore <- function(values) subagent_history_restore(state, values)
+  result <- list(
     restored = function(transcript = TRUE, delegation_id = NULL) {
       subagent_history_restored(state, transcript, delegation_id)
     },
     status = function() subagent_history_status(state),
     conversation_id = function() subagent_history_active_id(state)
-  ))
+  )
+  if (is.null(chat)) {
+    # The host registers these with `chat_enable_history()` itself: shinychat
+    # keeps that history's callbacks where Deputy can't reach them.
+    result$on_save <- on_save
+    result$on_restore <- on_restore
+  } else {
+    chat$history$on_save(on_save)
+    chat$history$on_restore(on_restore)
+  }
+  invisible(result)
 }
