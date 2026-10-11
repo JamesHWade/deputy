@@ -402,3 +402,60 @@ test_that("a PostToolUseFailure hook's promise is waited for before the next req
   expect_identical(seen, 1L)
   expect_identical(trimws(result$response), "final answer")
 })
+
+test_that("a PostToolUse hook that answers after its run failed changes nothing in the next run", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  callbacks <- new.env(parent = emptyenv())
+  callbacks$request <- function(request) invisible(NULL)
+  callbacks$result <- function(result) invisible(NULL)
+  calls <- 0L
+  chat <- create_mock_chat()
+  chat$on_tool_request <- function(callback) callbacks$request <- callback
+  chat$on_tool_result <- function(callback) callbacks$result <- callback
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    calls <<- calls + 1L
+    if (calls == 1L) {
+      # A tool call whose result is reported, then a stream that fails while
+      # the hook's promise is still pending.
+      return(coro::async_generator(function() {
+        request <- ellmer::ContentToolRequest(
+          id = "late-1",
+          name = "read_file",
+          arguments = list(path = "a.txt")
+        )
+        callbacks$request(request)
+        callbacks$result(ellmer::ContentToolResult(
+          value = "ok",
+          request = request
+        ))
+        stop("stream failed")
+      })())
+    }
+    # The next run is still going when the first run's hook answers.
+    coro::async_generator(function() {
+      coro::await(later_value(NULL, 0.3))
+      coro::yield(ellmer::ContentText("second run done"))
+    })()
+  }
+  agent <- Agent$new(chat = chat, permissions = permissions_full())
+  hook_calls <- 0L
+  agent$add_hook(HookMatcher(
+    "PostToolUse",
+    function(tool_name, tool_result, tool_error, context) {
+      hook_calls <<- hook_calls + 1L
+      later_value(
+        HookResultPostToolUse(continue = FALSE, stop_reason = "late"),
+        0.15
+      )
+    }
+  ))
+
+  expect_error(resolve_async_value(agent$run_async("first")), "stream failed")
+  second <- resolve_async_value(agent$run_async("second"), max_polls = 300L)
+
+  expect_identical(hook_calls, 1L)
+  expect_identical(second$stop_reason, "complete")
+  expect_identical(second$response, "second run done")
+})

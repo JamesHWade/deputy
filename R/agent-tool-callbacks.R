@@ -166,6 +166,18 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         }
       }
 
+      # A hook's promise can settle after its run is over: the run failed, or
+      # its stream was dropped, while the hook was pending. Nothing of that
+      # run is left for the answer to change, and a later run must not be
+      # changed by it.
+      hook_run_id <- private$current_run_id
+      hook_in_run <- isTRUE(private$run_active)
+      run_over <- function() {
+        hook_in_run &&
+          (!isTRUE(private$run_active) ||
+            !identical(private$current_run_id, hook_run_id))
+      }
+
       # What follows a PreToolUse answer: the hook's own decision, the file
       # checkpoint, the "allow" event and the delegation queue.
       after_pre_tool <- function(hook_result) {
@@ -273,6 +285,9 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         )
         waited <- promises::is.promising(fired)
         hook_then(fired, function(hook_result) {
+          if (run_over()) {
+            ellmer::tool_reject("The run has ended.")
+          }
           # An interrupt that arrived while the hook was pending.
           if (waited && !stopped_before && isTRUE(private$should_stop)) {
             ellmer::tool_reject("The run was stopped.")
@@ -290,6 +305,9 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
           context = context
         )
         return(hook_then(fired, function(request_result) {
+          if (run_over()) {
+            ellmer::tool_reject("The run has ended.")
+          }
           if (S7::S7_inherits(request_result, PermissionResultAllow)) {
             perm_result <- request_result
           } else if (S7::S7_inherits(request_result, PermissionResultDeny)) {
@@ -384,9 +402,24 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         keep.null = FALSE
       )
 
+      # A hook's promise can settle after its run is over: the run failed, or
+      # its stream was dropped, while the hook was pending. Nothing of that
+      # run is left for the answer to change, and a later run must not be
+      # changed by it.
+      hook_run_id <- private$current_run_id
+      hook_in_run <- isTRUE(private$run_active)
+      run_over <- function() {
+        hook_in_run &&
+          (!isTRUE(private$run_active) ||
+            !identical(private$current_run_id, hook_run_id))
+      }
+
       # What follows a PostToolUse answer. The tool_end event reads the
       # overrides this sets, so it waits for the hook too.
       after_post_tool <- function(hook_result) {
+        if (run_over()) {
+          return(invisible(NULL))
+        }
         # Check continue field in PostToolUse result
         if (S7::S7_inherits(hook_result, HookResultPostToolUse)) {
           private$tool_event_overrides[[record$tool_call_id]] <- list(
@@ -413,6 +446,9 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
           )
         }
         hook_then(failed, function(ignored) {
+          if (run_over()) {
+            return(invisible(NULL))
+          }
           private$record_run_event(private$tool_end_event(extracted))
 
           record_state <- private$tool_call_records[[record$record_index]]
