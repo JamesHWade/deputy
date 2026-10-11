@@ -197,6 +197,15 @@ test_that("an interrupt before the first pull stops a real provider run before a
   expect_identical(result$ending@by, "caller")
 })
 
+test_that("a stream dropped before it was read is no longer waiting to start", {
+  agent <- Agent$new(chat = create_mock_chat())
+  stream <- agent$stream_async("go")
+  rm(stream)
+  gc()
+
+  expect_false(agent$interrupt("nothing is there"))
+})
+
 test_that("a stream that is never read does not leave an interrupt behind", {
   agent <- Agent$new(create_mock_chat(list("answer")))
 

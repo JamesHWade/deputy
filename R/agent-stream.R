@@ -88,6 +88,15 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       reg.finalizer(
         environment(governed),
         function(environment) {
+          # A stream dropped before it was read is no longer waiting to start,
+          # so an interrupt has nothing of it to stop.
+          waiting <- agent$.__enclos_env__$private
+          if (
+            is.null(state$active_run_id) &&
+              identical(waiting$unstarted_run, state)
+          ) {
+            waiting$unstarted_run <- NULL
+          }
           if (
             !isTRUE(state$finished) &&
               !is.null(state$active_run_id)
