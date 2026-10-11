@@ -622,25 +622,34 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         )
       )
 
-      # Check if hook wants to cancel compaction
-      if (!is.null(hook_result) && isFALSE(hook_result$continue)) {
-        result <- DeputyCompaction(
-          method = "cancelled",
-          automatic = automatic,
-          turns_compacted = 0L,
-          turns_kept = length(plan$turns),
-          run_id = private$active_run_id(),
-          estimated_tokens = estimated_tokens
-        )
-        private$.last_compaction <- result
-        return(list(result = result))
-      }
+      planned <- function(hook_result) {
+        # Check if hook wants to cancel compaction
+        if (!is.null(hook_result) && isFALSE(hook_result$continue)) {
+          result <- DeputyCompaction(
+            method = "cancelled",
+            automatic = automatic,
+            turns_compacted = 0L,
+            turns_kept = length(plan$turns),
+            run_id = private$active_run_id(),
+            estimated_tokens = estimated_tokens
+          )
+          private$.last_compaction <- result
+          return(list(result = result))
+        }
 
-      plan$summary <- summary %||% hook_result$summary
-      plan$method <- if (!is.null(summary)) "custom" else "hook"
-      plan$automatic <- automatic
-      plan$estimated_tokens <- estimated_tokens
-      plan
+        plan$summary <- summary %||% hook_result$summary
+        plan$method <- if (!is.null(summary)) "custom" else "hook"
+        plan$automatic <- automatic
+        plan$estimated_tokens <- estimated_tokens
+        plan
+      }
+      # Only the automatic path runs in a coroutine that can wait for a
+      # promise; a manual compact() cannot, so a promise counts as no answer.
+      if (isTRUE(automatic)) {
+        hook_then(hook_result, planned)
+      } else {
+        planned(hook_unawaited(hook_result))
+      }
     },
 
     install_compaction = function(
@@ -793,7 +802,7 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         usage = summary_usage,
         attempts = attempts
       ))
-      private$fire_hook(
+      fired <- private$fire_hook(
         "PostCompact",
         result = result,
         context = private$hook_context(
@@ -802,6 +811,9 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
           automatic = isTRUE(plan$automatic)
         )
       )
+      if (isTRUE(plan$automatic)) {
+        return(hook_then(fired, function(ignored) result))
+      }
       result
     },
 
