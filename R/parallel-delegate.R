@@ -142,18 +142,17 @@ lead_parallel_delegate <- function(
       },
       add = TRUE
     )
-    initialize_agent_run(
-      lead,
-      state,
-      lapply(
-        selected$tasks,
-        delegation_task_label,
-        max_bytes = private$delegation_max_bytes
-      ),
-      limits,
-      context,
-      controller
+    labels <- lapply(
+      selected$tasks,
+      delegation_task_label,
+      max_bytes = private$delegation_max_bytes
     )
+    initialize_agent_run(lead, state, labels, limits, context, controller)
+    # No task is admitted until the batch's own start hooks have answered.
+    started <- run_start_hooks(lead, state, labels)
+    if (promises::is.promising(started)) {
+      coro::await(started)
+    }
     count <- length(selected$tasks)
     # Admit every selected task before preparing children. Failed preparation
     # must retain the failing record and unstarted siblings without paid work.

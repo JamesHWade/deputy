@@ -746,29 +746,12 @@ governed_run_stream <- coro::async_generator(function(
         run_limits,
         effective_run_context,
         controller,
-        stream_mode,
-        start_hooks = FALSE
+        stream_mode
       )
-      stopped_before <- agent$.__enclos_env__$private$should_stop
-      started <- fire_session_start(agent, stream_state)
-      waited <- promises::is.promising(started)
-      if (waited) {
+      started <- run_start_hooks(agent, stream_state, messages)
+      if (promises::is.promising(started)) {
         coro::await(started)
       }
-      stream_state$session_started <- TRUE
-      # A stop that arrived while SessionStart was pending takes effect now:
-      # the prompt is not submitted, and no later hook can hold the stop.
-      if (
-        !(waited &&
-          !stopped_before &&
-          agent$.__enclos_env__$private$should_stop)
-      ) {
-        submitted <- fire_prompt_submit(agent, stream_state, messages)
-        if (promises::is.promising(submitted)) {
-          coro::await(submitted)
-        }
-      }
-      check_initial_run_limits(agent, stream_state)
     },
     error = function(error) {
       stream_state$reason <- "error"
