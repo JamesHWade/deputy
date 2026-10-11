@@ -199,7 +199,13 @@ The record format, codec, scope (`delegation_scope` plus
 unchanged; only where the callbacks and the ID come from differs. Restore
 still runs no tool, resumes no subagent and creates no records.
 
-shinychat's "new chat" clears the turns without calling either callback. A
-host that reads the ID from `lead$conversation_id` keeps the previous
-conversation's ID until it sets a new one, before the next reply at the
-latest, and `restored()` reads the previous conversation's records until then.
+shinychat's "new chat" (and deleting the open conversation) saves the
+conversation being left, then empties the client's turns without calling
+`on_restore`. That `$set_turns(list())` is the only signal Deputy gets, so an
+Agent whose conversation is emptied sets `conversation_id` back to `NULL`. With
+the `lead$conversation_id` fallback, `restored()` then shows nothing and
+`on_save` saves nothing until the host sets the new conversation's ID, and a
+subagent started in the meantime carries no `host_conversation_id` instead of
+the conversation just left. `chat_server()` sets the ID before every reply, so
+it is unaffected. A host passing its own `conversation_id` function must
+return `NULL` (or the new ID) after a new chat itself.

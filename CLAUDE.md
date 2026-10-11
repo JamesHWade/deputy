@@ -576,7 +576,9 @@ registers nothing and also returns `on_save`/`on_restore` for the host to pass
 to `chat_enable_history()`; the open conversation's ID comes from the
 `conversation_id` function, else `lead$conversation_id`, which the host sets
 before each reply (as `chat_server()` does) and before `on_restore` runs.
-Giving both `chat` and `conversation_id` is an error.
+Giving both `chat` and `conversation_id` is an error. `Agent$set_turns(list())`
+clears `conversation_id`: shinychat's new chat (and deleting the open
+conversation) only empties the client, never calling `on_restore`.
 
 ### Optional child chat panel
 

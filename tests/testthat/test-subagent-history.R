@@ -366,6 +366,13 @@ test_that("delegations record the conversation the lead answered in", {
   )))
   lead$conversation_id <- NULL
   expect_null(lead$conversation_id)
+
+  # Replacing the turns keeps the conversation; emptying them starts a new one.
+  lead$conversation_id <- "conv-a"
+  lead$set_turns(lead$get_turns())
+  expect_identical(lead$conversation_id, "conv-a")
+  lead$set_turns(list())
+  expect_null(lead$conversation_id)
 })
 
 test_that("subagent records are saved with the conversation and restored read-only", {
@@ -2136,8 +2143,16 @@ test_that("without a chat, each conversation saves only its own subagents", {
   lead <- history_lead(root, sales, counter)
   host_history_session(lead, store, function(session, host) {
     expect_identical(host_history_submit(session, host, "One?"), "host-1")
+    expect_length(host$saver$restored(), 1L)
     session$setInputs(chat_history_new = 1L)
     session$flushReact()
+    # A new chat empties the lead, which leaves no conversation open until
+    # the app names the next one: the first conversation's subagent is no
+    # longer shown, and nothing is saved under its ID.
+    expect_null(lead$conversation_id)
+    expect_null(host$saver$conversation_id())
+    expect_null(host$saver$restored())
+    expect_identical(host$saver$on_save(list(other = 1)), list(other = 1))
     expect_identical(host_history_submit(session, host, "Two?"), "host-2")
     views <- host$saver$restored()
     expect_length(views, 1L)

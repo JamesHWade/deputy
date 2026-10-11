@@ -10,6 +10,11 @@
   are kept under that ID unless you pass `conversation_id`, a function
   returning the open conversation's ID (#252).
 
+* `Agent$set_turns(list())` sets `conversation_id` back to `NULL`, since an
+  emptied conversation is a new one. shinychat's "new chat" does this, so an
+  app with its own loop no longer shows, or saves new subagents under, the
+  conversation it just left.
+
 * `DelegationPolicy()` gains `chat`, a function that builds each subagent's
   chat, so a host can choose a subagent's provider, credentials and request
   parameters, for example a lower reasoning effort than the lead's on its own

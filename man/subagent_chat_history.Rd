@@ -94,7 +94,11 @@ Records are kept under the ID of the conversation open in the chat, which
 \code{chat_server()} otherwise looks after. Before each reply, set
 \code{lead$conversation_id} to the ID of the conversation the reply belongs to,
 as \code{chat_server()} does, so the subagents it starts are saved with that
-conversation. When a conversation is reopened, its ID must be the open one
+conversation. shinychat's "new chat" empties the lead's conversation, which
+sets \code{lead$conversation_id} back to \code{NULL}, so the previous conversation's
+subagents stop showing until you set the next ID. If you pass your own
+\code{conversation_id} function, make it return \code{NULL} or the new ID after a new
+chat. When a conversation is reopened, its ID must be the open one
 before \code{on_restore} runs: records saved under another ID are not read. By
 default the open conversation's ID is read from \code{lead$conversation_id};
 pass \code{conversation_id} to read it from somewhere else. For example, keeping

@@ -76,10 +76,11 @@ agent$add_hook(HookMatcher(
 
     \item{\code{conversation_id}}{The host conversation the agent is answering
 in, or \code{NULL}. shinychat's \code{chat_server()} sets it before each reply;
-set it yourself before starting a run outside a reply. Each delegation
-keeps the value it had when the delegation started, so
-\code{\link[=subagent_chat_history]{subagent_chat_history()}} can save a conversation's subagents with it.
-It isn't sent to the model.}
+set it yourself before starting a run outside a reply. Emptying the
+conversation with \verb{$set_turns(list())}, as shinychat does for a new
+chat, sets it back to \code{NULL}. Each delegation keeps the value it had
+when the delegation started, so \code{\link[=subagent_chat_history]{subagent_chat_history()}} can save a
+conversation's subagents with it. It isn't sent to the model.}
 
     \item{\code{run_context}}{The \code{run_context} attached to every run. Read-only.}
 

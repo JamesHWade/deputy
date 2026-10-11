@@ -1306,6 +1306,13 @@ Agent <- R6::R6Class(
       # Subagent activity shown in the conversation never reaches the model.
       split <- activity_split(value)
       private$.conversation_state$replace(private$.chat, split$turns)
+      # An emptied conversation is a new one: shinychat's "new chat" and
+      # deleting the open conversation both end here, and neither tells the
+      # host's callbacks. Keeping the old ID would file subagents started
+      # before the host sets the next one under the conversation just left.
+      if (length(value) == 0L) {
+        private$.conversation_id <- NULL
+      }
       preserve_run_usage(self, usage)
       private$.activity_overlay <- split$overlay
       activity_reset(self)
@@ -2496,10 +2503,11 @@ Agent <- R6::R6Class(
 
     #' @field conversation_id The host conversation the agent is answering
     #'   in, or `NULL`. shinychat's `chat_server()` sets it before each reply;
-    #'   set it yourself before starting a run outside a reply. Each delegation
-    #'   keeps the value it had when the delegation started, so
-    #'   [subagent_chat_history()] can save a conversation's subagents with it.
-    #'   It isn't sent to the model.
+    #'   set it yourself before starting a run outside a reply. Emptying the
+    #'   conversation with `$set_turns(list())`, as shinychat does for a new
+    #'   chat, sets it back to `NULL`. Each delegation keeps the value it had
+    #'   when the delegation started, so [subagent_chat_history()] can save a
+    #'   conversation's subagents with it. It isn't sent to the model.
     conversation_id = function(value) {
       if (missing(value)) {
         return(private$.conversation_id)
