@@ -12,7 +12,7 @@ tool_multi_edit(path, edits)
 \arguments{
 \item{path}{Path to the file to edit.}
 
-\item{edits}{A list of edits, or a JSON array. Each edit has \code{old_text},
+\item{edits}{A list of edits. Each edit is a list with \code{old_text},
 \code{new_text} and, optionally, \code{replace_all}.}
 }
 \value{

@@ -61,8 +61,10 @@ required; the other fields default as in \code{\link[=agent_definition]{agent_de
 \code{skills} are lists of registry names, and \code{disallowed_tools}, \code{memory} and
 \code{mcp_servers} are lists of strings; a single string also works for a
 one-item list. \code{model}, \code{initial_prompt} and \code{permission_mode} are strings,
-and \code{max_requests} is a non-negative integer. \code{null} is allowed only for
-fields whose default is \code{NULL}.
+and \code{max_requests} is a non-negative integer. \code{params} is a mapping of
+\code{\link[ellmer:params]{ellmer::params()}} arguments to single values, except \code{stop_sequences},
+which may be a list of strings; it is written only when the definition has
+parameters. \code{null} is allowed only for fields whose default is \code{NULL}.
 
 Unknown fields or versions, unknown tool or skill names, duplicate keys and
 \code{!expr} tags are errors. YAML guesses types, so quote strings such as

@@ -273,7 +273,7 @@ r_session_tool_read_json <- function(path, max_bytes, context) {
   }
   text <- rawToChar(raw)
   tryCatch(
-    jsonlite::fromJSON(text, simplifyVector = FALSE),
+    jsonlite::parse_json(text, simplifyVector = FALSE),
     error = function(error) {
       abort_deputy(
         "Malformed R session mailbox {.val {context}}: {conditionMessage(error)}",

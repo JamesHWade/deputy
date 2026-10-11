@@ -9,9 +9,9 @@ set_ask_user_callback(callback)
 \arguments{
 \item{callback}{A function that takes \code{questions}, a list in which each
 question has \code{question}, \code{header}, \code{options} (each with \code{label} and
-\code{description}) and \code{multiSelect}. It returns a named list mapping each
-question's text to the chosen label; join several labels with \code{", "}.
-\code{NULL} removes the callback.}
+\code{description}) and \code{multiSelect}. It returns a named list that maps each
+question's text to a character vector of answers, as described in
+\code{\link[=tools_interactive]{tools_interactive()}}. \code{NULL} removes the callback.}
 }
 \value{
 The previous callback (or \code{NULL}), invisibly.

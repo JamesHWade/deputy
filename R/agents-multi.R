@@ -110,6 +110,22 @@ LeadAgent <- R6::R6Class(
       if (!is.null(private$.chat)) {
         check_conversation_initialization(self)
       }
+      # A failed re-initialize leaves the lead as it was. Agent$initialize()
+      # snapshots only once it starts, after the lead has assigned its own
+      # fields below, so the lead snapshots every field first. The
+      # conversation state is left to Agent$initialize(), which restores a
+      # copy taken before changing it in place.
+      previous <- if (!is.null(private$.chat)) {
+        snapshot <- agent_private_snapshot(private)
+        snapshot[names(snapshot) != ".conversation_state"]
+      }
+      completed <- FALSE
+      on.exit(
+        if (!completed && !is.null(previous)) {
+          agent_private_restore(private, previous)
+        },
+        add = TRUE
+      )
       check_incoming_conversation(chat)
       if (!S7::S7_inherits(delegation_policy, DelegationPolicy)) {
         delegation_binding_abort(
@@ -146,6 +162,9 @@ LeadAgent <- R6::R6Class(
         )
       }
       private$.sub_agent_defs <- normalize_agent_definitions(sub_agents)
+      for (definition in private$.sub_agent_defs) {
+        private$check_definition_params(definition)
+      }
 
       # Build enhanced system prompt
       enhanced_prompt <- private$build_lead_prompt(
@@ -182,6 +201,8 @@ LeadAgent <- R6::R6Class(
         approval_dir = approval_dir,
         trusted_results = trusted_results
       )
+      completed <- TRUE
+      invisible(self)
     },
 
     #' @description
@@ -292,6 +313,7 @@ LeadAgent <- R6::R6Class(
       }
 
       definition <- copy_agent_definition(definition)
+      private$check_definition_params(definition)
       name <- definition$name
       previous <- private$.sub_agent_defs[[name]]
       if (!is.null(previous) && !replace) {
@@ -462,6 +484,26 @@ LeadAgent <- R6::R6Class(
   ),
 
   private = list(
+    # A copy of the lead's chat keeps the lead's params, and ellmer has no
+    # public way to change them, so only a host chat function can apply a
+    # clone-form definition's params.
+    check_definition_params = function(definition) {
+      if (
+        length(definition$params) &&
+          definition_copies_lead_chat(definition) &&
+          !is.function(private$.delegation_policy$chat)
+      ) {
+        abort_deputy(
+          c(
+            "AgentDefinition {.val {definition$name}} has {.arg params}, but its model copies the lead's chat, which keeps the lead's params.",
+            "i" = "Give the lead a {.code DelegationPolicy(chat = )} function that builds the subagent's chat, or use a {.val provider/model} model."
+          ),
+          class = "delegation_binding"
+        )
+      }
+      invisible(definition)
+    },
+
     # Build the lead agent's system prompt
     build_lead_prompt = function(base_prompt, sub_agents) {
       lines <- character()
@@ -523,6 +565,11 @@ LeadAgent <- R6::R6Class(
         ""
       } else {
         substr(full_prompt, after_start, nchar(full_prompt))
+      }
+      # The section ends with the newline that followed the old end marker,
+      # so `after` must not bring a second one.
+      if (endsWith(section, "\n") && startsWith(after, "\n")) {
+        after <- substr(after, 2L, nchar(after))
       }
       paste0(before, section, after)
     },
@@ -698,9 +745,12 @@ LeadAgent <- R6::R6Class(
       # way to run a child on a cheaper model of a provider that
       # ellmer::chat() cannot name, such as a gateway client built outside
       # ellmer.
-      same_provider <- def$model == "inherit" ||
-        !grepl("/", def$model, fixed = TRUE)
-      if (same_provider) {
+      same_provider <- definition_copies_lead_chat(def)
+      if (is.function(private$.delegation_policy$chat)) {
+        # The host builds every subagent's client and applies the
+        # definition's params itself.
+        sub_chat <- delegation_factory_chat(self, def, correlation)
+      } else if (same_provider) {
         # Clone the parent chat to get the same provider/model config,
         # then clear conversation history so the sub-agent starts fresh.
         sub_chat <- tryCatch(
@@ -734,7 +784,10 @@ LeadAgent <- R6::R6Class(
       } else {
         # Use the specified model string (e.g., "openai/gpt-6-luna", "anthropic/claude-sonnet-5")
         sub_chat <- tryCatch(
-          ellmer::chat(def$model),
+          ellmer::chat(
+            def$model,
+            params = if (length(def$params)) def$params
+          ),
           error = function(e) {
             cli_abort(c(
               "Failed to create chat for sub-agent {.val {def$name}}",
@@ -1024,3 +1077,9 @@ LeadAgent <- R6::R6Class(
     delegation_sources = list()
   )
 )
+
+# "inherit" and a bare model id copy the lead's chat, keeping its provider,
+# credentials and request parameters; a "provider/model" id makes a new chat.
+definition_copies_lead_chat <- function(definition) {
+  definition$model == "inherit" || !grepl("/", definition$model, fixed = TRUE)
+}

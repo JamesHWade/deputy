@@ -4,14 +4,21 @@
 \alias{subagent_chat_history}
 \title{Save subagent records with a shinychat conversation}
 \usage{
-subagent_chat_history(chat, lead, requester, max_bytes = 16 * 1024^2)
+subagent_chat_history(
+  chat = NULL,
+  lead,
+  requester,
+  max_bytes = 16 * 1024^2,
+  conversation_id = NULL
+)
 }
 \arguments{
 \item{chat}{The value returned by \code{\link[shinychat:chat_server]{shinychat::chat_server()}} for the lead's
-chat.}
+chat, or \code{NULL} (the default) when your app runs the lead's replies
+itself.}
 
 \item{lead}{The \link{Agent} or \link{LeadAgent} given to \code{chat_server()} as its
-client.}
+client, or whose replies your app streams into the chat.}
 
 \item{requester}{A function returning the current user, as your
 \link{DelegationDisclosure} expects it.}
@@ -20,6 +27,10 @@ client.}
 that don't fit, here or in the \code{max_bytes} of the lead's
 \code{delegation_disclosure}, keep their outcome without their conversation,
 or are left out, and \code{status()} counts them. Defaults to 16 MiB.}
+
+\item{conversation_id}{Only without \code{chat}: a function returning the ID of
+the conversation open in the chat, or \code{NULL} when none is. Defaults to
+reading \code{lead$conversation_id}.}
 }
 \value{
 Invisibly, a list of functions:
@@ -39,6 +50,10 @@ can't be found again, such as an earlier session's or those released
 since), and any problem saving or reading it. A user the lead's
 \code{delegation_disclosure} doesn't let see them gets no counts, and a note
 saying so.
+\item \code{conversation_id()}: the open conversation's ID, or \code{NULL}.
+\item Without \code{chat}, also \code{on_save(values)} and \code{on_restore(values)}, the
+callbacks for \code{\link[shinychat:chat_enable_history]{shinychat::chat_enable_history()}}. \code{on_save} returns
+\code{values} with the conversation's records added.
 }
 }
 \description{
@@ -66,6 +81,56 @@ Large results that subagents saved to disk are kept as references, which
 may no longer resolve. Needs shiny and shinychat (>= 0.5.0) with history
 enabled.
 }
+\section{Apps that run the lead's replies themselves}{
+
+If your app streams the lead's replies into the chat itself instead of
+using \code{\link[shinychat:chat_server]{shinychat::chat_server()}}, and keeps conversations with
+\code{\link[shinychat:chat_enable_history]{shinychat::chat_enable_history()}}, leave out \code{chat}. The returned list then
+also holds \code{on_save} and \code{on_restore}: pass them to \code{chat_enable_history()}.
+If you already have your own \code{on_save}, call this one from inside it and
+return what it returns; do the same with \code{on_restore}.
+
+Records are kept under the ID of the conversation open in the chat, which
+\code{chat_server()} otherwise looks after. Before each reply, set
+\code{lead$conversation_id} to the ID of the conversation the reply belongs to,
+as \code{chat_server()} does, so the subagents it starts are saved with that
+conversation. shinychat's "new chat" empties the lead's conversation, which
+sets \code{lead$conversation_id} back to \code{NULL}, so the previous conversation's
+subagents stop showing until you set the next ID. If you pass your own
+\code{conversation_id} function, make it return \code{NULL} or the new ID after a new
+chat. shinychat also empties the lead when the first message of a
+conversation is edited, and from the lead the two look the same: the
+example below gives such an edit a new ID, so the subagents from before the
+edit are no longer saved with that conversation. When a conversation is
+reopened, its ID must be the open one
+before \code{on_restore} runs: records saved under another ID are not read. By
+default the open conversation's ID is read from \code{lead$conversation_id};
+pass \code{conversation_id} to read it from somewhere else. For example, keeping
+the ID with the conversation itself:
+
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{saved <- subagent_chat_history(lead = lead, requester = user)
+shinychat::chat_enable_history(
+  "chat",
+  lead,
+  on_save = function(values) \{
+    values$conversation <- lead$conversation_id
+    saved$on_save(values)
+  \},
+  on_restore = function(values) \{
+    lead$conversation_id <- values$conversation
+    saved$on_restore(values)
+  \}
+)
+shiny::observeEvent(input$chat_user_input, \{
+  if (length(lead$get_turns()) == 0) \{
+    lead$conversation_id <- new_conversation_id() # your own ID scheme
+  \}
+  stream <- lead$stream_async(input$chat_user_input, stream = "content")
+  shinychat::chat_append("chat", stream)
+\})
+}\if{html}{\out{</div>}}
+}
+
 \seealso{
 \code{\link[=subagent_chat_activity]{subagent_chat_activity()}} to show subagent tool calls in the
 chat itself.

@@ -4,14 +4,15 @@
 \alias{subagent_chat_activity}
 \title{Show subagent tool calls in the main chat}
 \usage{
-subagent_chat_activity(chat, lead, requester, interval = 100L)
+subagent_chat_activity(chat = NULL, lead, requester, interval = 100L)
 }
 \arguments{
 \item{chat}{The value returned by \code{\link[shinychat:chat_server]{shinychat::chat_server()}} for the lead's
-chat.}
+chat, or \code{NULL} (the default) when your app streams the lead's replies
+into the chat itself.}
 
 \item{lead}{The \link{Agent} or \link{LeadAgent} given to \code{chat_server()} as its
-client.}
+client, or whose replies your app streams into the chat.}
 
 \item{requester}{A function returning the current user, as your
 \link{DelegationDisclosure} expects it. Access is checked each time new calls
@@ -54,6 +55,13 @@ only when \code{requester} may see the subagents under the lead's
 subagent shows as not completed. Up to 256 calls appear per reply. Showing a
 call never runs it again. Needs shiny, shinychat (>= 0.5.0), bslib,
 commonmark and xml2.
+
+If your app runs the lead's replies itself instead of through
+\code{\link[shinychat:chat_server]{shinychat::chat_server()}}, leave out \code{chat}. Stream
+\code{lead$stream_async(..., stream = "content")} into the chat with
+\code{\link[shinychat:chat_append]{shinychat::chat_append()}}: the cards arrive in that stream, and they are in
+\code{lead$get_turns()} for saving the conversation, for example with
+\code{\link[shinychat:chat_enable_history]{shinychat::chat_enable_history()}}.
 }
 \seealso{
 \code{\link[=subagent_chat_ui]{subagent_chat_ui()}} for a panel with each subagent's full

@@ -27,13 +27,28 @@ NULL
 #' @param human_input Optional `function(questions, context)` that answers
 #'   `ask_user` questions from subagents whose definition includes that tool.
 #'   `context` holds the subagent's IDs, the lead's `delegation_scope` and the
-#'   run context. Return the answers or a promise of them; [AskUserDeferred()]
-#'   isn't supported. Without it, delegating to a definition with `ask_user`
+#'   run context. Return the answers, in the form described for
+#'   [tools_interactive()], or a promise of them; [AskUserDeferred()] isn't
+#'   supported. Without it, delegating to a definition with `ask_user`
 #'   fails. Subagents never use [set_ask_user_callback()].
 #' @param observers Extra hook events for which the lead's hooks also run when
 #'   a subagent fires them. The lead's `PreToolUse`, `PostToolUse` and
 #'   `PostToolUseFailure` hooks always do. `PermissionRequest`,
 #'   `SubagentStart` and `SubagentStop` can't be added.
+#' @param chat Optional `function(definition, context)` that returns a new
+#'   ellmer chat for each subagent, including those started by
+#'   `$parallel_delegate()`. Use it to choose a subagent's provider, model,
+#'   credentials and request parameters yourself, for example to run a
+#'   subagent at a lower reasoning effort than the lead on a client you build.
+#'   `definition` is the subagent's [AgentDefinition][agent_definition],
+#'   including its `model` and `params`, which the function decides how to
+#'   use. `context` holds the delegation's IDs, the subagent's name and run
+#'   context, the lead's `delegation_scope` as `scope`, and the working
+#'   directory. Return a chat no agent is using, not the lead's. The
+#'   subagent runs on a copy of it, without its turns, tools and tool
+#'   callbacks, and with its own system prompt and tools. Without it,
+#'   Deputy copies the lead's chat or calls [ellmer::chat()], as the
+#'   definition's `model` says.
 #' @details
 #' A subagent never has more permissions than the lead had when the
 #' delegation started, and each of its tool calls is also checked against the
@@ -59,14 +74,16 @@ DelegationPolicy <- S7::new_class(
     resource_key = readonly_property("resource_key", S7::class_any),
     resources = readonly_property("resources", S7::class_any),
     human_input = readonly_property("human_input", S7::class_any),
-    observers = readonly_property("observers", S7::class_character)
+    observers = readonly_property("observers", S7::class_character),
+    chat = readonly_property("chat", S7::class_any)
   ),
   constructor = function(
     resource_mode = "shared",
     resource_key = NULL,
     resources = NULL,
     human_input = NULL,
-    observers = character()
+    observers = character(),
+    chat = NULL
   ) {
     resource_mode <- match.arg(resource_mode, c("shared", "exclusive", "owned"))
     if (resource_mode == "exclusive" && !is_nonempty_string(resource_key)) {
@@ -88,6 +105,9 @@ DelegationPolicy <- S7::new_class(
     if (!is.null(human_input) && !is.function(human_input)) {
       delegation_binding_abort("human_input must be a function or NULL.")
     }
+    if (!is.null(chat) && !is.function(chat)) {
+      delegation_binding_abort("chat must be a function or NULL.")
+    }
     observers <- delegation_strings(observers, "observers")
     allowed <- setdiff(
       HookEvent,
@@ -102,7 +122,8 @@ DelegationPolicy <- S7::new_class(
       resource_key = resource_key,
       resources = resources,
       human_input = human_input,
-      observers = unique(observers)
+      observers = unique(observers),
+      chat = chat
     )
     freeze_value(value)
   }
@@ -202,6 +223,7 @@ begin_delegation_binding <- function(lead, definition, correlation, stateless) {
       permissions = "initial child ceiling plus current lead restrictions",
       approval = "unsupported",
       human_input = "none",
+      chat = if (is.function(policy$chat)) "host factory" else "default",
       cleanup = switch(
         mode,
         owned = "runtime-owned",
@@ -212,6 +234,77 @@ begin_delegation_binding <- function(lead, definition, correlation, stateless) {
   )
   private$delegation_bindings[[id]] <- binding
   invisible(binding)
+}
+
+# Build a subagent's chat with the host's DelegationPolicy(chat = ) function.
+# The result is treated like the lead's chat: it must be an unused ellmer
+# Chat, and the subagent runs on a deep copy without turns, tools or tool
+# callbacks.
+delegation_factory_chat <- function(lead, definition, correlation) {
+  private <- lead$.__enclos_env__$private
+  context <- list(
+    working_dir = lead$working_dir,
+    scope = private$delegation_scope,
+    agent_name = definition$name,
+    parent_agent_id = correlation$parent_agent_id,
+    parent_run_id = correlation$parent_run_id,
+    delegation_id = correlation$delegation_id,
+    run_context = merge_run_context(
+      correlation$run_context,
+      list(role = definition$name)
+    )
+  )
+  chat <- tryCatch(
+    private$.delegation_policy$chat(definition, context),
+    error = function(error) {
+      abort_deputy(
+        "The chat function failed for subagent {.val {definition$name}}.",
+        class = "delegation_binding",
+        parent = error
+      )
+    }
+  )
+  # An Agent also carries the "Chat" class; clearing it below would wipe
+  # that agent's conversation and tools.
+  if (!inherits(chat, "Chat") || inherits(chat, "Agent")) {
+    delegation_binding_abort("The chat function must return an ellmer Chat.")
+  }
+  owned <- tryCatch(
+    {
+      check_incoming_conversation(chat)
+      FALSE
+    },
+    error = function(error) TRUE
+  )
+  if (
+    owned ||
+      identical(chat, private$.chat) ||
+      length(chat_owners(chat))
+  ) {
+    delegation_binding_abort(
+      "The chat function must return a new chat, not one an agent already uses."
+    )
+  }
+  # Work on a deep copy, as for the lead's chat: a host's `template$clone()`
+  # shares its callback managers with the template and every other shallow
+  # copy, and clearing them would strip another live subagent's callbacks.
+  copy <- tryCatch(
+    {
+      copy <- clone_governed_chat(chat)
+      clear_chat_tool_callbacks(copy, source = chat)
+      copy
+    },
+    error = function(error) {
+      abort_deputy(
+        "Could not copy the chat built for subagent {.val {definition$name}}.",
+        class = "delegation_binding",
+        parent = error
+      )
+    }
+  )
+  copy$set_turns(list())
+  copy$set_tools(list())
+  copy
 }
 
 release_delegation_binding <- function(lead, id) {
@@ -368,6 +461,8 @@ bind_delegation_host <- function(
         "Delegated human input requires DelegationPolicy(human_input = ...)."
       )
     }
+    # The same tool as tools_interactive(): it validates questions and
+    # answers and returns JSON, but its handler may not defer.
     interactive_tool <- new_ask_user_tool(
       policy$human_input,
       context = function() {
@@ -375,18 +470,7 @@ bind_delegation_host <- function(
       },
       allow_deferred = FALSE
     )
-    child$register_tool(
-      mark_native_tool(ellmer::tool(
-        function(questions) {
-          delegated_ask_user_json(interactive_tool(questions))
-        },
-        name = interactive_tool@name,
-        description = interactive_tool@description,
-        arguments = interactive_tool@arguments@properties,
-        annotations = interactive_tool@annotations
-      )),
-      replace = TRUE
-    )
+    child$register_tool(interactive_tool, replace = TRUE)
     binding$manifest$human_input <- "host-bound"
   }
   if (stateless && length(child$get_tools())) {
@@ -427,12 +511,3 @@ local({
   S7::method(`$`, DelegationPolicy) <- function(x, name) S7::prop(x, name)
   S7::method(`$`, DelegationResources) <- function(x, name) S7::prop(x, name)
 })
-
-# A delegated handler may answer now or through a promise; either way the child
-# receives the answers as JSON within its current run.
-delegated_ask_user_json <- function(result) {
-  if (promises::is.promising(result)) {
-    return(promises::then(result, delegated_ask_user_json))
-  }
-  jsonlite::toJSON(result, auto_unbox = TRUE, null = "null")
-}

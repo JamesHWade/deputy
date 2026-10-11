@@ -1,5 +1,61 @@
 # deputy (development version)
 
+* `subagent_chat_activity()` and `subagent_chat_history()` work in apps that
+  run the lead's replies themselves instead of through
+  `shinychat::chat_server()`. Leave out `chat`: subagent tool calls then appear
+  in the lead's `$stream_async()` stream that the app appends to its chat, and
+  `subagent_chat_history()` returns `on_save` and `on_restore` callbacks to
+  pass to `shinychat::chat_enable_history()`. Such an app sets
+  `lead$conversation_id` before each reply, as `chat_server()` does. Records
+  are kept under that ID unless you pass `conversation_id`, a function
+  returning the open conversation's ID (#252).
+
+* `Agent$set_turns(list())` sets `conversation_id` back to `NULL`, since an
+  emptied conversation is a new one. shinychat's "new chat" does this, so an
+  app with its own loop no longer shows, or saves new subagents under, the
+  conversation it just left.
+
+* `DelegationPolicy()` gains `chat`, a function that builds each subagent's
+  chat, so a host can choose a subagent's provider, credentials and request
+  parameters, for example a lower reasoning effort than the lead's on its own
+  gateway client. It builds `$parallel_delegate()` responders' chats too
+  (#237).
+
+* `agent_definition()` gains `params`, request parameters made with
+  `ellmer::params()`. They apply to `"provider/model"` models and are saved in
+  definition files. A definition with `params` whose model copies the lead's
+  chat needs a `DelegationPolicy(chat = )` function (#237).
+
+* `DelegationManifest` records the `provider` and `params` each subagent
+  started with, beside its model, and moves to schema version 2.
+
+* `ask_user` takes its questions as a typed array, not as JSON text; a string
+  goes back to the model with a request to send the array. Questions are
+  checked before anyone is asked: 1 to 4 questions with different texts, 2 to
+  4 options with different labels, a header of at most 12 characters, and
+  every text a non-empty string. A question that breaks a rule goes back to
+  the model with what to fix, rather than failing with an R error. A handler
+  returns a named list keyed by each question's exact text, each value a
+  character vector holding the chosen labels and at most one answer the
+  person typed; an ordinary question takes one of these. The model receives,
+  for each question in order, `selected` (an array of the chosen labels) and
+  `other_text` (what the person typed, or `null`), and a tool called from R
+  returns that JSON text. Answers in any other shape are a handler error. At
+  the console, option numbers that don't match an option, such as `1.5` or
+  `9`, are asked for again (#218).
+
+* `LeadAgent$register_sub_agent(replace = TRUE)` no longer adds a newline to
+  the lead's system prompt each time it's called. Replacing a definition with
+  an identical one leaves the prompt unchanged, so the provider's prompt cache
+  stays valid (#236).
+
+* `multi_edit` takes `edits` as an array of objects with `old_text`,
+  `new_text` and an optional `replace_all`. It no longer accepts a JSON string
+  or the `old_string`, `new_string` and `replaceAll` names. Parsing that
+  string with `jsonlite::fromJSON()` read a string that wasn't JSON as a file
+  path or URL, so a model could make the tool read a local file or fetch a
+  URL. The `RSession` tool bridge now reads its messages as JSON text only.
+
 * `AgentResult` has an `ending`: a `RunEnding` value that says how the run
   ended and holds only what that ending has. `RunEndingAnswered()`,
   `RunEndingStopped()` (who stopped it and the reason they gave),
