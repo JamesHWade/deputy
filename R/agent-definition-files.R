@@ -32,8 +32,10 @@
 #' `skills` are lists of registry names, and `disallowed_tools`, `memory` and
 #' `mcp_servers` are lists of strings; a single string also works for a
 #' one-item list. `model`, `initial_prompt` and `permission_mode` are strings,
-#' and `max_requests` is a non-negative integer. `null` is allowed only for
-#' fields whose default is `NULL`.
+#' and `max_requests` is a non-negative integer. `params` is a mapping of
+#' [ellmer::params()] arguments to single values, except `stop_sequences`,
+#' which may be a list of strings; it is written only when the definition has
+#' parameters. `null` is allowed only for fields whose default is `NULL`.
 #'
 #' Unknown fields or versions, unknown tool or skill names, duplicate keys and
 #' `!expr` tags are errors. YAML guesses types, so quote strings such as
@@ -138,6 +140,12 @@ agent_definition_write <- function(
     "mcp_servers"
   )) {
     if (!is.null(spec[[field]])) spec[[field]] <- unname(as.list(spec[[field]]))
+  }
+  # Files without parameters stay readable by versions that predate them.
+  if (length(spec$params) == 0L) {
+    spec$params <- NULL
+  } else if (!is.null(spec$params$stop_sequences)) {
+    spec$params$stop_sequences <- as.list(spec$params$stop_sequences)
   }
   definition_from_spec(spec, tools, skills, path)
   bytes <- charToRaw(enc2utf8(yaml::as.yaml(spec)))
@@ -327,6 +335,9 @@ definition_from_spec <- function(spec, tools, skills, path) {
     }
     spec[[field]] <- unname(registry[keys])
   }
+  if ("params" %in% names(spec)) {
+    spec["params"] <- list(definition_params(spec$params, path))
+  }
   for (field in c("memory", "mcp_servers", "disallowed_tools")) {
     if (field %in% names(spec)) {
       spec[field] <- list(definition_string_sequence(
@@ -339,6 +350,32 @@ definition_from_spec <- function(spec, tools, skills, path) {
   }
   tryCatch(do.call(agent_definition, spec), error = function(e) {
     abort_definition_file("{conditionMessage(e)}", path)
+  })
+}
+
+definition_params <- function(params, path) {
+  if (is.null(params)) {
+    return(list())
+  }
+  if (
+    !is.list(params) ||
+      is.null(names(params)) ||
+      !all(nzchar(names(params)))
+  ) {
+    abort_definition_file("{.field params} must be a mapping", path)
+  }
+  lapply(stats::setNames(names(params), names(params)), function(name) {
+    value <- params[[name]]
+    if (identical(name, "stop_sequences") && is.list(value)) {
+      value <- definition_string_sequence(value, "params: stop_sequences", path)
+    }
+    if (!is.atomic(value) || length(value) == 0L) {
+      abort_definition_file(
+        "{.field params} values must be single values",
+        path
+      )
+    }
+    value
   })
 }
 

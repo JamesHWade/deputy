@@ -509,7 +509,12 @@ Owned factories return `DelegationResources` through public Agent/RSession/MCP
 interfaces; cleanup runs after settlement and preparation failure. Definition MCP
 selections require owned factories. Shared closures and workspaces are not isolated.
 Delegated durable approval/continuation is rejected until #152/#42 supports it.
-See ADR-0019 and `R/delegation-binding.R`.
+See ADR-0019 and `R/delegation-binding.R`. `DelegationPolicy(chat = )` builds
+every subagent's Chat (parallel responders included); the result is treated
+like a clone and refused if it is the lead's or owned by a live Agent.
+`AgentDefinition(params = )` holds standard `ellmer::params()`; clone-form
+definitions with params need that factory. Manifests (schema 2) record
+`provider` and `params` (ADR-0037).
 
 ### Child inspection
 

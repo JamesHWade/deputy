@@ -4,8 +4,8 @@ NULL
 #' Record what a subagent started with
 #'
 #' Holds what a subagent was given when a delegation started: the task,
-#' evidence, system prompt, first message, model, tool names, and its
-#' permission and context settings. A [LeadAgent] keeps one in memory for each
+#' evidence, system prompt, first message, provider, model and request
+#' parameters, tool names, and its permission and context settings. A [LeadAgent] keeps one in memory for each
 #' delegation; read them with `$get_subagent_contexts()`. A manifest covers
 #' the starting point only, not what happened during the run.
 #'
@@ -20,12 +20,16 @@ NULL
 #' @param message The first message sent to the subagent, including the
 #'   definition's `initial_prompt` and the evidence.
 #' @param model The model name. Credentials are never recorded.
+#' @param provider The name of the subagent's provider, such as `"OpenAI"`.
+#' @param params The request parameters set with [ellmer::params()] on the
+#'   subagent's chat, such as `reasoning_effort`; `extra_args` are left out.
 #' @param tools Names of the subagent's tools.
 #' @param policies A summary of the permission, context and [DelegationPolicy]
 #'   settings, with hashes that identify them. Callbacks are not recorded.
 #' @param size `text_bytes`, `manifest_bytes` and `estimated_tokens` (`NULL`
 #'   when unknown). The token count is an estimate, not a billed count.
-#' @param schema_version Format version; must be `1L`.
+#' @param schema_version Format version, `2L`. Records saved with version
+#'   `1L`, which have no `provider` or `params`, can still be rebuilt.
 #' @details
 #' To store a manifest, save `S7::props(x)` (plain lists) and rebuild it with
 #' `do.call(DelegationManifest, record)`. A manifest includes the task and
@@ -47,7 +51,9 @@ DelegationManifest <- S7::new_class(
     model = readonly_property("model", S7::class_character),
     tools = readonly_property("tools", S7::class_character),
     policies = readonly_property("policies", S7::class_list),
-    size = readonly_property("size", S7::class_list)
+    size = readonly_property("size", S7::class_list),
+    provider = readonly_property("provider", S7::class_character),
+    params = readonly_property("params", S7::class_list)
   ),
   constructor = function(
     input,
@@ -60,13 +66,15 @@ DelegationManifest <- S7::new_class(
     tools,
     policies,
     size,
-    schema_version = 1L
+    provider = "",
+    params = list(),
+    schema_version = 2L
   ) {
     if (
       !is.numeric(schema_version) ||
         length(schema_version) != 1L ||
         is.na(schema_version) ||
-        schema_version != 1 ||
+        !schema_version %in% c(1, 2) ||
         !is.null(attributes(schema_version))
     ) {
       delegation_input_abort(
@@ -74,9 +82,18 @@ DelegationManifest <- S7::new_class(
         "Unsupported delegation manifest schema."
       )
     }
+    if (schema_version == 1 && (!identical(provider, "") || length(params))) {
+      delegation_input_abort(
+        "invalid",
+        "Version 1 delegation manifests have no provider or params."
+      )
+    }
+    if (!is.list(params) || (length(params) && is.null(names(params)))) {
+      delegation_input_abort("invalid", "params must be a named list.")
+    }
     value <- S7::new_object(
       S7::S7_object(),
-      schema_version = 1L,
+      schema_version = as.integer(schema_version),
       input = S7::props(do.call(DelegationInput, input)),
       definition = normalize_run_context(definition),
       sources = lapply(sources, normalize_run_context),
@@ -90,7 +107,9 @@ DelegationManifest <- S7::new_class(
       model = delegation_text(model, "model", empty = TRUE),
       tools = delegation_strings(tools, "tools", max_entries = Inf),
       policies = normalize_run_context(policies),
-      size = normalize_run_context(size)
+      size = normalize_run_context(size),
+      provider = delegation_text(provider, "provider", empty = TRUE),
+      params = normalize_run_context(params)
     )
     freeze_value(value)
   }
@@ -173,13 +192,19 @@ prepare_delegation_manifest <- function(lead, definition, prepared, child) {
     model = child$get_model() %||% "",
     tools = unname(names(child$get_tools()) %||% character()),
     policies = policy,
-    size = list(text_bytes = text_bytes, estimated_tokens = estimated)
+    size = list(text_bytes = text_bytes, estimated_tokens = estimated),
+    provider = delegation_chat_provider(child),
+    params = delegation_chat_params(child)
   )
   # Hash the declarative source separately from executable tool closures.
-  fields$definition$id <- delegation_digest(list(
-    definition = fields$definition,
-    model = fields$model,
-    tools = fields$tools
+  # Params join the hash only when set, so earlier IDs stay the same.
+  fields$definition$id <- delegation_digest(c(
+    list(
+      definition = fields$definition,
+      model = fields$model,
+      tools = fields$tools
+    ),
+    if (length(fields$params)) list(params = fields$params)
   ))
   # Canonical constructor output is the export representation. Include the
   # count itself until its decimal width stabilizes.
@@ -201,6 +226,25 @@ prepare_delegation_manifest <- function(lead, definition, prepared, child) {
   manifest
 }
 
+# What a subagent runs with, read through its public provider and model.
+# Chats that don't offer them, such as test doubles, record nothing.
+delegation_chat_provider <- function(agent) {
+  name <- tryCatch(agent$get_provider()@name, error = function(error) NULL)
+  if (is_nonempty_string(name)) name else ""
+}
+
+delegation_chat_params <- function(agent) {
+  params <- tryCatch(
+    agent$get_model_object()@params,
+    error = function(error) NULL
+  )
+  if (!is.list(params) || is.null(names(params))) {
+    return(list())
+  }
+  params <- params[setdiff(names(params), "extra_args")]
+  Filter(function(value) is.atomic(value) && length(value) > 0L, params)
+}
+
 redact_delegation_manifest <- function(manifest) {
   if (is.null(manifest)) {
     return(NULL)
@@ -209,7 +253,9 @@ redact_delegation_manifest <- function(manifest) {
     schema_version = manifest$schema_version,
     content_redacted = TRUE,
     definition_id = manifest$definition$id,
+    provider = manifest$provider,
     model = manifest$model,
+    params = manifest$params,
     tools = manifest$tools,
     size = manifest$size,
     policies = c(
@@ -219,13 +265,17 @@ redact_delegation_manifest <- function(manifest) {
         "context_policy_id"
       )],
       list(
-        binding = manifest$policies$binding[c(
-          "resource_mode",
-          "hooks",
-          "permissions",
-          "approval",
-          "human_input",
-          "cleanup"
+        binding = manifest$policies$binding[intersect(
+          c(
+            "resource_mode",
+            "hooks",
+            "permissions",
+            "approval",
+            "human_input",
+            "chat",
+            "cleanup"
+          ),
+          names(manifest$policies$binding)
         )]
       )
     ),

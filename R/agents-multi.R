@@ -146,6 +146,9 @@ LeadAgent <- R6::R6Class(
         )
       }
       private$.sub_agent_defs <- normalize_agent_definitions(sub_agents)
+      for (definition in private$.sub_agent_defs) {
+        private$check_definition_params(definition)
+      }
 
       # Build enhanced system prompt
       enhanced_prompt <- private$build_lead_prompt(
@@ -292,6 +295,7 @@ LeadAgent <- R6::R6Class(
       }
 
       definition <- copy_agent_definition(definition)
+      private$check_definition_params(definition)
       name <- definition$name
       previous <- private$.sub_agent_defs[[name]]
       if (!is.null(previous) && !replace) {
@@ -462,6 +466,28 @@ LeadAgent <- R6::R6Class(
   ),
 
   private = list(
+    # A copy of the lead's chat keeps the lead's params, and ellmer has no
+    # public way to change them, so only a host chat function can apply a
+    # clone-form definition's params.
+    check_definition_params = function(definition) {
+      clone_form <- definition$model == "inherit" ||
+        !grepl("/", definition$model, fixed = TRUE)
+      if (
+        length(definition$params) &&
+          clone_form &&
+          !is.function(private$.delegation_policy$chat)
+      ) {
+        abort_deputy(
+          c(
+            "AgentDefinition {.val {definition$name}} has {.arg params}, but its model copies the lead's chat, which keeps the lead's params.",
+            "i" = "Give the lead a {.code DelegationPolicy(chat = )} function that builds the subagent's chat, or use a {.val provider/model} model."
+          ),
+          class = "delegation_binding"
+        )
+      }
+      invisible(definition)
+    },
+
     # Build the lead agent's system prompt
     build_lead_prompt = function(base_prompt, sub_agents) {
       lines <- character()
@@ -705,7 +731,11 @@ LeadAgent <- R6::R6Class(
       # ellmer.
       same_provider <- def$model == "inherit" ||
         !grepl("/", def$model, fixed = TRUE)
-      if (same_provider) {
+      if (is.function(private$.delegation_policy$chat)) {
+        # The host builds every subagent's client and applies the
+        # definition's params itself.
+        sub_chat <- delegation_factory_chat(self, def, correlation)
+      } else if (same_provider) {
         # Clone the parent chat to get the same provider/model config,
         # then clear conversation history so the sub-agent starts fresh.
         sub_chat <- tryCatch(
@@ -739,7 +769,10 @@ LeadAgent <- R6::R6Class(
       } else {
         # Use the specified model string (e.g., "openai/gpt-6-luna", "anthropic/claude-sonnet-5")
         sub_chat <- tryCatch(
-          ellmer::chat(def$model),
+          ellmer::chat(
+            def$model,
+            params = if (length(def$params)) def$params
+          ),
           error = function(e) {
             cli_abort(c(
               "Failed to create chat for sub-agent {.val {def$name}}",

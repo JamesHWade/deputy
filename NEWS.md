@@ -1,5 +1,20 @@
 # deputy (development version)
 
+* `DelegationPolicy()` gains `chat`, a function that builds each subagent's
+  chat, so a host can choose a subagent's provider, credentials and request
+  parameters, for example a lower reasoning effort than the lead's on its own
+  gateway client. It builds `$parallel_delegate()` responders' chats too
+  (#237).
+
+* `agent_definition()` gains `params`, request parameters made with
+  `ellmer::params()`. They apply to `"provider/model"` models and are saved in
+  definition files. A definition with `params` whose model copies the lead's
+  chat needs a `DelegationPolicy(chat = )` function (#237).
+
+* `DelegationManifest` records the `provider` and `params` each subagent
+  started with, beside its model, and moves to schema version 2. Saved
+  version 1 records still rebuild.
+
 * `LeadAgent$register_sub_agent(replace = TRUE)` no longer adds a newline to
   the lead's system prompt each time it's called. Replacing a definition with
   an identical one leaves the prompt unchanged, so the provider's prompt cache

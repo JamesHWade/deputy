@@ -27,7 +27,8 @@ test_that("agent_definition creates correct structure", {
       "mcp_servers",
       "initial_prompt",
       "max_requests",
-      "permission_mode"
+      "permission_mode",
+      "params"
     )
   )
 })

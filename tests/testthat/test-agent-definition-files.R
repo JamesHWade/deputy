@@ -58,6 +58,55 @@ test_that("every AgentDefinition field round-trips through YAML", {
   expect_identical(restored$skills[[1]], skill)
 })
 
+test_that("params round-trip through YAML and are written only when set", {
+  skip_if_not_installed("yaml")
+  path <- file.path(withr::local_tempdir(), "agent.yaml")
+  definition <- agent_definition(
+    "research",
+    "Searches",
+    "Search.",
+    model = "openai/gpt-test",
+    params = ellmer::params(
+      reasoning_effort = "low",
+      max_tokens = 2000L,
+      temperature = 0.5,
+      stop_sequences = "END"
+    )
+  )
+  agent_definition_write(definition, path)
+  expect_identical(agent_definition_read(path), definition)
+  lines <- readLines(path)
+  expect_true("params:" %in% lines)
+  expect_true("  reasoning_effort: low" %in% lines)
+
+  plain <- agent_definition("research", "Searches", "Search.")
+  agent_definition_write(plain, path, overwrite = TRUE)
+  expect_false(any(grepl("params", readLines(path), fixed = TRUE)))
+
+  path <- write_definition_fixture(c(
+    minimal_definition_yaml,
+    "params:",
+    "  reasoning_effort: high",
+    "  stop_sequences: [END, STOP]"
+  ))
+  expect_identical(
+    agent_definition_read(path)$params,
+    list(stop_sequences = c("END", "STOP"), reasoning_effort = "high")
+  )
+  for (params in list(
+    "params: low",
+    c("params:", "  reasoning_effort: [low, high]"),
+    c("params:", "  temperature: -1"),
+    c("params:", "  headers: {a: b}")
+  )) {
+    path <- write_definition_fixture(c(minimal_definition_yaml, params))
+    expect_error(
+      agent_definition_read(path),
+      class = "deputy_agent_definition_file"
+    )
+  }
+})
+
 test_that("omitted fields, nulls and empty sequences retain constructor defaults", {
   skip_if_not_installed("yaml")
   path <- write_definition_fixture(minimal_definition_yaml)

@@ -34,6 +34,20 @@ NULL
 #'   a subagent fires them. The lead's `PreToolUse`, `PostToolUse` and
 #'   `PostToolUseFailure` hooks always do. `PermissionRequest`,
 #'   `SubagentStart` and `SubagentStop` can't be added.
+#' @param chat Optional `function(definition, context)` that returns a new
+#'   ellmer chat for each subagent, including those started by
+#'   `$parallel_delegate()`. Use it to choose a subagent's provider, model,
+#'   credentials and request parameters yourself, for example to run a
+#'   subagent at a lower reasoning effort than the lead on a client you build.
+#'   `definition` is the subagent's [AgentDefinition][agent_definition],
+#'   including its `model` and `params`, which the function decides how to
+#'   use. `context` holds the delegation's IDs, the subagent's name and run
+#'   context, the lead's `delegation_scope` as `scope`, and the working
+#'   directory. Return a new chat each time, not the lead's chat or one
+#'   already used by an agent. Deputy removes its turns, tools and tool
+#'   callbacks and sets the subagent's system prompt and tools. Without it,
+#'   Deputy copies the lead's chat or calls [ellmer::chat()], as the
+#'   definition's `model` says.
 #' @details
 #' A subagent never has more permissions than the lead had when the
 #' delegation started, and each of its tool calls is also checked against the
@@ -59,14 +73,16 @@ DelegationPolicy <- S7::new_class(
     resource_key = readonly_property("resource_key", S7::class_any),
     resources = readonly_property("resources", S7::class_any),
     human_input = readonly_property("human_input", S7::class_any),
-    observers = readonly_property("observers", S7::class_character)
+    observers = readonly_property("observers", S7::class_character),
+    chat = readonly_property("chat", S7::class_any)
   ),
   constructor = function(
     resource_mode = "shared",
     resource_key = NULL,
     resources = NULL,
     human_input = NULL,
-    observers = character()
+    observers = character(),
+    chat = NULL
   ) {
     resource_mode <- match.arg(resource_mode, c("shared", "exclusive", "owned"))
     if (resource_mode == "exclusive" && !is_nonempty_string(resource_key)) {
@@ -88,6 +104,9 @@ DelegationPolicy <- S7::new_class(
     if (!is.null(human_input) && !is.function(human_input)) {
       delegation_binding_abort("human_input must be a function or NULL.")
     }
+    if (!is.null(chat) && !is.function(chat)) {
+      delegation_binding_abort("chat must be a function or NULL.")
+    }
     observers <- delegation_strings(observers, "observers")
     allowed <- setdiff(
       HookEvent,
@@ -102,7 +121,8 @@ DelegationPolicy <- S7::new_class(
       resource_key = resource_key,
       resources = resources,
       human_input = human_input,
-      observers = unique(observers)
+      observers = unique(observers),
+      chat = chat
     )
     freeze_value(value)
   }
@@ -202,6 +222,7 @@ begin_delegation_binding <- function(lead, definition, correlation, stateless) {
       permissions = "initial child ceiling plus current lead restrictions",
       approval = "unsupported",
       human_input = "none",
+      chat = if (is.function(policy$chat)) "host factory" else "default",
       cleanup = switch(
         mode,
         owned = "runtime-owned",
@@ -212,6 +233,65 @@ begin_delegation_binding <- function(lead, definition, correlation, stateless) {
   )
   private$delegation_bindings[[id]] <- binding
   invisible(binding)
+}
+
+# Build a subagent's chat with the host's DelegationPolicy(chat = ) function.
+# The result is treated like a copy of the lead's chat: it must be its own,
+# unused client, and it starts without turns, tools or tool callbacks.
+delegation_factory_chat <- function(lead, definition, correlation) {
+  private <- lead$.__enclos_env__$private
+  context <- list(
+    working_dir = lead$working_dir,
+    scope = private$delegation_scope,
+    agent_name = definition$name,
+    parent_agent_id = correlation$parent_agent_id,
+    parent_run_id = correlation$parent_run_id,
+    delegation_id = correlation$delegation_id,
+    run_context = merge_run_context(
+      correlation$run_context,
+      list(role = definition$name)
+    )
+  )
+  chat <- tryCatch(
+    private$.delegation_policy$chat(definition, context),
+    error = function(error) {
+      abort_deputy(
+        "The chat function failed for subagent {.val {definition$name}}.",
+        class = "delegation_binding",
+        parent = error
+      )
+    }
+  )
+  if (!inherits(chat, "Chat")) {
+    delegation_binding_abort("The chat function must return an ellmer Chat.")
+  }
+  owned <- tryCatch(
+    {
+      check_incoming_conversation(chat)
+      FALSE
+    },
+    error = function(error) TRUE
+  )
+  if (
+    owned ||
+      identical(chat, private$.chat) ||
+      length(chat_owners(chat))
+  ) {
+    delegation_binding_abort(
+      "The chat function must return a new chat, not one an agent already uses."
+    )
+  }
+  tryCatch(
+    clear_chat_tool_callbacks(chat, source = private$.chat),
+    error = function(error) {
+      delegation_binding_abort(
+        "The chat function must return a chat that doesn't share the lead's callbacks."
+      )
+    }
+  )
+  chat$set_turns(list())
+  chat$set_tools(list())
+  chat
 }
 
 release_delegation_binding <- function(lead, id) {

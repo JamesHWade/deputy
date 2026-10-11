@@ -9,7 +9,8 @@ DelegationPolicy(
   resource_key = NULL,
   resources = NULL,
   human_input = NULL,
-  observers = character()
+  observers = character(),
+  chat = NULL
 )
 }
 \arguments{
@@ -44,6 +45,21 @@ fails. Subagents never use \code{\link[=set_ask_user_callback]{set_ask_user_call
 a subagent fires them. The lead's \code{PreToolUse}, \code{PostToolUse} and
 \code{PostToolUseFailure} hooks always do. \code{PermissionRequest},
 \code{SubagentStart} and \code{SubagentStop} can't be added.}
+
+\item{chat}{Optional \verb{function(definition, context)} that returns a new
+ellmer chat for each subagent, including those started by
+\verb{$parallel_delegate()}. Use it to choose a subagent's provider, model,
+credentials and request parameters yourself, for example to run a
+subagent at a lower reasoning effort than the lead on a client you build.
+\code{definition} is the subagent's \link[=agent_definition]{AgentDefinition},
+including its \code{model} and \code{params}, which the function decides how to
+use. \code{context} holds the delegation's IDs, the subagent's name and run
+context, the lead's \code{delegation_scope} as \code{scope}, and the working
+directory. Return a new chat each time, not the lead's chat or one
+already used by an agent. Deputy removes its turns, tools and tool
+callbacks and sets the subagent's system prompt and tools. Without it,
+Deputy copies the lead's chat or calls \code{\link[ellmer:chat]{ellmer::chat()}}, as the
+definition's \code{model} says.}
 }
 \value{
 A \code{DelegationPolicy} object.
