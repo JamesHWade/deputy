@@ -83,3 +83,18 @@ test_that("HookMatcher rejects invalid timeouts at construction", {
     error = TRUE
   )
 })
+
+test_that("HookMatcher validates promise_timeout", {
+  callback <- function(tool_name, tool_input, context) NULL
+
+  expect_equal(
+    HookMatcher("PreToolUse", callback = callback)@promise_timeout,
+    60
+  )
+  for (bad in list(0, -1, NA, Inf, "a")) {
+    expect_error(
+      HookMatcher("PreToolUse", callback = callback, promise_timeout = bad),
+      "promise_timeout.*must be one finite positive number"
+    )
+  }
+})

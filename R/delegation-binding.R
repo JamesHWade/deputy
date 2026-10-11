@@ -402,26 +402,34 @@ bind_delegation_host <- function(
 forward_delegation_hook <- function(lead, id, event, ...) {
   private <- lead$.__enclos_env__$private
   before <- length(lead$hooks$last_errors())
-  on.exit(
-    {
-      errors <- lead$hooks$last_errors()
-      record <- private$subagent_runs[[id]]
-      if (!is.null(record) && length(errors) > before) {
-        messages <- vapply(
-          errors[seq.int(before + 1L, length(errors))],
-          function(error) paste0(error$event, ": ", error$error),
-          character(1)
-        )
-        record$hook_error <- paste(
-          c(record$hook_error, messages),
-          collapse = "\n"
-        )
-        private$subagent_runs[[id]] <- record
-      }
-    },
-    add = TRUE
-  )
-  lead$hooks$fire(event, ...)
+  # Copies the errors recorded since the last copy. It runs on exit and again
+  # when a promised result settles, so it must not copy an error twice.
+  copy_new_errors <- function() {
+    errors <- lead$hooks$last_errors()
+    if (length(errors) <= before) {
+      return(invisible(NULL))
+    }
+    record <- private$subagent_runs[[id]]
+    if (!is.null(record)) {
+      messages <- vapply(
+        errors[seq.int(before + 1L, length(errors))],
+        function(error) paste0(error$event, ": ", error$error),
+        character(1)
+      )
+      record$hook_error <- paste(
+        c(record$hook_error, messages),
+        collapse = "\n"
+      )
+      private$subagent_runs[[id]] <- record
+    }
+    before <<- length(errors)
+    invisible(NULL)
+  }
+  on.exit(copy_new_errors(), add = TRUE)
+  hook_then(lead$hooks$fire(event, ...), function(value) {
+    copy_new_errors()
+    value
+  })
 }
 
 local({

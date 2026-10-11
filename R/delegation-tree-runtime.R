@@ -140,25 +140,44 @@ graph_fire_hooks <- function(agent, event, tool_name = NULL, ...) {
     registry <- source$hooks
     before <- length(registry$last_errors())
     value <- registry$fire(event, tool_name = tool_name, ...)
-    errors <- registry$last_errors()
-    if (length(errors) > before) {
-      rp <- root$.__enclos_env__$private
-      record <- rp$subagent_runs[[private$.delegation_id]]
-      record$hook_error <- paste(
-        c(
-          record$hook_error,
-          vapply(
-            errors[seq.int(before + 1L, length(errors))],
-            function(x) paste0(x$event, ": ", x$error),
-            character(1)
-          )
-        ),
-        collapse = "\n"
-      )
-      rp$subagent_runs[[private$.delegation_id]] <- record
-    }
-    value
+    # A promise's error arrives later, so the bookkeeping runs once the value is known.
+    hook_then(value, function(value) {
+      errors <- registry$last_errors()
+      if (length(errors) > before) {
+        rp <- root$.__enclos_env__$private
+        record <- rp$subagent_runs[[private$.delegation_id]]
+        record$hook_error <- paste(
+          c(
+            record$hook_error,
+            vapply(
+              errors[seq.int(before + 1L, length(errors))],
+              function(x) paste0(x$event, ": ", x$error),
+              character(1)
+            )
+          ),
+          collapse = "\n"
+        )
+        rp$subagent_runs[[private$.delegation_id]] <- record
+      }
+      value
+    })
   })
+  if (any(vapply(results, promises::is.promising, logical(1)))) {
+    return(promises::then(
+      promises::promise_all(
+        .list = lapply(results, function(r) {
+          if (promises::is.promising(r)) r else promises::promise_resolve(r)
+        })
+      ),
+      function(results) merge_tool_hook_results(event, results)
+    ))
+  }
+  merge_tool_hook_results(event, results)
+}
+
+# Merges the results of the hooks that ran for one tool event across a
+# delegation tree: a denial wins, any stop stops, and contexts are joined.
+merge_tool_hook_results <- function(event, results) {
   class <- if (event == "PreToolUse") {
     HookResultPreToolUse
   } else {

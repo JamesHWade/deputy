@@ -622,3 +622,208 @@ test_that("Hook timeout warns once when callr not installed", {
     )
   )
 })
+
+test_that("fire() stays synchronous when no callback returns a promise", {
+  registry <- HookRegistry$new()
+  registry$add(HookMatcher(
+    "PreToolUse",
+    callback = function(tool_name, tool_input, context) {
+      HookResultPreToolUse(permission = "deny", reason = "sync")
+    }
+  ))
+
+  result <- registry$fire(
+    "PreToolUse",
+    tool_name = "x",
+    tool_input = list(),
+    context = list()
+  )
+
+  expect_false(promises::is.promising(result))
+  expect_true(S7::S7_inherits(result, HookResultPreToolUse))
+})
+
+test_that("fire() returns a promise of the result when a callback returns a promise", {
+  registry <- HookRegistry$new()
+  registry$add(HookMatcher(
+    "PreToolUse",
+    callback = function(tool_name, tool_input, context) {
+      later_value(HookResultPreToolUse(permission = "deny", reason = "later"))
+    }
+  ))
+
+  result <- resolve_async_value(registry$fire(
+    "PreToolUse",
+    tool_name = "x",
+    tool_input = list(),
+    context = list()
+  ))
+
+  expect_true(S7::S7_inherits(result, HookResultPreToolUse))
+  expect_equal(result@permission, "deny")
+  expect_equal(result@reason, "later")
+})
+
+test_that("a promise that resolves to NULL lets the next hook decide, in order", {
+  ran <- character()
+  registry <- HookRegistry$new()
+  registry$add(HookMatcher(
+    "PreToolUse",
+    callback = function(tool_name, tool_input, context) {
+      ran <<- c(ran, "first")
+      later_value(NULL)
+    }
+  ))
+  registry$add(HookMatcher(
+    "PreToolUse",
+    callback = function(tool_name, tool_input, context) {
+      ran <<- c(ran, "second")
+      HookResultPreToolUse(permission = "deny", reason = "second")
+    }
+  ))
+
+  pending <- registry$fire(
+    "PreToolUse",
+    tool_name = "x",
+    tool_input = list(),
+    context = list()
+  )
+
+  expect_equal(ran, "first")
+
+  result <- resolve_async_value(pending)
+
+  expect_equal(ran, c("first", "second"))
+  expect_equal(result@permission, "deny")
+  expect_equal(result@reason, "second")
+})
+
+test_that("after a promised result, later hooks do not run", {
+  ran <- FALSE
+  registry <- HookRegistry$new()
+  registry$add(HookMatcher(
+    "PreToolUse",
+    callback = function(tool_name, tool_input, context) {
+      later_value(HookResultPreToolUse(permission = "allow"))
+    }
+  ))
+  registry$add(HookMatcher(
+    "PreToolUse",
+    callback = function(tool_name, tool_input, context) {
+      ran <<- TRUE
+      HookResultPreToolUse(permission = "deny", reason = "never")
+    }
+  ))
+
+  result <- resolve_async_value(registry$fire(
+    "PreToolUse",
+    tool_name = "x",
+    tool_input = list(),
+    context = list()
+  ))
+
+  expect_false(ran)
+  expect_equal(result@permission, "allow")
+})
+
+test_that("a rejected promise is recorded, and denies for PreToolUse", {
+  rejected <- function(message) {
+    promises::promise(function(resolve, reject) {
+      later::later(function() reject(rlang::error_cnd(message = message)), 0.02)
+    })
+  }
+  rejected_string <- function() {
+    promises::promise(function(resolve, reject) {
+      later::later(function() reject("plain failure"), 0.02)
+    })
+  }
+
+  registry <- HookRegistry$new()
+  registry$add(HookMatcher(
+    "PreToolUse",
+    callback = function(tool_name, tool_input, context) rejected("boom")
+  ))
+  registry$add(HookMatcher(
+    "PostToolUse",
+    callback = function(tool_name, tool_result, tool_error, context) {
+      rejected("post boom")
+    }
+  ))
+
+  denied <- resolve_async_value(registry$fire(
+    "PreToolUse",
+    tool_name = "x",
+    tool_input = list(),
+    context = list()
+  ))
+  expect_true(S7::S7_inherits(denied, HookResultPreToolUse))
+  expect_equal(denied@permission, "deny")
+  expect_match(denied@reason, "^Hook error:")
+  expect_length(registry$last_errors(), 1L)
+
+  post <- resolve_async_value(registry$fire(
+    "PostToolUse",
+    tool_name = "x",
+    tool_result = "r",
+    tool_error = NULL,
+    context = list()
+  ))
+  expect_null(post)
+  expect_length(registry$last_errors(), 2L)
+
+  string_registry <- HookRegistry$new()
+  string_registry$add(HookMatcher(
+    "PreToolUse",
+    callback = function(tool_name, tool_input, context) rejected_string()
+  ))
+  denied_string <- resolve_async_value(string_registry$fire(
+    "PreToolUse",
+    tool_name = "y",
+    tool_input = list(),
+    context = list()
+  ))
+  expect_equal(denied_string@permission, "deny")
+  expect_match(denied_string@reason, "^Hook error:.*plain failure")
+  expect_length(string_registry$last_errors(), 1L)
+})
+
+test_that("a promise that does not settle in time counts as no answer and is recorded", {
+  never <- function(...) promises::promise(function(resolve, reject) NULL)
+
+  post_registry <- HookRegistry$new()
+  post_registry$add(HookMatcher(
+    "PostToolUse",
+    callback = function(tool_name, tool_result, tool_error, context) {
+      never()
+    },
+    promise_timeout = 0.05
+  ))
+  post <- resolve_async_value(post_registry$fire(
+    "PostToolUse",
+    tool_name = "x",
+    tool_result = "r",
+    tool_error = NULL,
+    context = list()
+  ))
+  expect_null(post)
+  expect_length(post_registry$last_errors(), 1L)
+  expect_match(
+    post_registry$last_errors()[[1]]$error,
+    "did not settle within 0.05 seconds"
+  )
+
+  pre_registry <- HookRegistry$new()
+  pre_registry$add(HookMatcher(
+    "PreToolUse",
+    callback = function(tool_name, tool_input, context) never(),
+    promise_timeout = 0.05
+  ))
+  denied <- resolve_async_value(pre_registry$fire(
+    "PreToolUse",
+    tool_name = "x",
+    tool_input = list(),
+    context = list()
+  ))
+  expect_equal(denied@permission, "deny")
+  expect_length(pre_registry$last_errors(), 1L)
+})

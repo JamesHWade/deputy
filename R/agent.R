@@ -1668,13 +1668,13 @@ Agent <- R6::R6Class(
 
       private$.permissions <- narrowed_permissions
 
-      private$fire_hook(
+      hook_unawaited(private$fire_hook(
         "ConfigChange",
         key = "permission_mode",
         old_value = old_mode,
         new_value = mode,
         context = private$hook_context()
-      )
+      ))
 
       private$notify(
         paste0("Permission mode changed from ", old_mode, " to ", mode, "."),
@@ -3324,7 +3324,7 @@ Agent <- R6::R6Class(
       appended_hook_context_hashes = character(),
 
       notify = function(message, level = "info", code = NULL, ...) {
-        private$fire_hook(
+        hook_unawaited(private$fire_hook(
           "Notification",
           message = message,
           context = private$hook_context(
@@ -3332,7 +3332,7 @@ Agent <- R6::R6Class(
             code = code,
             ...
           )
-        )
+        ))
         invisible(NULL)
       },
 
