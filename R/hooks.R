@@ -23,6 +23,12 @@ NULL
 #' error or its stream is abandoned, and for a delegate batch, those hooks fire
 #' and are not waited for.
 #'
+#' A `PreToolUse` or `PermissionRequest` promise is waited for before the tool
+#' runs. A `PostToolUse` or `PostToolUseFailure` promise is waited for before
+#' the next model request, so the tool's result has already been recorded when
+#' the hook answers. With tools run concurrently, other tool calls of the same
+#' response may start or finish while a hook waits.
+#'
 #' @section Events:
 #'
 #' Each entry shows the event with its callback's arguments, then when it

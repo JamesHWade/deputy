@@ -211,6 +211,43 @@ test_that("ancestor hooks cannot be bypassed by a nearer explicit allow", {
   expect_identical(middle_calls, 2L)
 })
 
+test_that("ancestor hooks that answer with a promise cannot be bypassed either", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  effects <- 0L
+  tool <- ellmer::tool(
+    function() {
+      effects <<- effects + 1L
+      "written"
+    },
+    name = "write_evidence",
+    description = "Write",
+    arguments = list()
+  )
+  fixture <- recursive_fixture(leaf_tool = tool)
+  root_calls <- 0L
+  middle_calls <- 0L
+  fixture$root$add_hook(HookMatcher(
+    "PreToolUse",
+    callback = function(tool_name, ...) {
+      root_calls <<- root_calls + 1L
+      if (tool_name == "write_evidence") {
+        later_value(HookResultPreToolUse(permission = "deny"), 0.05)
+      }
+    }
+  ))
+  fixture$middle$add_hook(HookMatcher("PreToolUse", callback = function(...) {
+    middle_calls <<- middle_calls + 1L
+    HookResultPreToolUse(permission = "allow")
+  }))
+  fixture$configure()
+  suppressWarnings(fixture$root$run_sync("compose"))
+  expect_identical(effects, 0L)
+  expect_identical(root_calls, 3L)
+  expect_identical(middle_calls, 2L)
+})
+
 test_that("ancestor cancellation stops a queued grandchild before dispatch", {
   fixture <- recursive_fixture()
   fixture$configure()

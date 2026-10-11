@@ -166,71 +166,82 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         }
       }
 
-      if (S7::S7_inherits(perm_result, PermissionResultDeny)) {
-        request_result <- private$fire_hook(
-          "PermissionRequest",
-          tool_name = tool_name,
-          tool_input = tool_input,
-          permission_result = perm_result,
-          context = context
-        )
-
-        if (S7::S7_inherits(request_result, PermissionResultAllow)) {
-          perm_result <- request_result
-        } else if (S7::S7_inherits(request_result, PermissionResultDeny)) {
-          perm_result <- request_result
-        } else if (
-          S7::S7_inherits(request_result, HookResultPreToolUse) &&
-            identical(request_result$permission, "allow")
-        ) {
-          perm_result <- PermissionResultAllow()
+      # What follows a PreToolUse answer: the hook's own decision, the file
+      # checkpoint, the "allow" event and the delegation queue.
+      after_pre_tool <- function(hook_result) {
+        # Check hook result
+        if (S7::S7_inherits(hook_result, HookResultPreToolUse)) {
+          if (!is.null(hook_result$additional_context)) {
+            private$append_hook_context(hook_result$additional_context)
+          }
+          # Check continue field - signal to stop after this tool
+          if (!is.null(hook_result$continue) && !hook_result$continue) {
+            private$request_stream_stop(
+              hook_result$stop_reason %||% "hook_requested_stop",
+              by = "hook"
+            )
+          }
+          if (hook_result$permission == "deny") {
+            private$record_run_event(r_session_tool_agent_event(
+              private,
+              "permission",
+              record,
+              tool_call_id = record$tool_call_id,
+              decision = "deny"
+            ))
+            ellmer::tool_reject(hook_result$reason %||% "Denied by hook")
+          }
         }
-      }
 
-      if (S7::S7_inherits(perm_result, PermissionResultDeny)) {
+        if (
+          !is.null(private$.file_checkpoints) &&
+            !is_mcp_tool_context(context)
+        ) {
+          captured <- tryCatch(
+            private$.file_checkpoints$before_tool(
+              tool_name,
+              tool_input,
+              provider_tool_call_id %||% record$tool_call_id
+            ),
+            deputy_file_checkpoint_error = function(e) {
+              private$notify(
+                conditionMessage(e),
+                level = "warning",
+                code = "file_checkpoint_capture_failed",
+                tool_name = tool_name,
+                tool_call_id = record$tool_call_id
+              )
+              ellmer::tool_reject(conditionMessage(e))
+            }
+          )
+          private$tool_call_records[[
+            record$record_index
+          ]]$file_checkpoint_captured <-
+            isTRUE(captured)
+        }
+
+        # Emit authorization only after Deputy's policy and hook gates have
+        # accepted the request. An intermediate allow can still be denied.
         private$record_run_event(r_session_tool_agent_event(
           private,
           "permission",
           record,
           tool_call_id = record$tool_call_id,
-          decision = "deny"
+          decision = "allow"
         ))
-        if (isTRUE(perm_result$interrupt)) {
-          private$request_stream_stop("permission_denied", by = "permission")
-        }
-        r_session_tool_notify(
-          private,
-          perm_result$reason,
-          record,
-          level = "warning",
-          code = "permission_denied",
-          tool_name = tool_name,
-          tool_input = tool_input
-        )
-        ellmer::tool_reject(perm_result$reason)
+
+        # Queue delegated-run correlation only after every gate has allowed the
+        # request. A denied request never invokes the tool closure and therefore
+        # must not leave correlation for a later delegation to claim.
+        private$queue_delegation(record)
+
+        # Allow the tool to proceed
+        invisible(NULL)
       }
 
-      # Fire PreToolUse hooks
-      hook_result <- private$fire_hook(
-        "PreToolUse",
-        tool_name = tool_name,
-        tool_input = tool_input,
-        context = context
-      )
-
-      # Check hook result
-      if (S7::S7_inherits(hook_result, HookResultPreToolUse)) {
-        if (!is.null(hook_result$additional_context)) {
-          private$append_hook_context(hook_result$additional_context)
-        }
-        # Check continue field - signal to stop after this tool
-        if (!is.null(hook_result$continue) && !hook_result$continue) {
-          private$request_stream_stop(
-            hook_result$stop_reason %||% "hook_requested_stop",
-            by = "hook"
-          )
-        }
-        if (hook_result$permission == "deny") {
+      # What follows the permission decision: a denial, or the PreToolUse hooks.
+      after_permission <- function(perm_result) {
+        if (S7::S7_inherits(perm_result, PermissionResultDeny)) {
           private$record_run_event(r_session_tool_agent_event(
             private,
             "permission",
@@ -238,54 +249,62 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
             tool_call_id = record$tool_call_id,
             decision = "deny"
           ))
-          ellmer::tool_reject(hook_result$reason %||% "Denied by hook")
-        }
-      }
-
-      if (
-        !is.null(private$.file_checkpoints) &&
-          !is_mcp_tool_context(context)
-      ) {
-        captured <- tryCatch(
-          private$.file_checkpoints$before_tool(
-            tool_name,
-            tool_input,
-            provider_tool_call_id %||% record$tool_call_id
-          ),
-          deputy_file_checkpoint_error = function(e) {
-            private$notify(
-              conditionMessage(e),
-              level = "warning",
-              code = "file_checkpoint_capture_failed",
-              tool_name = tool_name,
-              tool_call_id = record$tool_call_id
-            )
-            ellmer::tool_reject(conditionMessage(e))
+          if (isTRUE(perm_result$interrupt)) {
+            private$request_stream_stop("permission_denied", by = "permission")
           }
+          r_session_tool_notify(
+            private,
+            perm_result$reason,
+            record,
+            level = "warning",
+            code = "permission_denied",
+            tool_name = tool_name,
+            tool_input = tool_input
+          )
+          ellmer::tool_reject(perm_result$reason)
+        }
+
+        stopped_before <- isTRUE(private$should_stop)
+        fired <- private$fire_hook(
+          "PreToolUse",
+          tool_name = tool_name,
+          tool_input = tool_input,
+          context = context
         )
-        private$tool_call_records[[
-          record$record_index
-        ]]$file_checkpoint_captured <-
-          isTRUE(captured)
+        waited <- promises::is.promising(fired)
+        hook_then(fired, function(hook_result) {
+          # An interrupt that arrived while the hook was pending.
+          if (waited && !stopped_before && isTRUE(private$should_stop)) {
+            ellmer::tool_reject("The run was stopped.")
+          }
+          after_pre_tool(hook_result)
+        })
       }
 
-      # Emit authorization only after Deputy's policy and hook gates have
-      # accepted the request. An intermediate allow can still be denied.
-      private$record_run_event(r_session_tool_agent_event(
-        private,
-        "permission",
-        record,
-        tool_call_id = record$tool_call_id,
-        decision = "allow"
-      ))
+      if (S7::S7_inherits(perm_result, PermissionResultDeny)) {
+        fired <- private$fire_hook(
+          "PermissionRequest",
+          tool_name = tool_name,
+          tool_input = tool_input,
+          permission_result = perm_result,
+          context = context
+        )
+        return(hook_then(fired, function(request_result) {
+          if (S7::S7_inherits(request_result, PermissionResultAllow)) {
+            perm_result <- request_result
+          } else if (S7::S7_inherits(request_result, PermissionResultDeny)) {
+            perm_result <- request_result
+          } else if (
+            S7::S7_inherits(request_result, HookResultPreToolUse) &&
+              identical(request_result$permission, "allow")
+          ) {
+            perm_result <- PermissionResultAllow()
+          }
+          after_permission(perm_result)
+        }))
+      }
 
-      # Queue delegated-run correlation only after every gate has allowed the
-      # request. A denied request never invokes the tool closure and therefore
-      # must not leave correlation for a later delegation to claim.
-      private$queue_delegation(record)
-
-      # Allow the tool to proceed
-      invisible(NULL)
+      after_permission(perm_result)
     },
 
     # Callback for tool results (hooks)
@@ -365,85 +384,94 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         keep.null = FALSE
       )
 
-      # Fire PostToolUse hooks
-      hook_result <- private$fire_hook(
-        "PostToolUse",
-        tool_name = extracted$tool_name,
-        tool_result = hook_tool_result,
-        tool_error = hook_tool_error,
-        context = context
-      )
+      # What follows a PostToolUse answer. The tool_end event reads the
+      # overrides this sets, so it waits for the hook too.
+      after_post_tool <- function(hook_result) {
+        # Check continue field in PostToolUse result
+        if (S7::S7_inherits(hook_result, HookResultPostToolUse)) {
+          private$tool_event_overrides[[record$tool_call_id]] <- list(
+            suppress_output = hook_result$suppress_output,
+            updated_tool_output = hook_result$updated_tool_output
+          )
+          if (!is.null(hook_result$additional_context)) {
+            private$append_hook_context(hook_result$additional_context)
+          }
+          if (!is.null(hook_result$continue) && !hook_result$continue) {
+            private$should_stop <- TRUE
+            private$stop_reason_from_hook <- hook_result$stop_reason %||%
+              "hook_requested_stop"
+            private$stop_requested_by <- "hook"
+          }
+        }
+        failed <- if (!is.null(hook_tool_error)) {
+          private$fire_hook(
+            "PostToolUseFailure",
+            tool_name = extracted$tool_name,
+            tool_result = hook_tool_result,
+            tool_error = hook_tool_error,
+            context = context
+          )
+        }
+        hook_then(failed, function(ignored) {
+          private$record_run_event(private$tool_end_event(extracted))
 
-      # Check continue field in PostToolUse result
-      if (S7::S7_inherits(hook_result, HookResultPostToolUse)) {
-        private$tool_event_overrides[[record$tool_call_id]] <- list(
-          suppress_output = hook_result$suppress_output,
-          updated_tool_output = hook_result$updated_tool_output
-        )
-        if (!is.null(hook_result$additional_context)) {
-          private$append_hook_context(hook_result$additional_context)
-        }
-        if (!is.null(hook_result$continue) && !hook_result$continue) {
-          private$should_stop <- TRUE
-          private$stop_reason_from_hook <- hook_result$stop_reason %||%
-            "hook_requested_stop"
-          private$stop_requested_by <- "hook"
-        }
+          record_state <- private$tool_call_records[[record$record_index]]
+          request_signature <- record_state$request_signature
+          cycle_signature <- if (is.null(request_signature)) {
+            NULL
+          } else {
+            tool_cycle_signature(
+              request_signature,
+              hook_tool_result,
+              hook_tool_error
+            )
+          }
+          if (is.null(cycle_signature)) {
+            private$last_tool_cycle_signature <- NULL
+            private$consecutive_tool_cycles <- 0L
+          } else {
+            loop <- advance_tool_loop(
+              signature = cycle_signature,
+              last_signature = private$last_tool_cycle_signature,
+              consecutive_calls = private$consecutive_tool_cycles
+            )
+            private$last_tool_cycle_signature <- loop$signature
+            private$consecutive_tool_cycles <- loop$consecutive_calls
+            if (isTRUE(loop$stalled) && !isTRUE(private$should_stop)) {
+              message <- paste0(
+                "Tool request `",
+                extracted$tool_name,
+                "` completed with the same result ",
+                loop$consecutive_calls,
+                " times without progress."
+              )
+              private$request_stream_stop("tool_loop")
+              private$notify(
+                message,
+                level = "warning",
+                code = "tool_loop",
+                tool_name = extracted$tool_name,
+                repeated = loop$consecutive_calls
+              )
+            }
+          }
+          invisible(NULL)
+        })
       }
 
-      if (!is.null(hook_tool_error)) {
+      pending <- hook_then(
         private$fire_hook(
-          "PostToolUseFailure",
+          "PostToolUse",
           tool_name = extracted$tool_name,
           tool_result = hook_tool_result,
           tool_error = hook_tool_error,
           context = context
-        )
+        ),
+        after_post_tool
+      )
+      if (promises::is.promising(pending)) {
+        private$held_hooks <- c(private$held_hooks, list(pending))
       }
-
-      private$record_run_event(private$tool_end_event(extracted))
-
-      record_state <- private$tool_call_records[[record$record_index]]
-      request_signature <- record_state$request_signature
-      cycle_signature <- if (is.null(request_signature)) {
-        NULL
-      } else {
-        tool_cycle_signature(
-          request_signature,
-          hook_tool_result,
-          hook_tool_error
-        )
-      }
-      if (is.null(cycle_signature)) {
-        private$last_tool_cycle_signature <- NULL
-        private$consecutive_tool_cycles <- 0L
-      } else {
-        loop <- advance_tool_loop(
-          signature = cycle_signature,
-          last_signature = private$last_tool_cycle_signature,
-          consecutive_calls = private$consecutive_tool_cycles
-        )
-        private$last_tool_cycle_signature <- loop$signature
-        private$consecutive_tool_cycles <- loop$consecutive_calls
-        if (isTRUE(loop$stalled) && !isTRUE(private$should_stop)) {
-          message <- paste0(
-            "Tool request `",
-            extracted$tool_name,
-            "` completed with the same result ",
-            loop$consecutive_calls,
-            " times without progress."
-          )
-          private$request_stream_stop("tool_loop")
-          private$notify(
-            message,
-            level = "warning",
-            code = "tool_loop",
-            tool_name = extracted$tool_name,
-            repeated = loop$consecutive_calls
-          )
-        }
-      }
-
       invisible(hook_tool_result)
     },
 

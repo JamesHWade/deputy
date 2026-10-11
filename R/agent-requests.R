@@ -56,6 +56,14 @@ install_request_callbacks <- function(agent) {
 request_start_async <- coro::async(function(agent, private, turns) {
   tryCatch(
     {
+      # PostToolUse promises are waited for here because ellmer does not wait
+      # for the tool-result callback. A stop a hook promised takes effect in
+      # begin_model_request().
+      held <- private$take_held_hooks()
+      if (length(held)) {
+        coro::await(promises::promise_all(.list = held))
+      }
+
       # All tool results have settled; ellmer has not stored or dispatched
       # the pending user turn yet. Count its contents without appending it.
       if (private$current_run_state$task_requests > 0L) {
