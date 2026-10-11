@@ -2203,3 +2203,105 @@ test_that("subagent_chat_activity() binds to the chat's own client", {
   )
   expect_null(lead$.__enclos_env__$private$.activity)
 })
+
+test_that("subagent_chat_activity() without a chat shows cards in the app's own stream", {
+  skip_if_not_installed("shiny")
+  skip_if_not_installed("shinychat", "0.5.0")
+  skip_if_not_installed("bslib")
+  skip_if_not_installed("commonmark")
+  skip_if_not_installed("xml2")
+  root_server <- local_runtime_server(list(
+    runtime_reply(tool = "ask_sales", arguments = list(task = "Sales?")),
+    runtime_reply("Lead done.")
+  ))
+  root <- Agent$new(
+    runtime_chat(root_server),
+    delegation_disclosure = activity_disclosure()
+  )
+  sales <- activity_specialist("sales", "60")
+  activity_retain(root, sales$agent, "ask_sales")
+  viewer <- function() "viewer"
+  # An app that streams the lead's replies into its chat itself, keeping
+  # what it hands to the chat.
+  host <- new.env()
+  host$seen <- list()
+  host$done <- FALSE
+  shiny::testServer(
+    function(input, output, session) {
+      expect_error(subagent_chat_activity(requester = viewer), "Agent")
+      expect_error(
+        subagent_chat_activity(lead = "root", requester = viewer),
+        "Agent"
+      )
+      expect_error(
+        subagent_chat_activity(lead = root, requester = "viewer"),
+        "function"
+      )
+      expect_error(
+        subagent_chat_activity(NULL, root, viewer, 10),
+        "at least 50"
+      )
+      control <- subagent_chat_activity(lead = root, requester = viewer)
+      expect_error(
+        subagent_chat_activity(lead = root, requester = viewer),
+        "already shown"
+      )
+      host$control <- control
+      shiny::observeEvent(input$chat_user_input, {
+        stream <- root$stream_async(input$chat_user_input, stream = "content")
+        shown <- coro::async_generator(function() {
+          for (chunk in coro::await_each(stream)) {
+            host$seen[[length(host$seen) + 1L]] <- chunk
+            coro::yield(chunk)
+          }
+        })
+        promises::then(shinychat::chat_append("chat", shown()), function(x) {
+          host$done <- TRUE
+        })
+      })
+    },
+    {
+      session$flushReact()
+      session$setInputs(chat_user_input = "Sales?")
+      deadline <- Sys.time() + 60
+      while (!host$done && Sys.time() < deadline) {
+        later::run_now(0.02)
+        session$flushReact()
+      }
+      expect_true(host$done)
+      cards <- activity_items(host$seen)
+      expect_length(cards, 2L)
+      expect_s3_class(cards[[1L]], "ellmer::ContentToolRequest")
+      expect_identical(cards[[1L]]@name, "call_measure")
+      expect_s3_class(cards[[2L]], "ellmer::ContentToolResult")
+      expect_true(all(startsWith(activity_ids(cards), "deputy_activity_")))
+      # The cards come before the delegation's own result, in its reply.
+      delegated <- which(vapply(
+        host$seen,
+        function(x) {
+          inherits(x, "ellmer::ContentToolResult") &&
+            !is_activity_content(x) &&
+            identical(x@request@name, "ask_sales")
+        },
+        logical(1)
+      ))
+      shown <- which(vapply(host$seen, is_activity_content, logical(1)))
+      expect_length(delegated, 1L)
+      expect_true(all(shown < delegated))
+      # The lead's turns hold them for saving; its model context doesn't.
+      turns <- unlist(lapply(root$get_turns(), function(turn) turn@contents))
+      context <- unlist(lapply(
+        root$get_context_turns(),
+        function(turn) turn@contents
+      ))
+      expect_length(activity_items(turns), 2L)
+      expect_length(activity_items(context), 0L)
+      host$control$stop()
+      expect_null(root$.__enclos_env__$private$.activity)
+      subagent_chat_activity(lead = root, requester = viewer)
+      expect_false(is.null(root$.__enclos_env__$private$.activity))
+    }
+  )
+  # Ending the session stops it.
+  expect_null(root$.__enclos_env__$private$.activity)
+})
