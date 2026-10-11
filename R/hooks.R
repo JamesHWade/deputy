@@ -14,6 +14,12 @@ NULL
 #' errors or times out, the tool call is denied. Errors in other callbacks are
 #' reported and the run continues.
 #'
+#' A callback may return a promise of what it would have returned. deputy
+#' waits for it, up to the hook's `promise_timeout`. A promise that has not
+#' settled by then counts as no answer and is recorded as a hook error. A
+#' rejected promise is handled the same way. `Notification` and `ConfigChange`
+#' hooks are not waited for.
+#'
 #' @section Events:
 #'
 #' Each entry shows the event with its callback's arguments, then when it
@@ -158,7 +164,12 @@ HookEvent <- c(
 #'   runs the callback in your R session with no limit. A positive value runs
 #'   it in a fresh R process with [callr::r()]. That process can't see your
 #'   global variables or attached packages (call functions as `pkg::fn()`),
-#'   and its printed output and other side effects stay there.
+#'   and its printed output and other side effects stay there. Such a
+#'   callback can't return a promise.
+#' @param promise_timeout Time limit, in seconds, for a promise the callback
+#'   returns. The default is 60. A promise that has not settled by then counts
+#'   as no answer and is recorded as a hook error. For PreToolUse that denies
+#'   the call.
 #' @return A `HookMatcher` object.
 #' @seealso [hook_matches()]
 #' @examples
@@ -182,9 +193,19 @@ HookMatcher <- S7::new_class(
       "pattern",
       S7::new_union(S7::class_character, NULL)
     ),
-    timeout = readonly_property("timeout", S7::class_numeric)
+    timeout = readonly_property("timeout", S7::class_numeric),
+    promise_timeout = readonly_property(
+      "promise_timeout",
+      S7::class_numeric
+    )
   ),
-  constructor = function(event, callback, pattern = NULL, timeout = 0) {
+  constructor = function(
+    event,
+    callback,
+    pattern = NULL,
+    timeout = 0,
+    promise_timeout = 60
+  ) {
     if (!is_nonempty_string(event) || !event %in% HookEvent) {
       cli_abort(c(
         "Invalid hook event: {.val {event}}",
@@ -197,12 +218,14 @@ HookMatcher <- S7::new_class(
     validate_hook_callback(event, callback)
     validate_hook_pattern(pattern)
     timeout <- validate_hook_timeout(timeout)
+    promise_timeout <- validate_hook_promise_timeout(promise_timeout)
     value <- S7::new_object(
       S7::S7_object(),
       event = event,
       callback = callback,
       pattern = pattern,
-      timeout = timeout
+      timeout = timeout,
+      promise_timeout = promise_timeout
     )
     freeze_value(value)
   }
@@ -245,6 +268,48 @@ S7::method(print, HookMatcher) <- function(x, ...) {
     cli::cli_text("timeout: {x@timeout} seconds")
   }))
   invisible(x)
+}
+
+# The value, or a promise of it, passed to `fn`. Synchronous when `value` is
+# not a promise, so code that never sees a promise runs exactly as before.
+hook_then <- function(value, fn) {
+  if (promises::is.promising(value)) promises::then(value, fn) else fn(value)
+}
+
+# For a caller that cannot wait: a promise counts as no answer. The promise
+# `fire()` returns never rejects, so dropping it is safe.
+hook_unawaited <- function(result) {
+  if (promises::is.promising(result)) NULL else result
+}
+
+# A promise that settles as `promise` does, or rejects after `seconds`.
+hook_promise_timeout <- function(promise, seconds, event) {
+  promises::promise(function(resolve, reject) {
+    cancel <- later::later(
+      function() {
+        reject(rlang::error_cnd(
+          class = "deputy_hook_timeout",
+          message = sprintf(
+            "%s hook's promise did not settle within %s seconds",
+            event,
+            format(seconds)
+          )
+        ))
+      },
+      seconds
+    )
+    promises::then(
+      promises::as.promise(promise),
+      onFulfilled = function(value) {
+        cancel()
+        resolve(value)
+      },
+      onRejected = function(error) {
+        cancel()
+        reject(error)
+      }
+    )
+  })
 }
 
 #' Hook registry
@@ -298,7 +363,9 @@ HookRegistry <- R6::R6Class(
 
     #' @description
     #' Run the matching hooks in the order they were added and return the
-    #' first non-`NULL` result. Later hooks don't run.
+    #' first non-`NULL` result. Later hooks don't run. When a callback returns
+    #' a promise, later hooks wait for it, and the promise `fire()` returns
+    #' resolves to that result.
     #'
 
     #' A failing callback is recorded in `last_errors()`. For PreToolUse the
@@ -309,7 +376,8 @@ HookRegistry <- R6::R6Class(
     #' @param tool_name Optional tool name, matched against hook patterns and
     #'   passed to the callback.
     #' @param ... Other arguments for the callback.
-    #' @return The first non-`NULL` result, or `NULL`.
+    #' @return The first non-`NULL` result, or `NULL`. A promise of it when a
+    #'   callback returned a promise.
     fire = function(event, tool_name = NULL, ...) {
       hooks <- self$get_hooks(event, tool_name)
 
@@ -319,88 +387,7 @@ HookRegistry <- R6::R6Class(
         args <- c(list(tool_name = tool_name), args)
       }
 
-      for (hook in hooks) {
-        result <- tryCatch(
-          {
-            # Call with timeout if callr is available
-            if (hook@timeout > 0 && rlang::is_installed("callr")) {
-              callr::r(
-                child_function(function(callback, args) {
-                  do.call(callback, args)
-                }),
-                args = list(callback = hook@callback, args = args),
-                timeout = hook@timeout
-              )
-            } else {
-              # Warn once if timeout requested but callr not installed
-              if (
-                hook@timeout > 0 &&
-                  !rlang::is_installed("callr") &&
-                  !isTRUE(private$callr_warned)
-              ) {
-                private$callr_warned <- TRUE
-                cli::cli_warn(c(
-                  "Hook timeout ignored: {.pkg callr} not installed",
-                  "i" = "Install {.pkg callr} to enforce timeout: {.code install.packages('callr')}",
-                  "i" = "Or set {.code timeout = 0} to suppress this warning"
-                ))
-              }
-              do.call(hook@callback, args)
-            }
-          },
-          error = function(e) {
-            error_message <- conditionMessage(e)
-
-            # Track the error for programmatic access
-            error_info <- list(
-              event = event,
-              tool_name = tool_name,
-              error = error_message,
-              timestamp = Sys.time()
-            )
-            private$hook_errors <- c(private$hook_errors, list(error_info))
-
-            # Use prominent error logging for all hook failures
-            # PreToolUse failures are security-critical
-            if (event == "PreToolUse") {
-              cli::cli_alert_danger(c(
-                "PreToolUse hook failed - denying tool for safety",
-                "x" = error_message
-              ))
-              return(HookResultPreToolUse(
-                permission = "deny",
-                reason = paste("Hook error:", error_message)
-              ))
-            }
-
-            # For other events, log prominently but continue execution
-            # These could be logging/audit hooks that shouldn't crash the agent
-            severity <- switch(
-              event,
-              "PostToolUse" = "PostToolUse hook failed (audit/logging may be incomplete)",
-              "Stop" = "Stop hook failed (cleanup may be incomplete)",
-              "SessionEnd" = "SessionEnd hook failed (state may not be saved)",
-              "SessionStart" = "SessionStart hook failed (initialization may be incomplete)",
-              paste0(event, " hook failed")
-            )
-
-            cli::cli_alert_danger(c(
-              severity,
-              "x" = error_message,
-              "i" = "Use registry$last_errors to inspect hook failures"
-            ))
-
-            NULL
-          }
-        )
-
-        # Return first non-NULL result
-        if (!is.null(result)) {
-          return(result)
-        }
-      }
-
-      NULL
+      private$fire_from(hooks, 1L, event, tool_name, args)
     },
 
     #' @description
@@ -457,6 +444,114 @@ HookRegistry <- R6::R6Class(
   ),
 
   private = list(
+    call_hook = function(hook, args) {
+      # Call with timeout if callr is available
+      if (hook@timeout > 0 && rlang::is_installed("callr")) {
+        callr::r(
+          child_function(function(callback, args) {
+            do.call(callback, args)
+          }),
+          args = list(callback = hook@callback, args = args),
+          timeout = hook@timeout
+        )
+      } else {
+        # Warn once if timeout requested but callr not installed
+        if (
+          hook@timeout > 0 &&
+            !rlang::is_installed("callr") &&
+            !isTRUE(private$callr_warned)
+        ) {
+          private$callr_warned <- TRUE
+          cli::cli_warn(c(
+            "Hook timeout ignored: {.pkg callr} not installed",
+            "i" = "Install {.pkg callr} to enforce timeout: {.code install.packages('callr')}",
+            "i" = "Or set {.code timeout = 0} to suppress this warning"
+          ))
+        }
+        do.call(hook@callback, args)
+      }
+    },
+
+    hook_failed = function(event, tool_name, error) {
+      error_message <- if (inherits(error, "condition")) {
+        conditionMessage(error)
+      } else {
+        paste(format(error), collapse = " ")
+      }
+
+      # Track the error for programmatic access
+      error_info <- list(
+        event = event,
+        tool_name = tool_name,
+        error = error_message,
+        timestamp = Sys.time()
+      )
+      private$hook_errors <- c(private$hook_errors, list(error_info))
+
+      # Use prominent error logging for all hook failures
+      # PreToolUse failures are security-critical
+      if (event == "PreToolUse") {
+        cli::cli_alert_danger(c(
+          "PreToolUse hook failed - denying tool for safety",
+          "x" = error_message
+        ))
+        return(HookResultPreToolUse(
+          permission = "deny",
+          reason = paste("Hook error:", error_message)
+        ))
+      }
+
+      # For other events, log prominently but continue execution
+      # These could be logging/audit hooks that shouldn't crash the agent
+      severity <- switch(
+        event,
+        "PostToolUse" = "PostToolUse hook failed (audit/logging may be incomplete)",
+        "Stop" = "Stop hook failed (cleanup may be incomplete)",
+        "SessionEnd" = "SessionEnd hook failed (state may not be saved)",
+        "SessionStart" = "SessionStart hook failed (initialization may be incomplete)",
+        paste0(event, " hook failed")
+      )
+
+      cli::cli_alert_danger(c(
+        severity,
+        "x" = error_message,
+        "i" = "Use registry$last_errors to inspect hook failures"
+      ))
+
+      NULL
+    },
+
+    fire_from = function(hooks, index, event, tool_name, args) {
+      while (index <= length(hooks)) {
+        hook <- hooks[[index]]
+        result <- tryCatch(
+          private$call_hook(hook, args),
+          error = function(e) private$hook_failed(event, tool_name, e)
+        )
+        if (promises::is.promising(result)) {
+          rest <- index + 1L
+          settled <- promises::then(
+            hook_promise_timeout(result, hook@promise_timeout, event),
+            onFulfilled = function(value) value,
+            onRejected = function(error) {
+              private$hook_failed(event, tool_name, error)
+            }
+          )
+          return(promises::then(settled, function(value) {
+            if (!is.null(value)) {
+              return(value)
+            }
+            private$fire_from(hooks, rest, event, tool_name, args)
+          }))
+        }
+        if (!is.null(result)) {
+          return(result)
+        }
+        index <- index + 1L
+      }
+      NULL
+    },
+
     configuration_locked = FALSE,
     assert_configurable = function() {
       if (private$configuration_locked) {

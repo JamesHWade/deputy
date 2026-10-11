@@ -98,3 +98,19 @@ validate_hook_timeout <- function(timeout) {
 
   as.numeric(timeout)
 }
+
+validate_hook_promise_timeout <- function(promise_timeout) {
+  if (
+    !is.numeric(promise_timeout) ||
+      length(promise_timeout) != 1L ||
+      is.na(promise_timeout) ||
+      !is.finite(promise_timeout) ||
+      promise_timeout <= 0
+  ) {
+    cli_abort(
+      "{.arg promise_timeout} must be one finite positive number"
+    )
+  }
+
+  as.numeric(promise_timeout)
+}
