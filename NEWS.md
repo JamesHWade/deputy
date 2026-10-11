@@ -29,10 +29,12 @@
   an identical one leaves the prompt unchanged, so the provider's prompt cache
   stays valid (#236).
 
-* `ask_user` and `multi_edit` read their JSON arguments only as JSON text. A
-  string that isn't JSON was read as a file path or URL, so a model could make
-  these tools read a local file or fetch a URL. The `RSession` tool bridge
-  reads its messages the same way.
+* `multi_edit` takes `edits` as an array of objects with `old_text`,
+  `new_text` and an optional `replace_all`. It no longer accepts a JSON string
+  or the `old_string`, `new_string` and `replaceAll` names. Parsing that
+  string with `jsonlite::fromJSON()` read a string that wasn't JSON as a file
+  path or URL, so a model could make the tool read a local file or fetch a
+  URL. The `RSession` tool bridge now reads its messages as JSON text only.
 
 * `AgentResult` has an `ending`: a `RunEnding` value that says how the run
   ended and holds only what that ending has. `RunEndingAnswered()`,

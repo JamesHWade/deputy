@@ -75,44 +75,35 @@ lf_newlines <- function(text) {
   gsub("\r\n", "\n", enc2utf8(text), fixed = TRUE)
 }
 
-# Parse multi-edit operations from a list or JSON string.
+# Check multi-edit operations: a non-empty list of edits, each with
+# `old_text`, `new_text` and an optional `replace_all`.
 parse_multi_edits <- function(edits) {
-  parsed <- edits
-
-  if (is.character(edits) && length(edits) == 1) {
-    rlang::check_installed("jsonlite", reason = "to parse JSON edits")
-
-    parsed <- tryCatch(
-      jsonlite::parse_json(edits, simplifyVector = FALSE),
-      error = function(e) {
-        cli_abort("Could not parse {.arg edits} as JSON.", parent = e)
-      }
-    )
+  if (!is.list(edits) || length(edits) == 0 || !is.null(names(edits))) {
+    cli_abort("{.arg edits} must be a non-empty array of edits.")
   }
 
-  if (!is.list(parsed) || length(parsed) == 0) {
-    cli_abort("{.arg edits} must be a non-empty list or JSON array.")
-  }
-
-  lapply(seq_along(parsed), function(i) {
-    edit <- parsed[[i]]
-    if (!is.list(edit)) {
+  lapply(seq_along(edits), function(i) {
+    edit <- edits[[i]]
+    if (!is.list(edit) || is.null(names(edit))) {
       cli_abort("Edit {i} must be an object.")
     }
-
-    old_text <- edit$old_text %||% edit$old_string
-    new_text <- edit$new_text %||% edit$new_string
-    replace_all <- isTRUE(edit$replace_all %||% edit$replaceAll)
-
-    if (is.null(old_text) || is.null(new_text)) {
-      cli_abort("Edit {i} must include {.arg old_text} and {.arg new_text}.")
+    unknown <- setdiff(names(edit), c("old_text", "new_text", "replace_all"))
+    if (length(unknown) > 0) {
+      cli_abort("Edit {i} has unknown fields: {.val {unknown}}.")
+    }
+    old_text <- edit[["old_text"]]
+    new_text <- edit[["new_text"]]
+    replace_all <- edit[["replace_all"]] %||% FALSE
+    if (!is_nonempty_string(old_text) || !rlang::is_string(new_text)) {
+      cli_abort(
+        "Edit {i} must have string {.arg old_text} and {.arg new_text}."
+      )
+    }
+    if (!rlang::is_bool(replace_all)) {
+      cli_abort("Edit {i}'s {.arg replace_all} must be true or false.")
     }
 
-    list(
-      old_text = as.character(old_text[[1]]),
-      new_text = as.character(new_text[[1]]),
-      replace_all = replace_all
-    )
+    list(old_text = old_text, new_text = new_text, replace_all = replace_all)
   })
 }
 
@@ -398,7 +389,7 @@ tool_edit_file <- ellmer::tool(
 #' @return A status message with the number of edits and replacements.
 #'
 #' @param path Path to the file to edit.
-#' @param edits A list of edits, or a JSON array. Each edit has `old_text`,
+#' @param edits A list of edits. Each edit is a list with `old_text`,
 #'   `new_text` and, optionally, `replace_all`.
 #'
 #' @examples
@@ -454,14 +445,22 @@ tool_multi_edit <- ellmer::tool(
     )
   },
   name = "multi_edit",
-  description = "Apply multiple exact-match text replacements to a file. Edits can be provided as a list or JSON string.",
+  description = "Apply multiple exact-match text replacements to a file, in order.",
   arguments = list(
     path = ellmer::type_string("Path to the file to edit"),
-    edits = ellmer::type_string(
-      "JSON array or structured list of edit operations with old_text/new_text.",
-      required = TRUE
+    edits = ellmer::type_array(
+      ellmer::type_object(
+        old_text = ellmer::type_string("Exact text to replace"),
+        new_text = ellmer::type_string("Replacement text"),
+        replace_all = ellmer::type_boolean(
+          "Replace every occurrence instead of exactly one",
+          required = FALSE
+        )
+      ),
+      "Edits to apply, in order"
     )
   ),
+  convert = FALSE,
   annotations = ellmer::tool_annotations(
     read_only_hint = FALSE,
     destructive_hint = TRUE
