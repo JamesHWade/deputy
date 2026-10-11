@@ -14,7 +14,7 @@ PermissionResult()
 \code{HookResult} and \code{PermissionResult} are the parent classes of the values
 that hook and permission callbacks return. You don't create them directly;
 use \code{\link[=HookResultPreToolUse]{HookResultPreToolUse()}}, \code{\link[=HookResultPostToolUse]{HookResultPostToolUse()}},
-\code{\link[=HookResultPreCompact]{HookResultPreCompact()}}, \code{\link[=PermissionResultAllow]{PermissionResultAllow()}},
+\code{\link[=HookResultPreCompact]{HookResultPreCompact()}}, \code{\link[=HookResultStop]{HookResultStop()}}, \code{\link[=PermissionResultAllow]{PermissionResultAllow()}},
 \code{\link[=PermissionResultDeny]{PermissionResultDeny()}} or \code{\link[=PermissionResultPending]{PermissionResultPending()}}. To test which kind
 a value is, use \code{S7::S7_inherits(x, PermissionResult)}.
 

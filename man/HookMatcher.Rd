@@ -4,7 +4,7 @@
 \alias{HookMatcher}
 \title{Create a hook}
 \usage{
-HookMatcher(event, callback, pattern = NULL, timeout = 0)
+HookMatcher(event, callback, pattern = NULL, timeout = 0, promise_timeout = 60)
 }
 \arguments{
 \item{event}{One of \link{HookEvent}.}
@@ -19,7 +19,13 @@ A hook with a pattern only fires for events that have a tool name.}
 runs the callback in your R session with no limit. A positive value runs
 it in a fresh R process with \code{\link[callr:r]{callr::r()}}. That process can't see your
 global variables or attached packages (call functions as \code{pkg::fn()}),
-and its printed output and other side effects stay there.}
+and its printed output and other side effects stay there. Such a
+callback can't return a promise.}
+
+\item{promise_timeout}{Time limit, in seconds, for a promise the callback
+returns. The default is 60. A promise that has not settled by then counts
+as no answer and is recorded as a hook error. For PreToolUse that denies
+the call.}
 }
 \value{
 A \code{HookMatcher} object.

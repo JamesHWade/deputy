@@ -1,5 +1,57 @@
 # deputy (development version)
 
+* `AgentResult` has an `ending`: a `RunEnding` value that says how the run
+  ended and holds only what that ending has. `RunEndingAnswered()`,
+  `RunEndingStopped()` (who stopped it and the reason they gave),
+  `RunEndingLimit()` (which limit and its figures), `RunEndingCutOff()` (the
+  provider's finish reason) and `RunEndingFailed()` (the error and where it
+  came from). Every stop reason maps to exactly one of them, so a host no
+  longer parses `stop_reason`. An answer the provider cut short keeps
+  `stop_reason` `"complete"`; its ending is where that shows. The `"stop"`
+  event carries the ending too.
+
+* Hook callbacks may return a promise of their result. Deputy waits for it,
+  up to the hook's new `promise_timeout` (60 seconds by default). A promise
+  that rejects or doesn't settle in time is recorded as a hook error and
+  counts as no answer, which for `PreToolUse` denies the call. A hook that
+  returns a plain value behaves as before. `Notification` and `ConfigChange`
+  hooks, and `$compact()`, don't wait. An `$interrupt()` that arrives while a
+  hook's promise is pending takes effect when the promise settles.
+
+* A `Stop` hook may return `HookResultStop(message)` to send an answered run
+  on: the model is asked again with `message` in the same run, with the same
+  run ID, limits, usage and stream. `Stop` now fires at each stop of a run,
+  with `context$stop_hook_active` set once a hook has sent the run on, and
+  `SessionEnd` fires once, when the run has ended. Both contexts carry the
+  run's `ending`. The result's `response` is the last pass's text.
+  `approval_review_server()` now refreshes on `SessionEnd`.
+
+* New hook event `PostModelRequest`, fired after each model request of a run
+  with the run's usage so far (`context$usage`, `context$usage_limits`,
+  `context$request_number`), so a host can show what a run is spending while
+  it runs, tools or no tools.
+
+* `$stream()` and `$stream_async()` take `usage_limits` for one run, merged
+  over the agent's limits as `$run_async()` merges them.
+
+* `UsageLimits()` gains `on_unknown_cost`. `"continue"` lets a run with
+  `max_cost_usd` go on when the cost of a response is unknown. The limit is
+  then enforced against the new `AgentUsage` field `known_cost_usd`: the cost
+  of the responses whose cost is known. A run that was stopped or failed now
+  reports the cost of the requests that finished there, where `cost_usd` alone
+  is `NA`.
+
+* `stream_result()` takes the stream that `$stream_async()` returned and gives
+  a promise of that run's `AgentResult`. It resolves when the run has
+  finished, however it ended.
+
+* `$interrupt()` called after `$stream_async()` but before the stream is first
+  read now stops the run when it starts. It was ignored, and the run started.
+
+* Saved limits and usage records gain a field each, so a durable job saved by
+  an earlier version is refused when it is bound again, as a job from any
+  other version is.
+
 * `Agent$initialize()` with a different Chat drops the previous conversation's
   subagent tool cards and pending activity, so they cannot appear in the new
   conversation or its saved session. Reinitializing with the same Chat keeps

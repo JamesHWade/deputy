@@ -66,6 +66,7 @@ deputy/
 │   ├── agent-definition.R # S7 AgentDefinition values and routing normalization
 │   ├── agent-definition-files.R # Portable YAML AgentDefinitions
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
+│   ├── run-ending.R        # RunEnding values and the stop-reason mapping
 │   ├── run-usage.R         # Run accounting and fail-closed limits
 │   ├── stall-detection.R   # Canonical repeated-tool progress signal
 │   ├── permissions.R       # S7 permission configuration and public evaluation
@@ -296,6 +297,11 @@ submission is blocked until then.
   explicit source loading. Tools nested in Skills retain caller-owned state.
   ADR-0015 records callback result validation, S7 family membership, and
   lifecycle interpretation. Nested tool-output payloads retain their identity.
+  ADR-0036 records run endings (`RunEnding` values on `AgentResult`), hooks
+  that answer with a promise and where each event waits, `Stop` sending a run
+  on, and why `Stop` and `SessionEnd` fire from the run's body. A hook that
+  returns a plain value must stay synchronous: use `hook_then()` and
+  `hook_unawaited()`, and never `coro::await()` a plain value.
 - **Printing**: Format summaries with `cli::cli_format_method()` and write the
   resulting lines with `cli::cat_line()` so printing remains on stdout. Pass
   user strings as interpolated values, never as cli templates, and return the

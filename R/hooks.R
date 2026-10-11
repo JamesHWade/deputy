@@ -14,20 +14,26 @@ NULL
 #' errors or times out, the tool call is denied. Errors in other callbacks are
 #' reported and the run continues.
 #'
-#' A callback may return a promise of what it would have returned. deputy
-#' waits for it, up to the hook's `promise_timeout`. A promise that has not
-#' settled by then counts as no answer and is recorded as a hook error. A
-#' rejected promise is handled the same way. `Notification` and `ConfigChange`
-#' hooks are not waited for. A promise from a `Stop` or `SessionEnd` hook is
-#' waited for when the run ends in its own course. When the run ends with an
-#' error or its stream is abandoned, and for a delegate batch, those hooks fire
-#' and are not waited for.
+#' A callback may return a promise of what it would have returned, so a hook
+#' can wait for a person, a model or a file. Deputy waits for the promise, up
+#' to the hook's `promise_timeout`, before it goes on:
 #'
-#' A `PreToolUse` or `PermissionRequest` promise is waited for before the tool
-#' runs. A `PostToolUse` or `PostToolUseFailure` promise is waited for before
-#' the next model request, so the tool's result has already been recorded when
-#' the hook answers. With tools run concurrently, other tool calls of the same
-#' response may start or finish while a hook waits.
+#' * `PreToolUse`, `PermissionRequest`: before the tool runs.
+#' * `PostToolUse`, `PostToolUseFailure`: before the next model request. The
+#'   tool's result has already been recorded when the hook answers.
+#' * `PostModelRequest`, `SessionStart`, `UserPromptSubmit`, `SubagentStart`,
+#'   `SubagentStop`, and `PreCompact` and `PostCompact` during automatic
+#'   compaction: before the run goes on.
+#' * `Stop`, `SessionEnd`: before the run finishes.
+#'
+#' A promise that is rejected, or has not settled in time, counts as no answer
+#' and is recorded as a hook error; for `PreToolUse` that denies the call.
+#' Deputy does not wait for `Notification` or `ConfigChange` hooks, for a hook
+#' fired by `$compact()`, or for `Stop` and `SessionEnd` when a run ends with
+#' an error, its stream is abandoned, or the run is a delegate batch. With
+#' tools run concurrently, other tool calls of the same response may start or
+#' finish while a hook waits. If `$interrupt()` is called while a hook waits,
+#' the run stops when the promise settles.
 #'
 #' @section Events:
 #'
@@ -41,31 +47,24 @@ NULL
 #' * `PostToolUseFailure(tool_name, tool_result, tool_error, context)`: after
 #'   `PostToolUse`, when the tool failed.
 #' * `PostModelRequest(context)`: after each model request of a run, once the
-#'   assistant's turn is in the conversation. Only an ellmer Chat fires
-#'   it, so a mock Chat never does. Its return value is ignored, but a promise is
-#'   waited for before the run goes on.
+#'   response is in the conversation. It needs ellmer's request callbacks, so
+#'   a stand-in for a Chat that lacks them never fires it.
 #' * `PermissionRequest(tool_name, tool_input, permission_result, context)`:
 #'   when the permission policy denies a call.
 #' * `SessionStart(context)`: at the start of each run.
 #' * `UserPromptSubmit(prompt, context)`: at the start of each run, after
 #'   `SessionStart`.
-#' * `Stop(reason, context)`: at each stop of a run. Its `context` also carries
-#'   `ending`, the run's [RunEnding] as it stands, and `stop_hook_active`, which
-#'   is `TRUE` when a hook has already sent this run on. A `Stop` hook may
-#'   return [HookResultStop()] to send an answered run on: the model is asked
-#'   again with its message, in the same run. Checking `stop_hook_active` stops
-#'   a hook from sending the run on for ever.
-#' * `SessionEnd(reason, context)`: once, when the run has ended. Its `context`
-#'   also carries `ending`.
+#' * `Stop(reason, context)`: at each stop of a run. A `Stop` hook may return
+#'   [HookResultStop()] to send an answered run on, so a run can stop more
+#'   than once.
+#' * `SessionEnd(reason, context)`: once, when the run has ended.
 #' * `SubagentStart(agent_name, task, context)`: when a subagent starts a
 #'   delegated task.
 #' * `SubagentStop(agent_name, task, result, context)`: when a subagent
 #'   finishes.
 #' * `PreCompact(turns_to_compact, turns_to_keep, context)`: before older
-#'   turns are summarised. `$compact()` does not wait for a promise from this
-#'   hook.
-#' * `PostCompact(result, context)`: after compaction. `$compact()` does not
-#'   wait for a promise from this hook.
+#'   turns are summarised.
+#' * `PostCompact(result, context)`: after compaction.
 #' * `Notification(message, context)`: when the agent reports something, such
 #'   as a denied call.
 #' * `ConfigChange(key, old_value, new_value, context)`: when
@@ -91,10 +90,10 @@ NULL
 #'   supply your own summary.
 #' * `Stop`: return [HookResultStop()] to send the run on.
 #'
-#' A run that is sent on keeps its run id, its limits and its usage. The
-#' result's `response` is the last pass's text, and its `turns` hold every
-#' pass. A run that extracts structured output with `$chat_structured()` is not
-#' sent on.
+#' A run that is sent on keeps its run ID, its limits and its usage. The
+#' result's `response` is the text of the last pass, and its `turns` hold
+#' every pass. Only an answered run is sent on, and a run that extracts
+#' structured output with `$chat_structured()` never is.
 #'
 #' Other events ignore the return value. Returning `NULL` means "no decision".
 #'
@@ -119,8 +118,11 @@ NULL
 #' * `tool_annotations`, `tool_arguments`, `tool_metadata` (PreToolUse,
 #'   PermissionRequest): the tool's annotations, declared arguments and
 #'   [tool_metadata()], when available.
-#' * `usage`, `cost` (Stop, SessionEnd): the run's [AgentUsage] and the
-#'   conversation's cost, as returned by `agent$cost()`.
+#' * `usage`, `cost`, `ending` (Stop, SessionEnd): the run's [AgentUsage], the
+#'   conversation's cost, as returned by `agent$cost()`, and the run's
+#'   [RunEnding] as it stands.
+#' * `stop_hook_active` (Stop): `TRUE` when a hook has already sent this run
+#'   on.
 #' * `total_turns`, `compact_count` (PreCompact, PostCompact): the number of
 #'   turns in the conversation and the number being summarised.
 #' * `automatic` (PostCompact): `TRUE` when compaction ran automatically

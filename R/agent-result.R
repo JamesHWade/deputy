@@ -438,7 +438,8 @@ S7::method(result_text_chunks, AgentResult) <- function(result) {
 #'
 #' @param result An [AgentResult].
 #' @return `TRUE` if the stop reason is `"complete"`, meaning the model
-#'   finished on its own. It doesn't check the answer.
+#'   finished on its own. It doesn't check the answer, and it is `TRUE` for an
+#'   answer the provider cut short: the result's `ending` tells those apart.
 #' @export
 result_is_success <- S7::new_generic(
   "result_is_success",
@@ -510,9 +511,12 @@ S7::method(print, AgentResult) <- function(x, ...) {
 #' @examples
 #' \dontrun{
 #' stream <- agent$stream_async(input$message)
-#' stream_result(stream)$then(function(result) {
-#'   showNotification(paste("Run ended:", class(result$ending)[[1]]))
+#' promises::then(stream_result(stream), function(result) {
+#'   if (!S7::S7_inherits(result$ending, RunEndingAnswered)) {
+#'     shiny::showNotification(paste("The run ended early:", result$stop_reason))
+#'   }
 #' })
+#' shinychat::chat_append("chat", stream)
 #' }
 #' @export
 stream_result <- function(stream) {

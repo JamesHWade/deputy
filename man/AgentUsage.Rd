@@ -10,7 +10,8 @@ AgentUsage(
   input_tokens = 0,
   output_tokens = 0,
   cached_tokens = 0,
-  cost_usd = 0
+  cost_usd = 0,
+  known_cost_usd = NULL
 )
 }
 \arguments{
@@ -27,6 +28,11 @@ aren't added to \code{total_tokens}.}
 
 \item{cost_usd}{Estimated cost in US dollars, or \code{NA_real_} if the cost of
 some responses is unknown.}
+
+\item{known_cost_usd}{The cost of the responses whose cost is known. When
+\code{cost_usd} is known this is ignored: the known cost is \code{cost_usd}. When
+\code{cost_usd} is \code{NA_real_}, it is a lower bound and \code{NULL} (the default)
+means \code{0}.}
 }
 \value{
 An \code{AgentUsage} object.
@@ -57,5 +63,7 @@ S7::props(usage)
 
 \describe{
 \item{\code{@total_tokens}}{\code{input_tokens + output_tokens}.}
+
+\item{\code{@known_cost_usd}}{The cost of the responses whose cost is known.}
 }}
 

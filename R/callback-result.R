@@ -236,7 +236,10 @@ HookResultPreCompact <- S7::new_class(
 #'
 #' @description
 #' Return this from a Stop hook to send the run on: the model is asked again
-#' with `message`, in the same run.
+#' with `message`, in the same run, which keeps its run ID, limits and usage.
+#' Only an answered run is sent on. `Stop` fires again at the next stop, with
+#' `context$stop_hook_active` set to `TRUE`; check it so a hook doesn't send
+#' the run on for ever.
 #'
 #' @param message The text the model is asked. It must not be empty.
 #' @seealso [CallbackResult] for reading result fields.

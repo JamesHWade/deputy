@@ -11,6 +11,7 @@ UsageLimits(
   max_output_tokens = NULL,
   max_total_tokens = NULL,
   max_cost_usd = NULL,
+  on_unknown_cost = c("stop", "continue"),
   on_exceed = c("stop", "error")
 )
 }
@@ -31,7 +32,12 @@ tokens are reported separately and aren't added again.}
 
 \item{max_cost_usd}{Maximum estimated cost in US dollars. If the cost of a
 response is unknown, the run stops with \code{"cost_unavailable"} rather than
-guessing.}
+guessing, unless \code{on_unknown_cost = "continue"}.}
+
+\item{on_unknown_cost}{What happens when \code{max_cost_usd} is set and the cost
+of a response is unknown. \code{"stop"} (the default) ends the run with
+\code{"cost_unavailable"}. \code{"continue"} lets the run go on, and checks the
+limit against the cost that is known (\link{AgentUsage}'s \code{known_cost_usd}).}
 
 \item{on_exceed}{What happens when a limit is reached. \code{"stop"} (the
 default) ends the run and returns an \link{AgentResult} whose \code{stop_reason}
@@ -55,8 +61,9 @@ can go over them by one response.
 
 Limits passed to \code{Agent$new()} apply to every run. Limits passed to a single
 run take any \code{NULL} field from the agent's limits, so they can't remove a
-limit the agent sets. Subagent runs are also capped by what is left of the
-lead's budget.
+limit the agent sets. A single run keeps its own \code{on_exceed} and
+\code{on_unknown_cost}; the agent's values for those don't replace them. Subagent
+runs are also capped by what is left of the lead's budget.
 
 The object is read-only: read fields with \code{$} and create a new one to change
 a limit.

@@ -85,7 +85,9 @@ Each agent has its own registry in \code{agent$hooks}; add hooks with
 \if{latex}{\out{\hypertarget{method-HookRegistry-fire}{}}}
 \subsection{\code{HookRegistry$fire()}}{
   Run the matching hooks in the order they were added and return the
-first non-\code{NULL} result. Later hooks don't run.
+first non-\code{NULL} result. Later hooks don't run. When a callback returns
+a promise, later hooks wait for it, and the promise \code{fire()} returns
+resolves to that result.
 
 A failing callback is recorded in \code{last_errors()}. For PreToolUse the
 failure denies the tool call; for other events it is reported and the
@@ -106,7 +108,8 @@ passed to the callback.}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    The first non-\code{NULL} result, or \code{NULL}.
+    The first non-\code{NULL} result, or \code{NULL}. A promise of it when a
+callback returned a promise.
   }
 }
 

@@ -38,8 +38,8 @@ NULL
 #'   guessing, unless `on_unknown_cost = "continue"`.
 #' @param on_unknown_cost What happens when `max_cost_usd` is set and the cost
 #'   of a response is unknown. `"stop"` (the default) ends the run with
-#'   `"cost_unavailable"`. `"continue"` lets the run go on without a cost check
-#'   for that response.
+#'   `"cost_unavailable"`. `"continue"` lets the run go on, and checks the
+#'   limit against the cost that is known ([AgentUsage]'s `known_cost_usd`).
 #' @param on_exceed What happens when a limit is reached. `"stop"` (the
 #'   default) ends the run and returns an [AgentResult] whose `stop_reason`
 #'   names the limit, such as `"request_limit"`, `"tool_call_limit"` or
