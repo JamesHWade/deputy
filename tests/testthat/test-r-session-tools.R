@@ -357,6 +357,20 @@ test_that("bridge transfer rejects runtime attributes and retains portable data"
   expect_snapshot(error = TRUE, r_session_tool_read_json(path, 128, "request"))
 })
 
+test_that("a mailbox holding a path or URL is malformed, not followed", {
+  target <- withr::local_tempfile(fileext = ".json")
+  writeLines('{"tool": "fetch_measurements"}', target)
+  for (text in c(target, "http://127.0.0.1:9/request.json")) {
+    mailbox <- withr::local_tempfile()
+    writeLines(text, mailbox)
+    error <- expect_error(
+      r_session_tool_read_json(mailbox, 4096, "request"),
+      class = "deputy_r_session_tool_protocol"
+    )
+    expect_match(conditionMessage(error), "lexical error")
+  }
+})
+
 test_that("request identity and raw JSON never restore worker classes", {
   request <- list(
     protocol = 1L,

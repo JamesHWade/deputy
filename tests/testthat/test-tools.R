@@ -633,6 +633,21 @@ test_that("multi_edit keeps CRLF line endings and the final newline state", {
   expect_identical(edit_test_bytes(path), "one\r\ntwo\r\nthree")
 })
 
+test_that("multi_edit reads edits from JSON text, never a path or URL", {
+  path <- edit_test_file("alpha\nbeta\n")
+  edits <- '[{"old_text": "alpha", "new_text": "one"}]'
+  saved <- withr::local_tempfile(fileext = ".json")
+  writeLines(edits, saved)
+
+  for (text in c(saved, "http://127.0.0.1:9/edits.json")) {
+    expect_error(tool_multi_edit(path, text), "Could not parse.*lexical error")
+  }
+  expect_identical(edit_test_bytes(path), "alpha\nbeta\n")
+
+  tool_multi_edit(path, edits)
+  expect_identical(edit_test_bytes(path), "one\nbeta\n")
+})
+
 test_that("edit tools leave mixed line endings outside the edit unchanged", {
   path <- edit_test_file("alpha\r\nbeta\ngamma\r\n")
 

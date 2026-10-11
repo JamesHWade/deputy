@@ -484,6 +484,25 @@ test_that("tool_ask_user rejects malformed JSON", {
   )
 })
 
+test_that("tool_ask_user reads questions from JSON text, never a path or URL", {
+  asked <- FALSE
+  set_ask_user_callback(function(questions) {
+    asked <<- TRUE
+    list("What format?" = "JSON")
+  })
+  withr::defer(set_ask_user_callback(NULL))
+  saved <- withr::local_tempfile(fileext = ".json")
+  writeLines(
+    '[{"question": "What format?", "header": "Format", "options": [{"label": "JSON", "description": "J"}, {"label": "YAML", "description": "Y"}]}]',
+    saved
+  )
+
+  for (text in c(saved, "http://127.0.0.1:9/questions.json")) {
+    expect_error(tool_ask_user(text), "Failed to parse questions JSON: lexical")
+  }
+  expect_false(asked)
+})
+
 test_that("tool_ask_user rejects empty JSON array", {
   set_ask_user_callback(function(questions) list())
   withr::defer(set_ask_user_callback(NULL))
