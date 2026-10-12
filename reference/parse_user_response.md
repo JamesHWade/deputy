@@ -1,6 +1,9 @@
 # Parse user response as option number(s) or free text
 
-Parse user response as option number(s) or free text
+A response made only of digits, commas, signs, dots and spaces is read
+as option numbers. Each must be a whole number from 1 to the number of
+options, and a single-select question takes exactly one. Any other text
+is the person's own answer.
 
 ## Usage
 
@@ -24,4 +27,6 @@ parse_user_response(response, options, multi_select = FALSE)
 
 ## Value
 
-Selected label(s) or the free text response
+A character vector: the chosen labels, in the order given, or the free
+text response. `NULL` when the response is option numbers that can't all
+be used, so the caller asks again.

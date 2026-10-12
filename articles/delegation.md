@@ -139,6 +139,36 @@ Lead hooks for `PreToolUse`, `PostToolUse` and `PostToolUseFailure`
 always run for subagent tool calls. List other events in `observers` to
 forward those too.
 
+### Build each subagent’s chat
+
+By default a subagent’s chat is a copy of the lead’s, or a new chat from
+[`ellmer::chat()`](https://ellmer.tidyverse.org/reference/chat-any.html)
+when its definition names a `"provider/model"`. Give the policy a `chat`
+function to build it yourself, for example to keep your own provider,
+endpoint and credentials while running a subagent at a lower reasoning
+effort than the lead:
+
+``` r
+
+policy <- DelegationPolicy(
+  chat = function(definition, context) {
+    ellmer::chat(
+      "openai/gpt-6-luna",
+      params = ellmer::params(
+        reasoning_effort = definition$params$reasoning_effort
+      )
+    )
+  }
+)
+```
+
+The function receives the definition, including its `model` and
+`params`, and the delegation’s identifiers. It must return a chat no
+agent is using, not the lead’s. The subagent runs on a copy of it,
+without its turns, tools and tool callbacks. If the function fails, the
+delegation fails before any request. It builds the chats for
+`$parallel_delegate()` too.
+
 ### Subagents that ask questions
 
 A subagent that should be able to ask the user something needs an

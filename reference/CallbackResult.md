@@ -6,6 +6,7 @@ directly; use
 [`HookResultPreToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.md),
 [`HookResultPostToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPostToolUse.md),
 [`HookResultPreCompact()`](https://jameshwade.github.io/deputy/reference/HookResultPreCompact.md),
+[`HookResultStop()`](https://jameshwade.github.io/deputy/reference/HookResultStop.md),
 [`PermissionResultAllow()`](https://jameshwade.github.io/deputy/reference/PermissionResultAllow.md),
 [`PermissionResultDeny()`](https://jameshwade.github.io/deputy/reference/PermissionResultDeny.md)
 or

@@ -13,7 +13,7 @@ S7::prop()."><meta property="og:image" content="https://jameshwade.github.io/dep
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -79,7 +79,7 @@ optionally, a tool-name pattern. Add it to an agent with
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">HookMatcher</span><span class="op">(</span><span class="va">event</span>, <span class="va">callback</span>, pattern <span class="op">=</span> <span class="cn">NULL</span>, timeout <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">HookMatcher</span><span class="op">(</span><span class="va">event</span>, <span class="va">callback</span>, pattern <span class="op">=</span> <span class="cn">NULL</span>, timeout <span class="op">=</span> <span class="fl">0</span>, promise_timeout <span class="op">=</span> <span class="fl">60</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -105,7 +105,15 @@ A hook with a pattern only fires for events that have a tool name.</p></dd>
 runs the callback in your R session with no limit. A positive value runs
 it in a fresh R process with <code><a href="https://callr.r-lib.org/reference/r.html" class="external-link">callr::r()</a></code>. That process can't see your
 global variables or attached packages (call functions as <code>pkg::fn()</code>),
-and its printed output and other side effects stay there.</p></dd>
+and its printed output and other side effects stay there. Such a
+callback can't return a promise.</p></dd>
+
+
+<dt id="arg-promise-timeout">promise_timeout<a class="anchor" aria-label="anchor" href="#arg-promise-timeout"></a></dt>
+<dd><p>Time limit, in seconds, for a promise the callback
+returns. The default is 60. A promise that has not settled by then counts
+as no answer and is recorded as a hook error. For PreToolUse that denies
+the call.</p></dd>
 
 </dl></div>
     <div class="section level2">

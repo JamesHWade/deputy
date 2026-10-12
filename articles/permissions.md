@@ -219,13 +219,17 @@ usage, so a run can overshoot them by one response.
 Cost comes from ellmer’s price table. If you set `max_cost_usd` and
 ellmer can’t price the model, for example because the model is newer
 than your version of ellmer, the run stops with `"cost_unavailable"`
-rather than guess. Likewise, `result$cost$total` is `NA` whenever any
-response couldn’t be priced, and `result$cost$missing` counts those
-responses.
+rather than guess. Set `UsageLimits(on_unknown_cost = "continue")` to
+let such a run go on: the limit is then checked against the cost that is
+known. Likewise, `result$cost$total` is `NA` whenever any response
+couldn’t be priced, and `result$cost$missing` counts those responses;
+`result$usage$known_cost_usd` is the cost of the ones that could.
 
 By default a limit returns an `AgentResult` with the reason in
-`stop_reason`. With `UsageLimits(on_exceed = "error")`, it signals an
-error instead, and `agent$last_run()` still holds the partial result.
+`stop_reason` and a `RunEndingLimit` in `ending`, which holds the figure
+reached and the figure allowed. With `UsageLimits(on_exceed = "error")`,
+it signals an error instead, and `agent$last_run()` still holds the
+partial result.
 
 Deputy also stops a run with `"tool_loop"` when the model makes the same
 tool call three times in a row and gets the same result each time.

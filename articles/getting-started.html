@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -291,7 +291,9 @@ then give the agent a smaller task or raise the limit it hit.
 the same result three times in a row. <code>"cost_unavailable"</code>
 means you set a cost limit but ellmer couldn’t price the model, so
 Deputy stopped rather than guess. <code><a href="../reference/UsageLimits.html">?UsageLimits</a></code> lists every
-limit.
+limit. <code>result$ending</code> says the same as a value: whether the
+run was answered, stopped, hit a limit, was cut off by the provider or
+failed, with the details of each (<code><a href="../reference/RunEnding.html">?RunEnding</a></code>).
 </dd>
 </dl>
 </div>

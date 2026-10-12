@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -79,6 +79,8 @@
 <div class="section level3">
 <h3 id="conversation-state">Conversation state<a class="anchor" aria-label="anchor" href="#conversation-state"></a></h3>
 <p><strong>Run</strong>: One invocation of an Agent against a task, ending when the model stops, a limit is reached, or it is interrupted. An Agent may perform many runs over its lifetime. <em>Avoid</em>: execution, invocation, call</p>
+<p><strong>Ending</strong>: How a run ended: answered, stopped, hit a limit, cut off by the provider, or failed. A read-only S7 value on the run’s result that holds only what that ending has (ADR-0036). <em>Avoid</em>: outcome, status, stop reason (the string it replaces as the thing to act on)</p>
+<p><strong>Pass</strong>: One stretch of a run from a model request to the next stop. A run has one pass unless a <code>Stop</code> hook sends it on. <em>Avoid</em>: round, attempt, second run</p>
 <p><strong>Turn</strong>: A single exchange within a run — one model response and any tool calls it requested. <em>Avoid</em>: step, iteration, round</p>
 <p><strong>Selected conversation</strong>: The complete path of turns currently chosen by the host, including material removed from model context and subagent activity shown with those turns. <em>Avoid</em>: model context, conversation snapshot</p>
 <p><strong>Model context</strong>: The instructions and turns currently supplied to the model. It may contain summaries or result markers in place of material in the selected conversation. <em>Avoid</em>: selected conversation, transcript</p>

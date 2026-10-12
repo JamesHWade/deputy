@@ -9,6 +9,31 @@ outcome, and the remaining hooks for that event don't run. If a
 PreToolUse callback errors or times out, the tool call is denied. Errors
 in other callbacks are reported and the run continues.
 
+A callback may return a promise of what it would have returned, so a
+hook can wait for a person, a model or a file. Deputy waits for the
+promise, up to the hook's `promise_timeout`, before it goes on:
+
+- `PreToolUse`, `PermissionRequest`: before the tool runs.
+
+- `PostToolUse`, `PostToolUseFailure`: before the next model request.
+  The tool's result has already been recorded when the hook answers.
+
+- `PostModelRequest`, `SessionStart`, `UserPromptSubmit`,
+  `SubagentStart`, `SubagentStop`, and `PreCompact` and `PostCompact`
+  during automatic compaction: before the run goes on.
+
+- `Stop`, `SessionEnd`: before the run finishes.
+
+A promise that is rejected, or has not settled in time, counts as no
+answer and is recorded as a hook error; for `PreToolUse` that denies the
+call. Deputy does not wait for `Notification` or `ConfigChange` hooks,
+for a hook fired by `$compact()`, or for `Stop` and `SessionEnd` when a
+run ends with an error or its stream is abandoned. With tools run
+concurrently, other tool calls of the same response may start or finish
+while a hook waits. If `$interrupt()` is called while a hook waits, or
+by the callback itself, the run stops when the hook answers, and a tool
+it was asked about does not run.
+
 ## Usage
 
 ``` r
@@ -29,6 +54,12 @@ fires.
 - `PostToolUseFailure(tool_name, tool_result, tool_error, context)`:
   after `PostToolUse`, when the tool failed.
 
+- `PostModelRequest(context)`: after each model request of a run, once
+  its response has arrived: the task's requests, a structured request,
+  and the summary request of an automatic compaction. It needs ellmer's
+  request callbacks, so a stand-in for a Chat that lacks them never
+  fires it.
+
 - `PermissionRequest(tool_name, tool_input, permission_result, context)`:
   when the permission policy denies a call.
 
@@ -37,9 +68,12 @@ fires.
 - `UserPromptSubmit(prompt, context)`: at the start of each run, after
   `SessionStart`.
 
-- `Stop(reason, context)`: at the end of each run.
+- `Stop(reason, context)`: at each stop of a run. A `Stop` hook may
+  return
+  [`HookResultStop()`](https://jameshwade.github.io/deputy/reference/HookResultStop.md)
+  to send an answered run on, so a run can stop more than once.
 
-- `SessionEnd(reason, context)`: at the end of each run, after `Stop`.
+- `SessionEnd(reason, context)`: once, when the run has ended.
 
 - `SubagentStart(agent_name, task, context)`: when a subagent starts a
   delegated task.
@@ -67,7 +101,7 @@ subagent's result for `SubagentStop` and the
 [DeputyCompaction](https://jameshwade.github.io/deputy/reference/DeputyCompaction.md)
 for `PostCompact`. For `ConfigChange`, `key` is `"permission_mode"`.
 
-Four events use the callback's return value:
+Five events use the callback's return value:
 
 - `PreToolUse`: return
   [`HookResultPreToolUse()`](https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.md)
@@ -86,6 +120,15 @@ Four events use the callback's return value:
 - `PreCompact`: return
   [`HookResultPreCompact()`](https://jameshwade.github.io/deputy/reference/HookResultPreCompact.md)
   to cancel compaction or to supply your own summary.
+
+- `Stop`: return
+  [`HookResultStop()`](https://jameshwade.github.io/deputy/reference/HookResultStop.md)
+  to send the run on.
+
+A run that is sent on keeps its run ID, its limits and its usage. The
+result's `response` is the text of the last pass, and its `turns` hold
+every pass. Only an answered run is sent on, and a run that extracts
+structured output with `$chat_structured()` never is.
 
 Other events ignore the return value. Returning `NULL` means "no
 decision".
@@ -113,14 +156,26 @@ Some events add fields:
   so far and its
   [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md).
 
+- `usage`, `usage_limits`, `request_number` (PostModelRequest): the
+  run's
+  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
+  so far, its
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  and the request's number in the run.
+
 - `tool_annotations`, `tool_arguments`, `tool_metadata` (PreToolUse,
   PermissionRequest): the tool's annotations, declared arguments and
   [`tool_metadata()`](https://jameshwade.github.io/deputy/reference/tool_metadata.md),
   when available.
 
-- `usage`, `cost` (Stop, SessionEnd): the run's
-  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)
-  and the conversation's cost, as returned by `agent$cost()`.
+- `usage`, `cost`, `ending` (Stop, SessionEnd): the run's
+  [AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md),
+  the conversation's cost, as returned by `agent$cost()`, and the run's
+  [RunEnding](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  as it stands.
+
+- `stop_hook_active` (Stop): `TRUE` when a hook has already sent this
+  run on.
 
 - `total_turns`, `compact_count` (PreCompact, PostCompact): the number
   of turns in the conversation and the number being summarised.

@@ -21,7 +21,8 @@ AgentDefinition(
   mcp_servers = NULL,
   initial_prompt = NULL,
   max_requests = NULL,
-  permission_mode = NULL
+  permission_mode = NULL,
+  params = list()
 )
 
 agent_definition(
@@ -36,7 +37,8 @@ agent_definition(
   mcp_servers = NULL,
   initial_prompt = NULL,
   max_requests = NULL,
-  permission_mode = NULL
+  permission_mode = NULL,
+  params = list()
 )
 ```
 
@@ -107,6 +109,18 @@ agent_definition(
   Permission mode for the subagent; defaults to the lead's. It can
   otherwise only be `"readonly"`, unless the lead's mode is `"full"`.
   Use `disallowed_tools` and `max_requests` for finer limits.
+
+- params:
+
+  Request parameters for the subagent's model, made with
+  [`ellmer::params()`](https://ellmer.tidyverse.org/reference/params.html),
+  such as `ellmer::params(reasoning_effort = "low")`. They apply to a
+  `"provider/model"` model. A copy of the lead's chat (`"inherit"` or a
+  bare model id) keeps the lead's parameters, so a definition with
+  `params` and such a model needs a lead whose
+  [DelegationPolicy](https://jameshwade.github.io/deputy/reference/DelegationPolicy.md)
+  has a `chat` function, which receives the definition and applies them.
+  `extra_args` aren't supported.
 
 ## Value
 

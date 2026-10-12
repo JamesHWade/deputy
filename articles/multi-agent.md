@@ -115,6 +115,31 @@ delegates several tasks in one turn, they can run concurrently.
   [`ellmer::chat()`](https://ellmer.tidyverse.org/reference/chat-any.html).
   Use this form for model ids that contain `/`.
 
+`params` sets the subagent’s request parameters, such as its reasoning
+effort, with
+[`ellmer::params()`](https://ellmer.tidyverse.org/reference/params.html):
+
+``` r
+
+researcher <- agent_definition(
+  name = "researcher",
+  description = "Searches the literature",
+  prompt = "Find and summarise relevant papers.",
+  model = "openai/gpt-6-luna",
+  params = ellmer::params(reasoning_effort = "low")
+)
+```
+
+`params` applies to a `"provider/model"` model. A copy of the lead’s
+chat (`"inherit"` or a bare model id) keeps the lead’s parameters, so a
+definition with `params` and one of those models is refused unless the
+lead’s
+[`DelegationPolicy()`](https://jameshwade.github.io/deputy/reference/DelegationPolicy.md)
+has a `chat` function that builds each subagent’s chat (see
+[`vignette("delegation")`](https://jameshwade.github.io/deputy/articles/delegation.md)).
+`$get_subagent_contexts()` shows the provider, model and parameters each
+subagent started with.
+
 ## Permissions and budgets
 
 A subagent can never do more than its lead. Deputy combines the

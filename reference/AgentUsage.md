@@ -22,7 +22,8 @@ AgentUsage(
   input_tokens = 0,
   output_tokens = 0,
   cached_tokens = 0,
-  cost_usd = 0
+  cost_usd = 0,
+  known_cost_usd = NULL
 )
 ```
 
@@ -54,6 +55,12 @@ AgentUsage(
   Estimated cost in US dollars, or `NA_real_` if the cost of some
   responses is unknown.
 
+- known_cost_usd:
+
+  The cost of the responses whose cost is known. When `cost_usd` is
+  known this is ignored: the known cost is `cost_usd`. When `cost_usd`
+  is `NA_real_`, it is a lower bound and `NULL` (the default) means `0`.
+
 ## Value
 
 An `AgentUsage` object.
@@ -63,6 +70,10 @@ An `AgentUsage` object.
 - `@total_tokens`:
 
   `input_tokens + output_tokens`.
+
+- `@known_cost_usd`:
+
+  The cost of the responses whose cost is known.
 
 ## Examples
 
@@ -104,5 +115,8 @@ S7::props(usage)
 #> 
 #> $cost_usd
 #> [1] NA
+#> 
+#> $known_cost_usd
+#> [1] 0
 #> 
 ```

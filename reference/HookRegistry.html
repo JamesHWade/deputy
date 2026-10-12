@@ -11,7 +11,7 @@ agent$add_hook()."><meta property="og:image" content="https://jameshwade.github.
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -84,7 +84,9 @@ Each agent has its own registry in <code>agent$hooks</code>; add hooks with
 <li><p><a href="#method-HookRegistry-add"><code>HookRegistry$add()</code></a></p></li>
 <li><p><a href="#method-HookRegistry-get_hooks"><code>HookRegistry$get_hooks()</code></a></p></li>
 <li><p><a href="#method-HookRegistry-fire"><code>HookRegistry$fire()</code></a></p></li>
+<li><p><a href="#method-HookRegistry-reserve_fire_id"><code>HookRegistry$reserve_fire_id()</code></a></p></li>
 <li><p><a href="#method-HookRegistry-last_errors"><code>HookRegistry$last_errors()</code></a></p></li>
+<li><p><a href="#method-HookRegistry-errors_from"><code>HookRegistry$errors_from()</code></a></p></li>
 <li><p><a href="#method-HookRegistry-clear_errors"><code>HookRegistry$clear_errors()</code></a></p></li>
 <li><p><a href="#method-HookRegistry-count"><code>HookRegistry$count()</code></a></p></li>
 <li><p><a href="#method-HookRegistry-print"><code>HookRegistry$print()</code></a></p></li>
@@ -142,7 +144,9 @@ Each agent has its own registry in <code>agent$hooks</code>; add hooks with
 <p></p><hr><a id="method-HookRegistry-fire"></a><div class="section">
 <h3 id="hookregistry-fire-"><code>HookRegistry$fire()</code><a class="anchor" aria-label="anchor" href="#hookregistry-fire-"></a></h3>
 <p>Run the matching hooks in the order they were added and return the
-first non-<code>NULL</code> result. Later hooks don't run.</p>
+first non-<code>NULL</code> result. Later hooks don't run. When a callback returns
+a promise, later hooks wait for it, and the promise <code>fire()</code> returns
+resolves to that result.</p>
 <p>A failing callback is recorded in <code>last_errors()</code>. For PreToolUse the
 failure denies the tool call; for other events it is reported and the
 next hook runs.</p><div class="section">
@@ -164,22 +168,58 @@ passed to the callback.</p></dd>
 </dl><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-2">Returns<a class="anchor" aria-label="anchor" href="#returns-2"></a></h4>
-<p>The first non-<code>NULL</code> result, or <code>NULL</code>.</p>
+<p>The first non-<code>NULL</code> result, or <code>NULL</code>. A promise of it when a
+callback returned a promise.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-HookRegistry-reserve_fire_id"></a><div class="section">
+<h3 id="hookregistry-reserve-fire-id-"><code>HookRegistry$reserve_fire_id()</code><a class="anchor" aria-label="anchor" href="#hookregistry-reserve-fire-id-"></a></h3>
+<p>Reserve the ID of the next <code>fire()</code> call, so that its errors can be
+found afterwards with <code>errors_from()</code>. Call it immediately before
+<code>fire()</code>.</p><div class="section">
+<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">HookRegistry</span><span class="op">$</span><span class="fu">reserve_fire_id</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
+<p>The ID, an integer.</p>
 </div>
 
 </div>
 
 <p></p><hr><a id="method-HookRegistry-last_errors"></a><div class="section">
 <h3 id="hookregistry-last-errors-"><code>HookRegistry$last_errors()</code><a class="anchor" aria-label="anchor" href="#hookregistry-last-errors-"></a></h3>
-<p>Get the errors raised by hook callbacks since the registry was created
+<p>Get the errors hook callbacks have raised since the registry was created
 or last cleared. Use it to check logging hooks, whose failures don't
 stop the run.</p><div class="section">
-<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
+<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">HookRegistry</span><span class="op">$</span><span class="fu">last_errors</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
-<p>A list of records with <code>event</code>, <code>tool_name</code>, <code>error</code> and
-<code>timestamp</code>.</p>
+<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
+<p>A list of records with <code>event</code>, <code>tool_name</code>, <code>error</code>,
+<code>timestamp</code> and <code>fire_id</code>, the ID of the <code>fire()</code> call that raised
+the error.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-HookRegistry-errors_from"></a><div class="section">
+<h3 id="hookregistry-errors-from-"><code>HookRegistry$errors_from()</code><a class="anchor" aria-label="anchor" href="#hookregistry-errors-from-"></a></h3>
+<p>Get the errors raised by one <code>fire()</code> call, including those of promises
+that settled later.</p><div class="section">
+<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">HookRegistry</span><span class="op">$</span><span class="fu">errors_from</span><span class="op">(</span><span class="va">fire_id</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-3">Arguments<a class="anchor" aria-label="anchor" href="#arguments-3"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>fire_id</code></dt>
+<dd><p>An ID from <code>reserve_fire_id()</code>.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
+<p>A list of records, as <code>last_errors()</code> returns.</p>
 </div>
 
 </div>
@@ -187,7 +227,7 @@ stop the run.</p><div class="section">
 <p></p><hr><a id="method-HookRegistry-clear_errors"></a><div class="section">
 <h3 id="hookregistry-clear-errors-"><code>HookRegistry$clear_errors()</code><a class="anchor" aria-label="anchor" href="#hookregistry-clear-errors-"></a></h3>
 <p>Clear the recorded errors.</p><div class="section">
-<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
+<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">HookRegistry</span><span class="op">$</span><span class="fu">clear_errors</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -196,10 +236,10 @@ stop the run.</p><div class="section">
 <p></p><hr><a id="method-HookRegistry-count"></a><div class="section">
 <h3 id="hookregistry-count-"><code>HookRegistry$count()</code><a class="anchor" aria-label="anchor" href="#hookregistry-count-"></a></h3>
 <p>Get the number of registered hooks.</p><div class="section">
-<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
+<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">HookRegistry</span><span class="op">$</span><span class="fu">count</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
+<h4 id="returns-6">Returns<a class="anchor" aria-label="anchor" href="#returns-6"></a></h4>
 <p>An integer.</p>
 </div>
 
@@ -208,7 +248,7 @@ stop the run.</p><div class="section">
 <p></p><hr><a id="method-HookRegistry-print"></a><div class="section">
 <h3 id="hookregistry-print-"><code>HookRegistry$print()</code><a class="anchor" aria-label="anchor" href="#hookregistry-print-"></a></h3>
 <p>Print the registry.</p><div class="section">
-<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
+<h4 id="usage-9">Usage<a class="anchor" aria-label="anchor" href="#usage-9"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">HookRegistry</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 
@@ -217,10 +257,10 @@ stop the run.</p><div class="section">
 <p></p><hr><a id="method-HookRegistry-clone"></a><div class="section">
 <h3 id="hookregistry-clone-"><code>HookRegistry$clone()</code><a class="anchor" aria-label="anchor" href="#hookregistry-clone-"></a></h3>
 <p>The objects of this class are cloneable with this method.</p><div class="section">
-<h4 id="usage-8">Usage<a class="anchor" aria-label="anchor" href="#usage-8"></a></h4>
+<h4 id="usage-10">Usage<a class="anchor" aria-label="anchor" href="#usage-10"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">HookRegistry</span><span class="op">$</span><span class="fu">clone</span><span class="op">(</span>deep <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="arguments-3">Arguments<a class="anchor" aria-label="anchor" href="#arguments-3"></a></h4>
+<h4 id="arguments-4">Arguments<a class="anchor" aria-label="anchor" href="#arguments-4"></a></h4>
 <p></p><div class="arguments"><dl><dt><code>deep</code></dt>
 <dd><p>Whether to make a deep clone.</p></dd>
 

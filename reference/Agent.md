@@ -39,8 +39,10 @@ would exceed the checkpoint size limits is refused.
 
   The host conversation the agent is answering in, or `NULL`.
   shinychat's `chat_server()` sets it before each reply; set it yourself
-  before starting a run outside a reply. Each delegation keeps the value
-  it had when the delegation started, so
+  before starting a run outside a reply. Emptying the conversation with
+  `$set_turns(list())`, as shinychat does for a new chat, sets it back
+  to `NULL`. Each delegation keeps the value it had when the delegation
+  started, so
   [`subagent_chat_history()`](https://jameshwade.github.io/deputy/reference/subagent_chat_history.md)
   can save a conversation's subagents with it. It isn't sent to the
   model.
@@ -1299,7 +1301,8 @@ permissions, hooks and usage limits applied.
       stream = c("text", "content"),
       controller = NULL,
       run_context = list(),
-      type = NULL
+      type = NULL,
+      usage_limits = NULL
     )
 
 #### Arguments
@@ -1328,6 +1331,11 @@ permissions, hooks and usage limits applied.
   the provider can't stream structured output, use `$chat_structured()`
   instead.
 
+- `usage_limits`:
+
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  for this run. `NULL` fields use the agent's limits.
+
 #### Returns
 
 A generator.
@@ -1348,7 +1356,8 @@ usage limits and compaction applied.
       stream = c("text", "content"),
       controller = NULL,
       run_context = list(),
-      type = NULL
+      type = NULL,
+      usage_limits = NULL
     )
 
 #### Arguments
@@ -1383,10 +1392,18 @@ usage limits and compaction applied.
   the provider can't stream structured output, use `$chat_structured()`
   instead.
 
+- `usage_limits`:
+
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  for this run. `NULL` fields use the agent's limits.
+
 #### Returns
 
 An asynchronous generator suitable for
 [`shinychat::chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html).
+[`stream_result()`](https://jameshwade.github.io/deputy/reference/stream_result.md)
+gives a promise of this run's
+[AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md).
 
 ------------------------------------------------------------------------
 
@@ -2100,6 +2117,10 @@ request or before the next tool call. An
 call in progress is stopped by closing its connection, which loses the
 server's session state.
 
+A stream that has been made but not yet read has not started, so it is
+stopped when it starts, without a model request. So is every other
+stream of this agent that is waiting to start.
+
 #### Usage
 
     Agent$interrupt(reason = "interrupted")
@@ -2112,7 +2133,8 @@ server's session state.
 
 #### Returns
 
-`TRUE`, invisibly, if anything was running.
+`TRUE`, invisibly, if anything was running or a stream made but not yet
+read was waiting to start; `FALSE` otherwise.
 
 ------------------------------------------------------------------------
 

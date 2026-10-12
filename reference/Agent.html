@@ -23,7 +23,7 @@ working_dir, are read-only afterwards."><meta property="og:image" content="https
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -118,10 +118,11 @@ exceed the checkpoint size limits is refused.</p>
     <dt><code>conversation_id</code></dt>
 <dd><p>The host conversation the agent is answering
 in, or <code>NULL</code>. shinychat's <code>chat_server()</code> sets it before each reply;
-set it yourself before starting a run outside a reply. Each delegation
-keeps the value it had when the delegation started, so
-<code><a href="subagent_chat_history.html">subagent_chat_history()</a></code> can save a conversation's subagents with it.
-It isn't sent to the model.</p></dd>
+set it yourself before starting a run outside a reply. Emptying the
+conversation with <code>$set_turns(list())</code>, as shinychat does for a new
+chat, sets it back to <code>NULL</code>. Each delegation keeps the value it had
+when the delegation started, so <code><a href="subagent_chat_history.html">subagent_chat_history()</a></code> can save a
+conversation's subagents with it. It isn't sent to the model.</p></dd>
 
 
     <dt><code>run_context</code></dt>
@@ -1151,7 +1152,8 @@ permissions, hooks and usage limits applied.</p><div class="section">
 <span>  stream <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"text"</span>, <span class="st">"content"</span><span class="op">)</span>,</span>
 <span>  controller <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  type <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  type <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-21">Arguments<a class="anchor" aria-label="anchor" href="#arguments-21"></a></h4>
@@ -1175,6 +1177,10 @@ this run.</p></dd>
 ellmer. If the provider can't stream structured output, use
 <code>$chat_structured()</code> instead.</p></dd>
 
+      <dt><code>usage_limits</code></dt>
+<dd><p><a href="UsageLimits.html">UsageLimits</a> for this run. <code>NULL</code> fields use the
+agent's limits.</p></dd>
+
 
 </dl><p></p></div>
 </div><p></p><div class="section">
@@ -1196,7 +1202,8 @@ usage limits and compaction applied.</p><div class="section">
 <span>  stream <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"text"</span>, <span class="st">"content"</span><span class="op">)</span>,</span>
 <span>  controller <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  type <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  type <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  usage_limits <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments-22">Arguments<a class="anchor" aria-label="anchor" href="#arguments-22"></a></h4>
@@ -1225,11 +1232,16 @@ this run.</p></dd>
 ellmer. If the provider can't stream structured output, use
 <code>$chat_structured()</code> instead.</p></dd>
 
+      <dt><code>usage_limits</code></dt>
+<dd><p><a href="UsageLimits.html">UsageLimits</a> for this run. <code>NULL</code> fields use the
+agent's limits.</p></dd>
+
 
 </dl><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-25">Returns<a class="anchor" aria-label="anchor" href="#returns-25"></a></h4>
-<p>An asynchronous generator suitable for <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">shinychat::chat_append()</a></code>.</p>
+<p>An asynchronous generator suitable for <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">shinychat::chat_append()</a></code>.
+<code><a href="stream_result.html">stream_result()</a></code> gives a promise of this run's <a href="AgentResult.html">AgentResult</a>.</p>
 </div>
 
 </div>
@@ -1874,7 +1886,10 @@ model asked for. Compaction summary requests aren't included; see
 <p>The run stops as soon as ellmer allows, usually during the current model
 request or before the next tool call. An <a href="McpConnection.html">McpConnection</a> call in progress
 is stopped by closing its connection, which loses the server's session
-state.</p><div class="section">
+state.</p>
+<p>A stream that has been made but not yet read has not started, so it is
+stopped when it starts, without a model request. So is every other
+stream of this agent that is waiting to start.</p><div class="section">
 <h4 id="usage-58">Usage<a class="anchor" aria-label="anchor" href="#usage-58"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">interrupt</span><span class="op">(</span>reason <span class="op">=</span> <span class="st">"interrupted"</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
@@ -1887,7 +1902,8 @@ result.</p></dd>
 </dl><p></p></div>
 </div><p></p><div class="section">
 <h4 id="returns-58">Returns<a class="anchor" aria-label="anchor" href="#returns-58"></a></h4>
-<p><code>TRUE</code>, invisibly, if anything was running.</p>
+<p><code>TRUE</code>, invisibly, if anything was running or a stream made but
+not yet read was waiting to start; <code>FALSE</code> otherwise.</p>
 </div>
 
 </div>

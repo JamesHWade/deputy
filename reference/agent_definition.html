@@ -13,7 +13,7 @@ definition."><meta property="og:image" content="https://jameshwade.github.io/dep
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -91,7 +91,8 @@ definition.</p>
 <span>  mcp_servers <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  initial_prompt <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_requests <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  permission_mode <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  permission_mode <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  params <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">agent_definition</span><span class="op">(</span></span>
@@ -106,7 +107,8 @@ definition.</p>
 <span>  mcp_servers <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  initial_prompt <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_requests <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  permission_mode <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  permission_mode <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  params <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -177,6 +179,16 @@ budget of the lead's run also applies.</p></dd>
 <dd><p>Permission mode for the subagent; defaults to the
 lead's. It can otherwise only be <code>"readonly"</code>, unless the lead's mode is
 <code>"full"</code>. Use <code>disallowed_tools</code> and <code>max_requests</code> for finer limits.</p></dd>
+
+
+<dt id="arg-params">params<a class="anchor" aria-label="anchor" href="#arg-params"></a></dt>
+<dd><p>Request parameters for the subagent's model, made with
+<code><a href="https://ellmer.tidyverse.org/reference/params.html" class="external-link">ellmer::params()</a></code>, such as <code>ellmer::params(reasoning_effort = "low")</code>.
+They apply to a <code>"provider/model"</code> model. A copy of the lead's chat
+(<code>"inherit"</code> or a bare model id) keeps the lead's parameters, so a
+definition with <code>params</code> and such a model needs a lead whose
+<a href="DelegationPolicy.html">DelegationPolicy</a> has a <code>chat</code> function, which receives the definition
+and applies them. <code>extra_args</code> aren't supported.</p></dd>
 
 </dl></div>
     <div class="section level2">

@@ -4,12 +4,54 @@ When several hooks match an event, they run in the order they were added.
 The first callback that returns a non-NULL value decides the outcome, and
 the remaining hooks for that event don't run. If a PreToolUse callback
 errors or times out, the tool call is denied. Errors in other callbacks are
-reported and the run continues."><meta property="og:description" content="HookEvent lists the events you can attach a hook to with HookMatcher().
+reported and the run continues.
+A callback may return a promise of what it would have returned, so a hook
+can wait for a person, a model or a file. Deputy waits for the promise, up
+to the hook's promise_timeout, before it goes on:
+PreToolUse, PermissionRequest: before the tool runs.
+PostToolUse, PostToolUseFailure: before the next model request. The
+tool's result has already been recorded when the hook answers.
+PostModelRequest, SessionStart, UserPromptSubmit, SubagentStart,
+SubagentStop, and PreCompact and PostCompact during automatic
+compaction: before the run goes on.
+Stop, SessionEnd: before the run finishes.
+
+
+A promise that is rejected, or has not settled in time, counts as no answer
+and is recorded as a hook error; for PreToolUse that denies the call.
+Deputy does not wait for Notification or ConfigChange hooks, for a hook
+fired by $compact(), or for Stop and SessionEnd when a run ends with
+an error or its stream is abandoned. With tools run concurrently, other
+tool calls of the same response may start or finish while a hook waits. If
+$interrupt() is called while a hook waits, or by the callback itself, the
+run stops when the hook answers, and a tool it was asked about does not
+run."><meta property="og:description" content="HookEvent lists the events you can attach a hook to with HookMatcher().
 When several hooks match an event, they run in the order they were added.
 The first callback that returns a non-NULL value decides the outcome, and
 the remaining hooks for that event don't run. If a PreToolUse callback
 errors or times out, the tool call is denied. Errors in other callbacks are
-reported and the run continues."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
+reported and the run continues.
+A callback may return a promise of what it would have returned, so a hook
+can wait for a person, a model or a file. Deputy waits for the promise, up
+to the hook's promise_timeout, before it goes on:
+PreToolUse, PermissionRequest: before the tool runs.
+PostToolUse, PostToolUseFailure: before the next model request. The
+tool's result has already been recorded when the hook answers.
+PostModelRequest, SessionStart, UserPromptSubmit, SubagentStart,
+SubagentStop, and PreCompact and PostCompact during automatic
+compaction: before the run goes on.
+Stop, SessionEnd: before the run finishes.
+
+
+A promise that is rejected, or has not settled in time, counts as no answer
+and is recorded as a hook error; for PreToolUse that denies the call.
+Deputy does not wait for Notification or ConfigChange hooks, for a hook
+fired by $compact(), or for Stop and SessionEnd when a run ends with
+an error or its stream is abandoned. With tools run concurrently, other
+tool calls of the same response may start or finish while a hook waits. If
+$interrupt() is called while a hook waits, or by the callback itself, the
+run stops when the hook answers, and a tool it was asked about does not
+run."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -17,7 +59,7 @@ reported and the run continues."><meta property="og:image" content="https://jame
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -81,6 +123,24 @@ The first callback that returns a non-<code>NULL</code> value decides the outcom
 the remaining hooks for that event don't run. If a PreToolUse callback
 errors or times out, the tool call is denied. Errors in other callbacks are
 reported and the run continues.</p>
+<p>A callback may return a promise of what it would have returned, so a hook
+can wait for a person, a model or a file. Deputy waits for the promise, up
+to the hook's <code>promise_timeout</code>, before it goes on:</p><ul><li><p><code>PreToolUse</code>, <code>PermissionRequest</code>: before the tool runs.</p></li>
+<li><p><code>PostToolUse</code>, <code>PostToolUseFailure</code>: before the next model request. The
+tool's result has already been recorded when the hook answers.</p></li>
+<li><p><code>PostModelRequest</code>, <code>SessionStart</code>, <code>UserPromptSubmit</code>, <code>SubagentStart</code>,
+<code>SubagentStop</code>, and <code>PreCompact</code> and <code>PostCompact</code> during automatic
+compaction: before the run goes on.</p></li>
+<li><p><code>Stop</code>, <code>SessionEnd</code>: before the run finishes.</p></li>
+</ul><p>A promise that is rejected, or has not settled in time, counts as no answer
+and is recorded as a hook error; for <code>PreToolUse</code> that denies the call.
+Deputy does not wait for <code>Notification</code> or <code>ConfigChange</code> hooks, for a hook
+fired by <code>$compact()</code>, or for <code>Stop</code> and <code>SessionEnd</code> when a run ends with
+an error or its stream is abandoned. With tools run concurrently, other
+tool calls of the same response may start or finish while a hook waits. If
+<code>$interrupt()</code> is called while a hook waits, or by the callback itself, the
+run stops when the hook answers, and a tool it was asked about does not
+run.</p>
     </div>
 
     <div class="section level2">
@@ -100,13 +160,19 @@ the permission policy has allowed it.</p></li>
 call finishes, whether or not it failed.</p></li>
 <li><p><code>PostToolUseFailure(tool_name, tool_result, tool_error, context)</code>: after
 <code>PostToolUse</code>, when the tool failed.</p></li>
+<li><p><code>PostModelRequest(context)</code>: after each model request of a run, once its
+response has arrived: the task's requests, a structured request, and the
+summary request of an automatic compaction. It needs ellmer's request
+callbacks, so a stand-in for a Chat that lacks them never fires it.</p></li>
 <li><p><code>PermissionRequest(tool_name, tool_input, permission_result, context)</code>:
 when the permission policy denies a call.</p></li>
 <li><p><code>SessionStart(context)</code>: at the start of each run.</p></li>
 <li><p><code>UserPromptSubmit(prompt, context)</code>: at the start of each run, after
 <code>SessionStart</code>.</p></li>
-<li><p><code>Stop(reason, context)</code>: at the end of each run.</p></li>
-<li><p><code>SessionEnd(reason, context)</code>: at the end of each run, after <code>Stop</code>.</p></li>
+<li><p><code>Stop(reason, context)</code>: at each stop of a run. A <code>Stop</code> hook may return
+<code><a href="HookResultStop.html">HookResultStop()</a></code> to send an answered run on, so a run can stop more
+than once.</p></li>
+<li><p><code>SessionEnd(reason, context)</code>: once, when the run has ended.</p></li>
 <li><p><code>SubagentStart(agent_name, task, context)</code>: when a subagent starts a
 delegated task.</p></li>
 <li><p><code>SubagentStop(agent_name, task, result, context)</code>: when a subagent
@@ -125,7 +191,7 @@ as a denied call.</p></li>
 <code>"hook_requested_stop"</code> or <code>"provider_error"</code>. <code>result</code> is the subagent's
 result for <code>SubagentStop</code> and the <a href="DeputyCompaction.html">DeputyCompaction</a> for <code>PostCompact</code>. For
 <code>ConfigChange</code>, <code>key</code> is <code>"permission_mode"</code>.</p>
-<p>Four events use the callback's return value:</p><ul><li><p><code>PreToolUse</code>: return <code><a href="HookResultPreToolUse.html">HookResultPreToolUse()</a></code> to allow or deny the call,
+<p>Five events use the callback's return value:</p><ul><li><p><code>PreToolUse</code>: return <code><a href="HookResultPreToolUse.html">HookResultPreToolUse()</a></code> to allow or deny the call,
 or to stop the run.</p></li>
 <li><p><code>PostToolUse</code>: return <code><a href="HookResultPostToolUse.html">HookResultPostToolUse()</a></code> to stop the run or to
 change what the <code>tool_end</code> event shows.</p></li>
@@ -133,7 +199,12 @@ change what the <code>tool_end</code> event shows.</p></li>
 anyway, or <code><a href="PermissionResultDeny.html">PermissionResultDeny()</a></code> to change the reason.</p></li>
 <li><p><code>PreCompact</code>: return <code><a href="HookResultPreCompact.html">HookResultPreCompact()</a></code> to cancel compaction or to
 supply your own summary.</p></li>
-</ul><p>Other events ignore the return value. Returning <code>NULL</code> means "no decision".</p>
+<li><p><code>Stop</code>: return <code><a href="HookResultStop.html">HookResultStop()</a></code> to send the run on.</p></li>
+</ul><p>A run that is sent on keeps its run ID, its limits and its usage. The
+result's <code>response</code> is the text of the last pass, and its <code>turns</code> hold
+every pass. Only an answered run is sent on, and a run that extracts
+structured output with <code>$chat_structured()</code> never is.</p>
+<p>Other events ignore the return value. Returning <code>NULL</code> means "no decision".</p>
     </div>
     <div class="section level2">
     <h2 id="context">Context<a class="anchor" aria-label="anchor" href="#context"></a></h2>
@@ -148,11 +219,17 @@ supply your own summary.</p></li>
 </ul><p>Some events add fields:</p><ul><li><p><code>tool_call_id</code>, <code>permission_mode</code>, <code>usage</code>, <code>usage_limits</code> (tool events):
 the call's ID, the permission mode, the run's <a href="AgentUsage.html">AgentUsage</a> so far and its
 <a href="UsageLimits.html">UsageLimits</a>.</p></li>
+<li><p><code>usage</code>, <code>usage_limits</code>, <code>request_number</code> (PostModelRequest): the run's
+<a href="AgentUsage.html">AgentUsage</a> so far, its <a href="UsageLimits.html">UsageLimits</a> and the request's number in the
+run.</p></li>
 <li><p><code>tool_annotations</code>, <code>tool_arguments</code>, <code>tool_metadata</code> (PreToolUse,
 PermissionRequest): the tool's annotations, declared arguments and
 <code><a href="tool_metadata.html">tool_metadata()</a></code>, when available.</p></li>
-<li><p><code>usage</code>, <code>cost</code> (Stop, SessionEnd): the run's <a href="AgentUsage.html">AgentUsage</a> and the
-conversation's cost, as returned by <code>agent$cost()</code>.</p></li>
+<li><p><code>usage</code>, <code>cost</code>, <code>ending</code> (Stop, SessionEnd): the run's <a href="AgentUsage.html">AgentUsage</a>, the
+conversation's cost, as returned by <code>agent$cost()</code>, and the run's
+<a href="RunEnding.html">RunEnding</a> as it stands.</p></li>
+<li><p><code>stop_hook_active</code> (Stop): <code>TRUE</code> when a hook has already sent this run
+on.</p></li>
 <li><p><code>total_turns</code>, <code>compact_count</code> (PreCompact, PostCompact): the number of
 turns in the conversation and the number being summarised.</p></li>
 <li><p><code>automatic</code> (PostCompact): <code>TRUE</code> when compaction ran automatically

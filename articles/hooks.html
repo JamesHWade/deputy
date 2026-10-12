@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -173,57 +173,61 @@ tells you whether a hook applies to a tool:</p>
 <td><code>tool_name, tool_result, tool_error, context</code></td>
 </tr>
 <tr class="even">
+<td><code>PostModelRequest</code></td>
+<td>after each model request of a run</td>
+<td><code>context</code></td>
+</tr>
+<tr class="odd">
 <td><code>PermissionRequest</code></td>
 <td>when the permission policy denies a call</td>
 <td><code>tool_name, tool_input, permission_result, context</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>SessionStart</code></td>
 <td>at the start of each run</td>
 <td><code>context</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>UserPromptSubmit</code></td>
 <td>at the start of each run, with the task</td>
 <td><code>prompt, context</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Stop</code></td>
-<td>at the end of each run</td>
+<td>at each stop of a run</td>
+<td><code>reason, context</code></td>
+</tr>
+<tr class="odd">
+<td><code>SessionEnd</code></td>
+<td>once, when the run has ended</td>
 <td><code>reason, context</code></td>
 </tr>
 <tr class="even">
-<td><code>SessionEnd</code></td>
-<td>at the end of each run, after <code>Stop</code>
-</td>
-<td><code>reason, context</code></td>
-</tr>
-<tr class="odd">
 <td><code>SubagentStart</code></td>
 <td>when a subagent starts a delegated task</td>
 <td><code>agent_name, task, context</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>SubagentStop</code></td>
 <td>when a subagent finishes</td>
 <td><code>agent_name, task, result, context</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>PreCompact</code></td>
 <td>before older turns are summarised</td>
 <td><code>turns_to_compact, turns_to_keep, context</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>PostCompact</code></td>
 <td>after a summary is installed</td>
 <td><code>result, context</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Notification</code></td>
 <td>when Deputy reports something, such as a denied call</td>
 <td><code>message, context</code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>ConfigChange</code></td>
 <td>when <code>set_permission_mode()</code> changes the mode</td>
 <td><code>key, old_value, new_value, context</code></td>
@@ -234,6 +238,22 @@ tells you whether a hook applies to a tool:</p>
 agent and run identifiers, and fields specific to the event, such as the
 tool’s annotations for <code>PreToolUse</code> or the run’s usage for
 <code>Stop</code>. <code><a href="../reference/HookEvent.html">?HookEvent</a></code> lists them all.</p>
+<p><code>Stop</code> and <code>SessionEnd</code> also get the run’s
+<code>ending</code> in <code>context</code>: a <code>RunEnding</code>
+value that says whether the run was answered, stopped, hit a limit, was
+cut off by the provider or failed. <code>PostModelRequest</code> gets
+the run’s usage so far, so you can show what a run is spending while it
+runs:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
+<span>  event <span class="op">=</span> <span class="st">"PostModelRequest"</span>,</span>
+<span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu">cli</span><span class="fu">::</span><span class="fu"><a href="https://cli.r-lib.org/reference/cli_alert.html" class="external-link">cli_alert_info</a></span><span class="op">(</span></span>
+<span>      <span class="st">"Request {context$request_number}: {context$usage$total_tokens} tokens so far"</span></span>
+<span>    <span class="op">)</span></span>
+<span>    <span class="cn">NULL</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="block-a-tool-call">Block a tool call<a class="anchor" aria-label="anchor" href="#block-a-tool-call"></a>
@@ -241,7 +261,7 @@ tool’s annotations for <code>PreToolUse</code> or the run’s usage for
 <p>A <code>PreToolUse</code> hook runs after the permission policy has
 allowed a call, and can still deny it. Return
 <code><a href="../reference/HookResultPreToolUse.html">HookResultPreToolUse()</a></code>:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">no_secrets</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PreToolUse"</span>,</span>
 <span>  pattern <span class="op">=</span> <span class="st">"^write_file$"</span>,</span>
@@ -263,7 +283,7 @@ policy denies never reach it.</p>
 <p>A <code>PermissionRequest</code> hook runs only when the policy
 denies a call, and can allow the call anyway. Use it to ask a person
 before running something the policy would refuse:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ask_before_code</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PermissionRequest"</span>,</span>
 <span>  pattern <span class="op">=</span> <span class="st">"^run_r_code$"</span>,</span>
@@ -287,7 +307,7 @@ permission policy.</p>
 <p><code>PostToolUse</code> hooks see each tool’s result or error.
 Return <code>HookResultPostToolUse(continue = FALSE)</code> to end the
 run after the current tool:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">stop_on_error</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
 <span>  event <span class="op">=</span> <span class="st">"PostToolUse"</span>,</span>
 <span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_result</span>, <span class="va">tool_error</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
@@ -303,18 +323,107 @@ and <code>stop_reason</code>. Both take <code>additional_context</code>,
 text that Deputy appends to the system prompt.</p>
 </div>
 <div class="section level2">
+<h2 id="check-an-answer-and-send-the-run-on">Check an answer and send the run on<a class="anchor" aria-label="anchor" href="#check-an-answer-and-send-the-run-on"></a>
+</h2>
+<p>A <code>Stop</code> hook sees a run that has just stopped. Return
+<code><a href="../reference/HookResultStop.html">HookResultStop()</a></code> to send an answered run on: Deputy asks
+the model again with your message, in the same run, so the run keeps its
+ID, its limits and its usage, and a stream carries on. This is how to
+check an answer and ask for a fix without starting a second run:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">needs_sources</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
+<span>  event <span class="op">=</span> <span class="st">"Stop"</span>,</span>
+<span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">reason</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="co"># Only an answered run, and only once.</span></span>
+<span>    <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/S7_inherits.html" class="external-link">S7_inherits</a></span><span class="op">(</span><span class="va">context</span><span class="op">$</span><span class="va">ending</span>, <span class="va">RunEndingAnswered</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span>
+<span>    <span class="op">}</span></span>
+<span>    <span class="kw">if</span> <span class="op">(</span><span class="va">context</span><span class="op">$</span><span class="va">stop_hook_active</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span>
+<span>    <span class="op">}</span></span>
+<span>    <span class="va">answer</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">last_turn</span><span class="op">(</span><span class="op">)</span><span class="op">@</span><span class="va">text</span></span>
+<span>    <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"Sources:"</span>, <span class="va">answer</span>, fixed <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="fu"><a href="../reference/HookResultStop.html">HookResultStop</a></span><span class="op">(</span><span class="st">"Add a 'Sources:' line listing what you read."</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="op">}</span></span>
+<span>    <span class="cn">NULL</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="va">needs_sources</span><span class="op">)</span></span></code></pre></div>
+<p><code>Stop</code> fires again when the run next stops, with
+<code>context$stop_hook_active</code> set to <code>TRUE</code>. Check
+it, as the hook above does, or the hook can send the run on for ever;
+the run’s limits are the only other thing that would stop it.
+<code>SessionEnd</code> fires once, when the run has really ended. Only
+an answered run is sent on: a run that was stopped, hit a limit or
+failed ends as it stands. The result’s <code>response</code> is the text
+of the last pass, and its <code>turns</code> hold them all.</p>
+</div>
+<div class="section level2">
+<h2 id="wait-for-something">Wait for something<a class="anchor" aria-label="anchor" href="#wait-for-something"></a>
+</h2>
+<p>A callback can return a promise of its result. Deputy waits for it
+before going on, so a hook can ask a person, call another model or read
+a file without blocking your R session:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">ask_reviewer</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/HookMatcher.html">HookMatcher</a></span><span class="op">(</span></span>
+<span>  event <span class="op">=</span> <span class="st">"PreToolUse"</span>,</span>
+<span>  pattern <span class="op">=</span> <span class="st">"^run_bash$"</span>,</span>
+<span>  promise_timeout <span class="op">=</span> <span class="fl">300</span>,</span>
+<span>  callback <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="co"># ask_someone() returns a promise that resolves to TRUE or FALSE.</span></span>
+<span>    <span class="fu">promises</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/promises/reference/then.html" class="external-link">then</a></span><span class="op">(</span><span class="fu">ask_someone</span><span class="op">(</span><span class="va">tool_input</span><span class="op">$</span><span class="va">command</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">approved</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="kw">if</span> <span class="op">(</span><span class="va">approved</span><span class="op">)</span> <span class="cn">NULL</span> <span class="kw">else</span> <span class="fu"><a href="../reference/HookResultPreToolUse.html">HookResultPreToolUse</a></span><span class="op">(</span><span class="st">"deny"</span>, reason <span class="op">=</span> <span class="st">"Not approved."</span><span class="op">)</span></span>
+<span>    <span class="op">}</span><span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p><code>promise_timeout</code> is how long Deputy waits, in seconds;
+the default is 60. A promise that is rejected or hasn’t settled by then
+counts as no answer and is recorded as a hook error, and for
+<code>PreToolUse</code> that denies the call. Where the wait happens
+depends on the event:</p>
+<ul>
+<li>
+<code>PreToolUse</code> and <code>PermissionRequest</code>: before
+the tool runs.</li>
+<li>
+<code>PostToolUse</code> and <code>PostToolUseFailure</code>: before
+the next model request. The tool’s result is already recorded when the
+hook answers.</li>
+<li>
+<code>PostModelRequest</code>, <code>SessionStart</code>,
+<code>UserPromptSubmit</code>, <code>SubagentStart</code>,
+<code>SubagentStop</code>, and <code>PreCompact</code> and
+<code>PostCompact</code> during automatic compaction: before the run
+goes on.</li>
+<li>
+<code>Stop</code> and <code>SessionEnd</code>: before the run
+finishes. While a <code>Stop</code> hook waits, the agent is still
+running, so it refuses a new run until the hook answers.</li>
+<li>
+<code>Notification</code> and <code>ConfigChange</code>, and any
+hook fired by <code>$compact()</code>: Deputy doesn’t wait.</li>
+</ul>
+<p>If you call <code>agent$interrupt()</code> while a hook is waiting,
+the run stops when the hook’s promise settles: a tool that was waiting
+doesn’t run, and a <code>Stop</code> hook’s answer no longer sends the
+run on. The same goes for a callback that calls
+<code>agent$interrupt()</code> itself: the tool it was asked about
+doesn’t run. Otherwise a hook that returns a plain value behaves as it
+always has.</p>
+</div>
+<div class="section level2">
 <h2 id="built-in-hooks">Built-in hooks<a class="anchor" aria-label="anchor" href="#built-in-hooks"></a>
 </h2>
 <p><code><a href="../reference/hook_log_tools.html">hook_log_tools()</a></code> prints a line after each tool call
 saying whether it succeeded. <code>verbose = TRUE</code> adds a short
 preview of the result:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/hook_log_tools.html">hook_log_tools</a></span><span class="op">(</span>verbose <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="../reference/hook_block_dangerous_bash.html">hook_block_dangerous_bash()</a></code> denies shell commands that
 match patterns such as <code>rm -rf</code>, <code>sudo</code> and
 <code>chmod 777</code>. Add your own patterns with
 <code>additional_patterns</code>:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">add_hook</span><span class="op">(</span><span class="fu"><a href="../reference/hook_block_dangerous_bash.html">hook_block_dangerous_bash</a></span><span class="op">(</span></span>
 <span>  additional_patterns <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"DROP\\s+TABLE"</span>, <span class="st">"TRUNCATE"</span><span class="op">)</span></span>
 <span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
@@ -337,7 +446,8 @@ might allow it. The built-in hooks return <code>NULL</code> unless they
 deny a call.</p>
 <p>If a <code>PreToolUse</code> hook throws an error, Deputy denies the
 tool call. An error in any other hook is reported and the run carries
-on. <code>agent$hooks$last_errors()</code> lists recent hook errors.</p>
+on. A promise that is rejected or times out is handled the same way.
+<code>agent$hooks$last_errors()</code> lists recent hook errors.</p>
 </div>
 <div class="section level2">
 <h2 id="run-a-hook-in-a-separate-process">Run a hook in a separate process<a class="anchor" aria-label="anchor" href="#run-a-hook-in-a-separate-process"></a>
@@ -347,7 +457,8 @@ your objects. Give <code><a href="../reference/HookMatcher.html">HookMatcher()</
 <code>timeout</code> (in seconds) to run the callback in a fresh R
 process that is killed if it takes too long. That process can’t see your
 session’s objects, so refer to package functions with <code>::</code>,
-for example <code><a href="../reference/HookResultPreToolUse.html">deputy::HookResultPreToolUse()</a></code>.</p>
+for example <code><a href="../reference/HookResultPreToolUse.html">deputy::HookResultPreToolUse()</a></code>. It can’t return
+a promise either.</p>
 </div>
 <div class="section level2">
 <h2 id="hooks-or-results">Hooks or results?<a class="anchor" aria-label="anchor" href="#hooks-or-results"></a>
@@ -356,7 +467,9 @@ for example <code><a href="../reference/HookResultPreToolUse.html">deputy::HookR
 afterwards, use the <code>AgentResult</code> instead:
 <code><a href="../reference/result_tool_calls.html">result_tool_calls()</a></code>, <code><a href="../reference/result_tool_results.html">result_tool_results()</a></code> and
 <code>result$events</code> hold the same information, without any hook
-state to manage.</p>
+state to manage, and <code>result$ending</code> says how the run ended.
+With <code>$stream_async()</code>, <code>stream_result(stream)</code>
+gives a promise of that result.</p>
 <p><a href="approvals.html">Human input and approvals</a> shows hooks
 that ask a person to approve a tool call before it runs.</p>
 </div>

@@ -1,8 +1,8 @@
 # Record what a subagent started with
 
 Holds what a subagent was given when a delegation started: the task,
-evidence, system prompt, first message, model, tool names, and its
-permission and context settings. A
+evidence, system prompt, first message, provider, model and request
+parameters, tool names, and its permission and context settings. A
 [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
 keeps one in memory for each delegation; read them with
 `$get_subagent_contexts()`. A manifest covers the starting point only,
@@ -22,7 +22,9 @@ DelegationManifest(
   tools,
   policies,
   size,
-  schema_version = 1L
+  provider = "",
+  params = list(),
+  schema_version = 2L
 )
 ```
 
@@ -76,9 +78,20 @@ DelegationManifest(
   `text_bytes`, `manifest_bytes` and `estimated_tokens` (`NULL` when
   unknown). The token count is an estimate, not a billed count.
 
+- provider:
+
+  The name of the subagent's provider, such as `"OpenAI"`.
+
+- params:
+
+  The request parameters set with
+  [`ellmer::params()`](https://ellmer.tidyverse.org/reference/params.html)
+  on the subagent's chat, such as `reasoning_effort`; `extra_args` are
+  left out.
+
 - schema_version:
 
-  Format version; must be `1L`.
+  Format version; must be `2L`.
 
 ## Value
 

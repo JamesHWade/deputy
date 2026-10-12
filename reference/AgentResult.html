@@ -7,6 +7,8 @@ session.
 Results are read-only. Read fields with $, for example
 result$response, or use result_n_turns(), result_tool_calls(),
 result_tool_results(), result_text_chunks() and result_is_success().
+ending says how the run ended in terms of its own classes, so a host need
+not parse stop_reason; see RunEnding.
 usage covers this run only, but cost covers the whole conversation,
 including earlier runs and turns that compaction removed from the model
 context."><meta property="og:description" content="An AgentResult describes one finished run. Agent$run_sync(),
@@ -17,6 +19,8 @@ session.
 Results are read-only. Read fields with $, for example
 result$response, or use result_n_turns(), result_tool_calls(),
 result_tool_results(), result_text_chunks() and result_is_success().
+ending says how the run ended in terms of its own classes, so a host need
+not parse stop_reason; see RunEnding.
 usage covers this run only, but cost covers the whole conversation,
 including earlier runs and turns that compaction removed from the model
 context."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
@@ -27,7 +31,7 @@ context."><meta property="og:image" content="https://jameshwade.github.io/deputy
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -93,6 +97,8 @@ session.</p>
 <p>Results are read-only. Read fields with <code>$</code>, for example
 <code>result$response</code>, or use <code><a href="result_n_turns.html">result_n_turns()</a></code>, <code><a href="result_tool_calls.html">result_tool_calls()</a></code>,
 <code><a href="result_tool_results.html">result_tool_results()</a></code>, <code><a href="result_text_chunks.html">result_text_chunks()</a></code> and <code><a href="result_is_success.html">result_is_success()</a></code>.</p>
+<p><code>ending</code> says how the run ended in terms of its own classes, so a host need
+not parse <code>stop_reason</code>; see <a href="RunEnding.html">RunEnding</a>.</p>
 <p><code>usage</code> covers this run only, but <code>cost</code> covers the whole conversation,
 including earlier runs and turns that compaction removed from the model
 context.</p>
@@ -117,7 +123,8 @@ context.</p>
 <span>  parent_agent_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  parent_run_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delegation_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  ending <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -167,6 +174,13 @@ subagent, to the parent run and delegation.</p></dd>
 
 <dt id="arg-run-context">run_context<a class="anchor" aria-label="anchor" href="#arg-run-context"></a></dt>
 <dd><p>The run's <code>run_context</code>, a named list.</p></dd>
+
+
+<dt id="arg-ending">ending<a class="anchor" aria-label="anchor" href="#arg-ending"></a></dt>
+<dd><p>How the run ended, as a <a href="RunEnding.html">RunEnding</a> object, or <code>NULL</code> to
+derive it from <code>stop_reason</code>. The five classes are <code><a href="RunEnding.html">RunEndingAnswered()</a></code>,
+<code><a href="RunEnding.html">RunEndingStopped()</a></code>, <code><a href="RunEnding.html">RunEndingLimit()</a></code>, <code><a href="RunEnding.html">RunEndingCutOff()</a></code> and
+<code><a href="RunEnding.html">RunEndingFailed()</a></code>.</p></dd>
 
 </dl></div>
     <div class="section level2">

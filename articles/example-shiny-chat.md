@@ -43,7 +43,11 @@ Create the agent inside `server()`, so that each browser session gets
 its own conversation, usage and hooks. shinychat calls the agent’s
 `stream_async()` method, passing text and attachments through unchanged,
 and handles the input box, cancellation and conversation history. After
-each reply, `agent$last_run()` returns the run’s `AgentResult`.
+each reply, `agent$last_run()` returns the run’s `AgentResult`, and its
+`ending` says how the run ended. If you call `stream_async()` yourself,
+`stream_result(stream)` gives a promise of that result. Pass
+`usage_limits` to `stream_async()` to limit one message differently from
+the rest.
 
 The limits apply to each message the user sends. The agent also keeps
 its [context

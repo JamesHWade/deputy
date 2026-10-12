@@ -24,8 +24,8 @@ A tool definition created with
 
 - edits:
 
-  A list of edits, or a JSON array. Each edit has `old_text`, `new_text`
-  and, optionally, `replace_all`.
+  A list of edits. Each edit is a list with `old_text`, `new_text` and,
+  optionally, `replace_all`.
 
 ## Value
 
@@ -40,6 +40,6 @@ tool_multi_edit(
   path,
   list(list(old_text = "alpha", new_text = "gamma"))
 )
-#> [1] "Successfully applied 1 edit(s) to /tmp/RtmpZ3IPuN/file1a5547c9868d.txt (1 total replacement)"
+#> [1] "Successfully applied 1 edit(s) to /tmp/RtmpHZtZ1y/file1a513760afb1.txt (1 total replacement)"
 unlink(path)
 ```

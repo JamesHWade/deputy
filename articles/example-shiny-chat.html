@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -136,7 +136,11 @@ session gets its own conversation, usage and hooks. shinychat calls the
 agent’s <code>stream_async()</code> method, passing text and attachments
 through unchanged, and handles the input box, cancellation and
 conversation history. After each reply, <code>agent$last_run()</code>
-returns the run’s <code>AgentResult</code>.</p>
+returns the run’s <code>AgentResult</code>, and its <code>ending</code>
+says how the run ended. If you call <code>stream_async()</code>
+yourself, <code>stream_result(stream)</code> gives a promise of that
+result. Pass <code>usage_limits</code> to <code>stream_async()</code> to
+limit one message differently from the rest.</p>
 <p>The limits apply to each message the user sends. The agent also keeps
 its <a href="conversations.html">context policy</a>: long conversations
 are compacted automatically, and large tool results are stored outside

@@ -22,9 +22,10 @@ set_ask_user_callback(callback)
 
   A function that takes `questions`, a list in which each question has
   `question`, `header`, `options` (each with `label` and `description`)
-  and `multiSelect`. It returns a named list mapping each question's
-  text to the chosen label; join several labels with `", "`. `NULL`
-  removes the callback.
+  and `multiSelect`. It returns a named list that maps each question's
+  text to a character vector of answers, as described in
+  [`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md).
+  `NULL` removes the callback.
 
 ## Value
 

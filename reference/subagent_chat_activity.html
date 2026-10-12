@@ -19,7 +19,7 @@ external resources removed from its HTML."><meta property="og:image" content="ht
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -88,7 +88,7 @@ external resources removed from its HTML.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">subagent_chat_activity</span><span class="op">(</span><span class="va">chat</span>, <span class="va">lead</span>, <span class="va">requester</span>, interval <span class="op">=</span> <span class="fl">100L</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">subagent_chat_activity</span><span class="op">(</span>chat <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">lead</span>, <span class="va">requester</span>, interval <span class="op">=</span> <span class="fl">100L</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -97,12 +97,13 @@ external resources removed from its HTML.</p>
 
 <dl><dt id="arg-chat">chat<a class="anchor" aria-label="anchor" href="#arg-chat"></a></dt>
 <dd><p>The value returned by <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">shinychat::chat_server()</a></code> for the lead's
-chat.</p></dd>
+chat, or <code>NULL</code> (the default) when your app streams the lead's replies
+into the chat itself.</p></dd>
 
 
 <dt id="arg-lead">lead<a class="anchor" aria-label="anchor" href="#arg-lead"></a></dt>
 <dd><p>The <a href="Agent.html">Agent</a> or <a href="LeadAgent.html">LeadAgent</a> given to <code>chat_server()</code> as its
-client.</p></dd>
+client, or whose replies your app streams into the chat.</p></dd>
 
 
 <dt id="arg-requester">requester<a class="anchor" aria-label="anchor" href="#arg-requester"></a></dt>
@@ -142,6 +143,12 @@ only when <code>requester</code> may see the subagents under the lead's
 subagent shows as not completed. Up to 256 calls appear per reply. Showing a
 call never runs it again. Needs shiny, shinychat (&gt;= 0.5.0), bslib,
 commonmark and xml2.</p>
+<p>If your app runs the lead's replies itself instead of through
+<code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">shinychat::chat_server()</a></code>, leave out <code>chat</code>. Stream
+<code>lead$stream_async(..., stream = "content")</code> into the chat with
+<code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">shinychat::chat_append()</a></code>: the cards arrive in that stream, and they are in
+<code>lead$get_turns()</code> for saving the conversation, for example with
+<code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_enable_history.html" class="external-link">shinychat::chat_enable_history()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

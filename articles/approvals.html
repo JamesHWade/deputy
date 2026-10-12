@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -112,8 +112,8 @@ edit its inputs before approving.</li>
 </h2>
 <p><code><a href="../reference/tools_interactive.html">tools_interactive()</a></code> returns an <code>ask_user</code>
 tool. The model sends one to four multiple-choice questions, and your
-handler returns the answers as a named list that maps each question to
-the chosen label:</p>
+handler returns the answers as a named list that maps each question’s
+text to the chosen label:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
@@ -136,8 +136,11 @@ answer instead of picking an option.</p>
 <p>Each question has <code>question</code>, a short <code>header</code>,
 two to four <code>options</code> (each with a <code>label</code> and
 <code>description</code>), and <code>multiSelect</code>. For a
-multi-select question, join the chosen labels with
-<code>", "</code>.</p>
+multi-select question, return the chosen labels as a character vector,
+such as <code>c("Tables", "Charts")</code>. Any string that isn’t one of
+the labels is passed on as the person’s own answer; give at most one per
+question. The model gets back, for each question, the
+<code>selected</code> labels and that <code>other_text</code>.</p>
 <p>A handler can answer in three ways:</p>
 <ul>
 <li>return the answers directly, as above;</li>

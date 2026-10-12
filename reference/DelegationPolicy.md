@@ -15,7 +15,8 @@ DelegationPolicy(
   resource_key = NULL,
   resources = NULL,
   human_input = NULL,
-  observers = character()
+  observers = character(),
+  chat = NULL
 )
 ```
 
@@ -55,7 +56,9 @@ DelegationPolicy(
   Optional `function(questions, context)` that answers `ask_user`
   questions from subagents whose definition includes that tool.
   `context` holds the subagent's IDs, the lead's `delegation_scope` and
-  the run context. Return the answers or a promise of them;
+  the run context. Return the answers, in the form described for
+  [`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md),
+  or a promise of them;
   [`AskUserDeferred()`](https://jameshwade.github.io/deputy/reference/AskUserDeferred.md)
   isn't supported. Without it, delegating to a definition with
   `ask_user` fails. Subagents never use
@@ -67,6 +70,25 @@ DelegationPolicy(
   fires them. The lead's `PreToolUse`, `PostToolUse` and
   `PostToolUseFailure` hooks always do. `PermissionRequest`,
   `SubagentStart` and `SubagentStop` can't be added.
+
+- chat:
+
+  Optional `function(definition, context)` that returns a new ellmer
+  chat for each subagent, including those started by
+  `$parallel_delegate()`. Use it to choose a subagent's provider, model,
+  credentials and request parameters yourself, for example to run a
+  subagent at a lower reasoning effort than the lead on a client you
+  build. `definition` is the subagent's
+  [AgentDefinition](https://jameshwade.github.io/deputy/reference/agent_definition.md),
+  including its `model` and `params`, which the function decides how to
+  use. `context` holds the delegation's IDs, the subagent's name and run
+  context, the lead's `delegation_scope` as `scope`, and the working
+  directory. Return a chat no agent is using, not the lead's. The
+  subagent runs on a copy of it, without its turns, tools and tool
+  callbacks, and with its own system prompt and tools. Without it,
+  Deputy copies the lead's chat or calls
+  [`ellmer::chat()`](https://ellmer.tidyverse.org/reference/chat-any.html),
+  as the definition's `model` says.
 
 ## Value
 

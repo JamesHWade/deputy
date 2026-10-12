@@ -18,4 +18,5 @@ result_is_success(result)
 ## Value
 
 `TRUE` if the stop reason is `"complete"`, meaning the model finished on
-its own. It doesn't check the answer.
+its own. It doesn't check the answer, and it is `TRUE` for an answer the
+provider cut short: the result's `ending` tells those apart.

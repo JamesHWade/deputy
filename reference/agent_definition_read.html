@@ -15,7 +15,7 @@ servers."><meta property="og:image" content="https://jameshwade.github.io/deputy
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -147,8 +147,10 @@ required; the other fields default as in <code><a href="agent_definition.html">a
 <code>skills</code> are lists of registry names, and <code>disallowed_tools</code>, <code>memory</code> and
 <code>mcp_servers</code> are lists of strings; a single string also works for a
 one-item list. <code>model</code>, <code>initial_prompt</code> and <code>permission_mode</code> are strings,
-and <code>max_requests</code> is a non-negative integer. <code>null</code> is allowed only for
-fields whose default is <code>NULL</code>.</p>
+and <code>max_requests</code> is a non-negative integer. <code>params</code> is a mapping of
+<code><a href="https://ellmer.tidyverse.org/reference/params.html" class="external-link">ellmer::params()</a></code> arguments to single values, except <code>stop_sequences</code>,
+which may be a list of strings; it is written only when the definition has
+parameters. <code>null</code> is allowed only for fields whose default is <code>NULL</code>.</p>
 <p>Unknown fields or versions, unknown tool or skill names, duplicate keys and
 <code>!expr</code> tags are errors. YAML guesses types, so quote strings such as
 <code>"yes"</code> or <code>"123"</code>. Files larger than 1 MiB are rejected.</p>

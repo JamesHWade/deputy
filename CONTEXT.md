@@ -37,6 +37,15 @@ model stops, a limit is reached, or it is interrupted. An Agent may
 perform many runs over its lifetime. *Avoid*: execution, invocation,
 call
 
+**Ending**: How a run ended: answered, stopped, hit a limit, cut off by
+the provider, or failed. A read-only S7 value on the run’s result that
+holds only what that ending has (ADR-0036). *Avoid*: outcome, status,
+stop reason (the string it replaces as the thing to act on)
+
+**Pass**: One stretch of a run from a model request to the next stop. A
+run has one pass unless a `Stop` hook sends it on. *Avoid*: round,
+attempt, second run
+
 **Turn**: A single exchange within a run — one model response and any
 tool calls it requested. *Avoid*: step, iteration, round
 

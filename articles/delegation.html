@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -226,6 +226,34 @@ connections.</p>
 <code>PostToolUseFailure</code> always run for subagent tool calls. List
 other events in <code>observers</code> to forward those too.</p>
 <div class="section level3">
+<h3 id="build-each-subagents-chat">Build each subagent’s chat<a class="anchor" aria-label="anchor" href="#build-each-subagents-chat"></a>
+</h3>
+<p>By default a subagent’s chat is a copy of the lead’s, or a new chat
+from <code><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">ellmer::chat()</a></code> when its definition names a
+<code>"provider/model"</code>. Give the policy a <code>chat</code>
+function to build it yourself, for example to keep your own provider,
+endpoint and credentials while running a subagent at a lower reasoning
+effort than the lead:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationPolicy.html">DelegationPolicy</a></span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">definition</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span></span>
+<span>      <span class="st">"openai/gpt-6-luna"</span>,</span>
+<span>      params <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/params.html" class="external-link">params</a></span><span class="op">(</span></span>
+<span>        reasoning_effort <span class="op">=</span> <span class="va">definition</span><span class="op">$</span><span class="va">params</span><span class="op">$</span><span class="va">reasoning_effort</span></span>
+<span>      <span class="op">)</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The function receives the definition, including its
+<code>model</code> and <code>params</code>, and the delegation’s
+identifiers. It must return a chat no agent is using, not the lead’s.
+The subagent runs on a copy of it, without its turns, tools and tool
+callbacks. If the function fails, the delegation fails before any
+request. It builds the chats for <code>$parallel_delegate()</code>
+too.</p>
+</div>
+<div class="section level3">
 <h3 id="subagents-that-ask-questions">Subagents that ask questions<a class="anchor" aria-label="anchor" href="#subagents-that-ask-questions"></a>
 </h3>
 <p>A subagent that should be able to ask the user something needs an
@@ -233,7 +261,7 @@ other events in <code>observers</code> to forward those too.</p>
 its definition) and a handler on the policy. The handler receives the
 subagent’s identifiers, so your app can route the question to the right
 place:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationPolicy.html">DelegationPolicy</a></span><span class="op">(</span></span>
 <span>  human_input <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">questions</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu">ask_in_app</span><span class="op">(</span></span>
@@ -273,7 +301,7 @@ you may want to show it to the user. <code>list_subagents()</code>,
 without any checks. The inspection methods below go through a
 <code>DelegationDisclosure</code>, which your app configures to decide
 who may see what:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">disclosure</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationDisclosure.html">DelegationDisclosure</a></span><span class="op">(</span></span>
 <span>  authorize <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">requester</span>, <span class="va">scope</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">requester</span><span class="op">$</span><span class="va">user_id</span>, <span class="va">scope</span><span class="op">$</span><span class="va">owner_id</span><span class="op">)</span></span>
@@ -309,7 +337,7 @@ display it.</p>
 as a plain list you can store, and <code><a href="../reference/delegation_history.html">delegation_history()</a></code>
 turns a stored list back into views, checking access again with the
 disclosure and scope you pass in:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">history</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">export_subagents</span><span class="op">(</span><span class="va">current_user</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">history</span>, <span class="st">"subagent-history.rds"</span><span class="op">)</span></span>
 <span></span>
@@ -330,7 +358,7 @@ stored separately because it was too long.</p>
 </h2>
 <p><code>observe_subagents()</code> returns a subscription that reads
 subagent activity as it happens, without slowing the subagents down:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">reader</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">observe_subagents</span><span class="op">(</span><span class="va">current_user</span><span class="op">)</span></span>
 <span><span class="va">reader</span><span class="op">$</span><span class="fu">snapshot</span><span class="op">(</span>transcript <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
@@ -362,7 +390,7 @@ you call it.</p>
 a strip of activity cards, one per delegation, and the selected
 subagent’s conversation, rendered with shinychat’s tool cards. The panel
 is read-only; it has no input box and can’t resume anything.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ui</span> <span class="op">&lt;-</span> <span class="fu">bslib</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/bslib/reference/page.html" class="external-link">page_fluid</a></span><span class="op">(</span></span>
 <span>  <span class="fu">bslib</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/bslib/reference/layout_columns.html" class="external-link">layout_columns</a></span><span class="op">(</span></span>
 <span>    <span class="fu">shinychat</span><span class="fu">::</span><span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_ui.html" class="external-link">chat_ui</a></span><span class="op">(</span><span class="st">"chat"</span><span class="op">)</span>,</span>
@@ -391,7 +419,7 @@ and xml2.</p>
 <p>The package includes a demo that needs no API key. It runs two
 specialists against a local test server and shows tool output, a plot, a
 failure, cancellation, revoked access and replayed history:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/runApp.html" class="external-link">runApp</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"examples"</span>, <span class="st">"subagent-chats"</span>, package <span class="op">=</span> <span class="st">"deputy"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
@@ -403,7 +431,7 @@ conversation. Each call appears as a tool card in the reply that
 delegated it, labelled with the subagent’s name, as it happens. A card
 looks as it did in the subagent’s chat, so a Commons table or plot still
 reads “Ran a trusted calculation”.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">shinychat</span><span class="fu">::</span><span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">chat_server</a></span><span class="op">(</span><span class="st">"chat"</span>, <span class="va">lead</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="../reference/subagent_chat_activity.html">subagent_chat_activity</a></span><span class="op">(</span><span class="va">chat</span>, <span class="va">lead</span>, requester <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="fu">current_user</span><span class="op">(</span><span class="va">session</span><span class="op">)</span><span class="op">)</span></span>
@@ -428,7 +456,7 @@ subagent resumes, and the lead’s model doesn’t see them. Pass the result
 to <code><a href="../reference/subagent_chat_ui.html">subagent_chat_server()</a></code> as <code>conversation</code> and
 the panel shows the subagents of the conversation that is open, saved or
 live:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">user</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="fu">current_user</span><span class="op">(</span><span class="va">session</span><span class="op">)</span></span>
 <span>  <span class="va">chat</span> <span class="op">&lt;-</span> <span class="fu">shinychat</span><span class="fu">::</span><span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">chat_server</a></span><span class="op">(</span><span class="st">"chat"</span>, <span class="va">lead</span><span class="op">)</span></span>

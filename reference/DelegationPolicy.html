@@ -11,7 +11,7 @@ LeadAgent$new(delegation_policy = ). See vignette("delegation").'><meta property
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -81,7 +81,8 @@ subagent events, and how subagents ask the user questions. Pass it as
 <span>  resource_key <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  resources <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  human_input <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  observers <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  observers <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -119,8 +120,9 @@ anything it created. Definitions with <code>mcp_servers</code> need this mode.</
 <dd><p>Optional <code>function(questions, context)</code> that answers
 <code>ask_user</code> questions from subagents whose definition includes that tool.
 <code>context</code> holds the subagent's IDs, the lead's <code>delegation_scope</code> and the
-run context. Return the answers or a promise of them; <code><a href="AskUserDeferred.html">AskUserDeferred()</a></code>
-isn't supported. Without it, delegating to a definition with <code>ask_user</code>
+run context. Return the answers, in the form described for
+<code><a href="tools_interactive.html">tools_interactive()</a></code>, or a promise of them; <code><a href="AskUserDeferred.html">AskUserDeferred()</a></code> isn't
+supported. Without it, delegating to a definition with <code>ask_user</code>
 fails. Subagents never use <code><a href="set_ask_user_callback.html">set_ask_user_callback()</a></code>.</p></dd>
 
 
@@ -129,6 +131,23 @@ fails. Subagents never use <code><a href="set_ask_user_callback.html">set_ask_us
 a subagent fires them. The lead's <code>PreToolUse</code>, <code>PostToolUse</code> and
 <code>PostToolUseFailure</code> hooks always do. <code>PermissionRequest</code>,
 <code>SubagentStart</code> and <code>SubagentStop</code> can't be added.</p></dd>
+
+
+<dt id="arg-chat">chat<a class="anchor" aria-label="anchor" href="#arg-chat"></a></dt>
+<dd><p>Optional <code>function(definition, context)</code> that returns a new
+ellmer chat for each subagent, including those started by
+<code>$parallel_delegate()</code>. Use it to choose a subagent's provider, model,
+credentials and request parameters yourself, for example to run a
+subagent at a lower reasoning effort than the lead on a client you build.
+<code>definition</code> is the subagent's <a href="agent_definition.html">AgentDefinition</a>,
+including its <code>model</code> and <code>params</code>, which the function decides how to
+use. <code>context</code> holds the delegation's IDs, the subagent's name and run
+context, the lead's <code>delegation_scope</code> as <code>scope</code>, and the working
+directory. Return a chat no agent is using, not the lead's. The
+subagent runs on a copy of it, without its turns, tools and tool
+callbacks, and with its own system prompt and tools. Without it,
+Deputy copies the lead's chat or calls <code><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">ellmer::chat()</a></code>, as the
+definition's <code>model</code> says.</p></dd>
 
 </dl></div>
     <div class="section level2">

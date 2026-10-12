@@ -18,16 +18,27 @@ A tool definition created with
 
 - questions:
 
-  A JSON string or list of 1 to 4 questions. Each has `question` (the
-  full text), `header` (a label of at most 12 characters), `options` (2
-  to 4, each with `label` and `description`) and, optionally,
-  `multiSelect`.
+  A list of 1 to 4 questions. Each has `question` (the full text),
+  `header` (a label of at most 12 characters), `options` (2 to 4, each
+  with `label` and `description`) and, optionally, `multiSelect` (`TRUE`
+  to allow several options). Every text is a non-empty string, no two
+  questions have the same text, and no two options of a question have
+  the same label. Questions that break these rules, or that arrive as a
+  string such as JSON text, are sent back to the model to fix.
 
 ## Value
 
-A list with the `questions` and a named `answers` list that maps each
-question's text to the chosen label. Several labels are joined with
-`", "`, and a person can also type their own answer.
+JSON text, which is what the model reads. It holds the `questions` and
+an `answers` array with one entry per question, in the same order:
+`question`, `selected` (an array of the chosen option labels, empty if
+none was chosen) and `other_text` (the answer the person typed instead
+of, or for a multi-select question as well as, choosing options; `null`
+if none). Read it in R with
+[`jsonlite::parse_json()`](https://jeroen.r-universe.dev/jsonlite/reference/read_json.html).
+If the handler returns
+[`AskUserDeferred()`](https://jameshwade.github.io/deputy/reference/AskUserDeferred.md),
+the result is instead a list with the `questions`, `status` `"deferred"`
+and `instructions` for the model.
 
 ## Details
 
@@ -39,6 +50,11 @@ session. With neither, the call errors. In a Shiny app, or anywhere
 several agents share one R process, use
 [`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md)
 to give each agent its own handler.
+
+At the [`readline()`](https://rdrr.io/r/base/readline.html) prompt, the
+person enters an option number, several numbers separated by commas for
+a multi-select question, or their own answer. A number that doesn't
+match an option asks again.
 
 ## See also
 

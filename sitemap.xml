@@ -51,6 +51,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/HookResultPostToolUse.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/HookResultPreCompact.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/HookResultPreToolUse.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/HookResultStop.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/LeadAgent.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/McpConnection.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/PermissionMode.html</loc></url>
@@ -59,6 +60,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/PermissionResultPending.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/Permissions.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/RSession.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/RunEnding.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/Skill.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/TrustedResults.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/UsageLimits.html</loc></url>
@@ -107,6 +109,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_create.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_load.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skills_list.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/stream_result.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/subagent_chat_activity.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/subagent_chat_history.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/subagent_chat_ui.html</loc></url>

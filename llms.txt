@@ -142,6 +142,15 @@ Create an agent, run a task, and inspect what happened.
   Agent that runs tasks with tools
 - [`AgentResult()`](https://jameshwade.github.io/deputy/reference/AgentResult.md)
   : Create an agent run result
+- [`RunEnding()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  [`RunEndingAnswered()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  [`RunEndingStopped()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  [`RunEndingLimit()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  [`RunEndingCutOff()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  [`RunEndingFailed()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  : How an agent run ended
+- [`stream_result()`](https://jameshwade.github.io/deputy/reference/stream_result.md)
+  : Get the result of a streamed run
 - [`result_is_success()`](https://jameshwade.github.io/deputy/reference/result_is_success.md)
   : Check whether a run completed
 - [`result_n_turns()`](https://jameshwade.github.io/deputy/reference/result_n_turns.md)
@@ -317,6 +326,8 @@ Run R code at fixed points in an agent’s lifecycle.
   : Create a PostToolUse hook result
 - [`HookResultPreCompact()`](https://jameshwade.github.io/deputy/reference/HookResultPreCompact.md)
   : Create a PreCompact hook result
+- [`HookResultStop()`](https://jameshwade.github.io/deputy/reference/HookResultStop.md)
+  : Create a Stop hook result
 - [`HookResult()`](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
   [`PermissionResult()`](https://jameshwade.github.io/deputy/reference/CallbackResult.md)
   : Hook and permission results

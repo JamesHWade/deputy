@@ -78,7 +78,11 @@ fields default as in
 `disallowed_tools`, `memory` and `mcp_servers` are lists of strings; a
 single string also works for a one-item list. `model`, `initial_prompt`
 and `permission_mode` are strings, and `max_requests` is a non-negative
-integer. `null` is allowed only for fields whose default is `NULL`.
+integer. `params` is a mapping of
+[`ellmer::params()`](https://ellmer.tidyverse.org/reference/params.html)
+arguments to single values, except `stop_sequences`, which may be a list
+of strings; it is written only when the definition has parameters.
+`null` is allowed only for fields whose default is `NULL`.
 
 Unknown fields or versions, unknown tool or skill names, duplicate keys
 and `!expr` tags are errors. YAML guesses types, so quote strings such

@@ -12,8 +12,9 @@ arrives, so a run can go over them by one response.
 
 Limits passed to `Agent$new()` apply to every run. Limits passed to a
 single run take any `NULL` field from the agent's limits, so they can't
-remove a limit the agent sets. Subagent runs are also capped by what is
-left of the lead's budget.
+remove a limit the agent sets. A single run keeps its own `on_exceed`
+and `on_unknown_cost`; the agent's values for those don't replace them.
+Subagent runs are also capped by what is left of the lead's budget.
 
 The object is read-only: read fields with `$` and create a new one to
 change a limit.
@@ -28,7 +29,8 @@ UsageLimits(
   max_output_tokens = NULL,
   max_total_tokens = NULL,
   max_cost_usd = NULL,
-  on_exceed = c("stop", "error")
+  on_exceed = c("stop", "error"),
+  on_unknown_cost = c("stop", "continue")
 )
 ```
 
@@ -60,7 +62,8 @@ UsageLimits(
 - max_cost_usd:
 
   Maximum estimated cost in US dollars. If the cost of a response is
-  unknown, the run stops with `"cost_unavailable"` rather than guessing.
+  unknown, the run stops with `"cost_unavailable"` rather than guessing,
+  unless `on_unknown_cost = "continue"`.
 
 - on_exceed:
 
@@ -72,6 +75,15 @@ UsageLimits(
   way, then signals an error that inherits from `deputy_budget` (see
   [deputy-errors](https://jameshwade.github.io/deputy/reference/deputy-errors.md)).
   The result is still available from `$last_run()`.
+
+- on_unknown_cost:
+
+  What happens when `max_cost_usd` is set and the cost of a response is
+  unknown. `"stop"` (the default) ends the run with
+  `"cost_unavailable"`. `"continue"` lets the run go on. The limit is
+  then checked against the cost that is known
+  ([AgentUsage](https://jameshwade.github.io/deputy/reference/AgentUsage.md)'s
+  `known_cost_usd`), and a subagent's budget is what that leaves.
 
 ## Value
 

@@ -184,7 +184,10 @@ recorded.
   `"cost_unavailable"` means you set a cost limit but ellmer couldn’t
   price the model, so Deputy stopped rather than guess.
   [`?UsageLimits`](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
-  lists every limit.
+  lists every limit. `result$ending` says the same as a value: whether
+  the run was answered, stopped, hit a limit, was cut off by the
+  provider or failed, with the details of each
+  ([`?RunEnding`](https://jameshwade.github.io/deputy/reference/RunEnding.md)).
 
 ## Next steps
 

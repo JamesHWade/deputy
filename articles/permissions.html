@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -455,15 +455,19 @@ usage, so a run can overshoot them by one response.</p>
 <p>Cost comes from ellmer’s price table. If you set
 <code>max_cost_usd</code> and ellmer can’t price the model, for example
 because the model is newer than your version of ellmer, the run stops
-with <code>"cost_unavailable"</code> rather than guess. Likewise,
-<code>result$cost$total</code> is <code>NA</code> whenever any response
-couldn’t be priced, and <code>result$cost$missing</code> counts those
-responses.</p>
+with <code>"cost_unavailable"</code> rather than guess. Set
+<code>UsageLimits(on_unknown_cost = "continue")</code> to let such a run
+go on: the limit is then checked against the cost that is known.
+Likewise, <code>result$cost$total</code> is <code>NA</code> whenever any
+response couldn’t be priced, and <code>result$cost$missing</code> counts
+those responses; <code>result$usage$known_cost_usd</code> is the cost of
+the ones that could.</p>
 <p>By default a limit returns an <code>AgentResult</code> with the
-reason in <code>stop_reason</code>. With
-<code>UsageLimits(on_exceed = "error")</code>, it signals an error
-instead, and <code>agent$last_run()</code> still holds the partial
-result.</p>
+reason in <code>stop_reason</code> and a <code>RunEndingLimit</code> in
+<code>ending</code>, which holds the figure reached and the figure
+allowed. With <code>UsageLimits(on_exceed = "error")</code>, it signals
+an error instead, and <code>agent$last_run()</code> still holds the
+partial result.</p>
 <p>Deputy also stops a run with <code>"tool_loop"</code> when the model
 makes the same tool call three times in a row and gets the same result
 each time.</p>

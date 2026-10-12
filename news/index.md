@@ -2,6 +2,150 @@
 
 ## deputy (development version)
 
+- [`subagent_chat_activity()`](https://jameshwade.github.io/deputy/reference/subagent_chat_activity.md)
+  and
+  [`subagent_chat_history()`](https://jameshwade.github.io/deputy/reference/subagent_chat_history.md)
+  work in apps that run the lead’s replies themselves instead of through
+  [`shinychat::chat_server()`](https://posit-dev.github.io/shinychat/r/reference/chat_app.html).
+  Leave out `chat`: subagent tool calls then appear in the lead’s
+  `$stream_async()` stream that the app appends to its chat, and
+  [`subagent_chat_history()`](https://jameshwade.github.io/deputy/reference/subagent_chat_history.md)
+  returns `on_save` and `on_restore` callbacks to pass to
+  [`shinychat::chat_enable_history()`](https://posit-dev.github.io/shinychat/r/reference/chat_enable_history.html).
+  Such an app sets `lead$conversation_id` before each reply, as
+  [`chat_server()`](https://posit-dev.github.io/shinychat/r/reference/chat_app.html)
+  does. Records are kept under that ID unless you pass
+  `conversation_id`, a function returning the open conversation’s ID
+  ([\#252](https://github.com/JamesHWade/deputy/issues/252)).
+
+- `Agent$set_turns(list())` sets `conversation_id` back to `NULL`, since
+  an emptied conversation is a new one. shinychat’s “new chat” does
+  this, so an app with its own loop no longer shows, or saves new
+  subagents under, the conversation it just left.
+
+- [`DelegationPolicy()`](https://jameshwade.github.io/deputy/reference/DelegationPolicy.md)
+  gains `chat`, a function that builds each subagent’s chat, so a host
+  can choose a subagent’s provider, credentials and request parameters,
+  for example a lower reasoning effort than the lead’s on its own
+  gateway client. It builds `$parallel_delegate()` responders’ chats too
+  ([\#237](https://github.com/JamesHWade/deputy/issues/237)).
+
+- [`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
+  gains `params`, request parameters made with
+  [`ellmer::params()`](https://ellmer.tidyverse.org/reference/params.html).
+  They apply to `"provider/model"` models and are saved in definition
+  files. A definition with `params` whose model copies the lead’s chat
+  needs a `DelegationPolicy(chat = )` function
+  ([\#237](https://github.com/JamesHWade/deputy/issues/237)).
+
+- `DelegationManifest` records the `provider` and `params` each subagent
+  started with, beside its model, and moves to schema version 2.
+
+- `ask_user` takes its questions as a typed array, not as JSON text; a
+  string goes back to the model with a request to send the array.
+  Questions are checked before anyone is asked: 1 to 4 questions with
+  different texts, 2 to 4 options with different labels, a header of at
+  most 12 characters, and every text a non-empty string. A question that
+  breaks a rule goes back to the model with what to fix, rather than
+  failing with an R error. A handler returns a named list keyed by each
+  question’s exact text, each value a character vector holding the
+  chosen labels and at most one answer the person typed; an ordinary
+  question takes one of these. The model receives, for each question in
+  order, `selected` (an array of the chosen labels) and `other_text`
+  (what the person typed, or `null`), and a tool called from R returns
+  that JSON text. Answers in any other shape are a handler error. At the
+  console, option numbers that don’t match an option, such as `1.5` or
+  `9`, are asked for again
+  ([\#218](https://github.com/JamesHWade/deputy/issues/218)).
+
+- `LeadAgent$register_sub_agent(replace = TRUE)` no longer adds a
+  newline to the lead’s system prompt each time it’s called. Replacing a
+  definition with an identical one leaves the prompt unchanged, so the
+  provider’s prompt cache stays valid
+  ([\#236](https://github.com/JamesHWade/deputy/issues/236)).
+
+- `multi_edit` takes `edits` as an array of objects with `old_text`,
+  `new_text` and an optional `replace_all`. It no longer accepts a JSON
+  string or the `old_string`, `new_string` and `replaceAll` names.
+  Parsing that string with
+  [`jsonlite::fromJSON()`](https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html)
+  read a string that wasn’t JSON as a file path or URL, so a model could
+  make the tool read a local file or fetch a URL. The `RSession` tool
+  bridge now reads its messages as JSON text only.
+
+- `AgentResult` has an `ending`: a `RunEnding` value that says how the
+  run ended and holds only what that ending has.
+  [`RunEndingAnswered()`](https://jameshwade.github.io/deputy/reference/RunEnding.md),
+  [`RunEndingStopped()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  (who stopped it and the reason they gave),
+  [`RunEndingLimit()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  (which limit and its figures),
+  [`RunEndingCutOff()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  (the provider’s finish reason) and
+  [`RunEndingFailed()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  (the error and where it came from). Every stop reason maps to exactly
+  one of them, so a host no longer parses `stop_reason`. An answer the
+  provider cut short keeps `stop_reason` `"complete"`; its ending is
+  where that shows. The `"stop"` event carries the ending too.
+
+- Hook callbacks may return a promise of their result. Deputy waits for
+  it, up to the hook’s new `promise_timeout` (60 seconds by default). A
+  promise that rejects or doesn’t settle in time is recorded as a hook
+  error and counts as no answer, which for `PreToolUse` denies the call.
+  A hook that returns a plain value behaves as before. `Notification`
+  and `ConfigChange` hooks, and `$compact()`, don’t wait. An
+  `$interrupt()` that arrives while a hook’s promise is pending takes
+  effect when the promise settles.
+
+- A run that has been stopped starts no more tools. A `PreToolUse`,
+  `PermissionRequest` or permission callback that calls `$interrupt()`
+  itself now stops the tool call it was asked about, a tool call that
+  comes in after a stop is refused, and a `SessionStart` callback that
+  interrupts keeps `UserPromptSubmit` from firing. The run was stopped
+  before, but the tool still ran. A hook’s own “stop after this tool”
+  still lets that tool run.
+
+- A `Stop` hook may return `HookResultStop(message)` to send an answered
+  run on: the model is asked again with `message` in the same run, with
+  the same run ID, limits, usage and stream. `Stop` now fires at each
+  stop of a run, with `context$stop_hook_active` set once a hook has
+  sent the run on, and `SessionEnd` fires once, when the run has ended.
+  Both contexts carry the run’s `ending`. The result’s `response` is the
+  last pass’s text.
+  [`approval_review_server()`](https://jameshwade.github.io/deputy/reference/approval_review_ui.md)
+  now refreshes on `SessionEnd`.
+
+- New hook event `PostModelRequest`, fired after each model request of a
+  run with the run’s usage so far (`context$usage`,
+  `context$usage_limits`, `context$request_number`), so a host can show
+  what a run is spending while it runs, tools or no tools. Structured
+  requests and the summary requests of automatic compaction count.
+
+- `$stream()` and `$stream_async()` take `usage_limits` for one run,
+  merged over the agent’s limits as `$run_async()` merges them.
+
+- [`UsageLimits()`](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
+  gains `on_unknown_cost`. `"continue"` lets a run with `max_cost_usd`
+  go on when the cost of a response is unknown. The limit is then
+  enforced against the new `AgentUsage` field `known_cost_usd`: the cost
+  of the responses whose cost is known. The budget a subagent or a
+  retained conversation is given is worked out from it too. A run that
+  was stopped or failed now reports the cost of the requests that
+  finished there, where `cost_usd` alone is `NA`.
+
+- [`stream_result()`](https://jameshwade.github.io/deputy/reference/stream_result.md)
+  takes the stream that `$stream_async()` returned and gives a promise
+  of that run’s `AgentResult`. It resolves when the run has finished,
+  however it ended, and is rejected when the run could not start.
+
+- `$interrupt()` called after `$stream_async()` but before the stream is
+  first read now stops the run when it starts. It was ignored, and the
+  run started.
+
+- Saved limits and usage records gain a field each, so a durable job
+  saved by an earlier version is refused when it is bound again, as a
+  job from any other version is.
+
 - `Agent$initialize()` with a different Chat drops the previous
   conversation’s subagent tool cards and pending activity, so they
   cannot appear in the new conversation or its saved session.

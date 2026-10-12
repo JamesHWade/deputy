@@ -16,6 +16,10 @@ Results are read-only. Read fields with `$`, for example
 and
 [`result_is_success()`](https://jameshwade.github.io/deputy/reference/result_is_success.md).
 
+`ending` says how the run ended in terms of its own classes, so a host
+need not parse `stop_reason`; see
+[RunEnding](https://jameshwade.github.io/deputy/reference/RunEnding.md).
+
 `usage` covers this run only, but `cost` covers the whole conversation,
 including earlier runs and turns that compaction removed from the model
 context.
@@ -40,7 +44,8 @@ AgentResult(
   parent_agent_id = NULL,
   parent_run_id = NULL,
   delegation_id = NULL,
-  run_context = list()
+  run_context = list(),
+  ending = NULL
 )
 ```
 
@@ -93,6 +98,19 @@ AgentResult(
 - run_context:
 
   The run's `run_context`, a named list.
+
+- ending:
+
+  How the run ended, as a
+  [RunEnding](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  object, or `NULL` to derive it from `stop_reason`. The five classes
+  are
+  [`RunEndingAnswered()`](https://jameshwade.github.io/deputy/reference/RunEnding.md),
+  [`RunEndingStopped()`](https://jameshwade.github.io/deputy/reference/RunEnding.md),
+  [`RunEndingLimit()`](https://jameshwade.github.io/deputy/reference/RunEnding.md),
+  [`RunEndingCutOff()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  and
+  [`RunEndingFailed()`](https://jameshwade.github.io/deputy/reference/RunEnding.md).
 
 ## Value
 

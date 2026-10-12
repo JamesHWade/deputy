@@ -8,8 +8,9 @@ Token and cost limits can only be checked after a response arrives, so a run
 can go over them by one response.
 Limits passed to Agent$new() apply to every run. Limits passed to a single
 run take any NULL field from the agent's limits, so they can't remove a
-limit the agent sets. Subagent runs are also capped by what is left of the
-lead's budget.
+limit the agent sets. A single run keeps its own on_exceed and
+on_unknown_cost; the agent's values for those don't replace them. Subagent
+runs are also capped by what is left of the lead's budget.
 The object is read-only: read fields with $ and create a new one to change
 a limit."><meta property="og:description" content="UsageLimits() caps what one run of an Agent may use: model requests,
 tool calls, tokens and estimated cost. Each run starts counting from zero, so
@@ -20,8 +21,9 @@ Token and cost limits can only be checked after a response arrives, so a run
 can go over them by one response.
 Limits passed to Agent$new() apply to every run. Limits passed to a single
 run take any NULL field from the agent's limits, so they can't remove a
-limit the agent sets. Subagent runs are also capped by what is left of the
-lead's budget.
+limit the agent sets. A single run keeps its own on_exceed and
+on_unknown_cost; the agent's values for those don't replace them. Subagent
+runs are also capped by what is left of the lead's budget.
 The object is read-only: read fields with $ and create a new one to change
 a limit."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -31,7 +33,7 @@ a limit."><meta property="og:image" content="https://jameshwade.github.io/deputy
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -98,8 +100,9 @@ Token and cost limits can only be checked after a response arrives, so a run
 can go over them by one response.</p>
 <p>Limits passed to <code>Agent$new()</code> apply to every run. Limits passed to a single
 run take any <code>NULL</code> field from the agent's limits, so they can't remove a
-limit the agent sets. Subagent runs are also capped by what is left of the
-lead's budget.</p>
+limit the agent sets. A single run keeps its own <code>on_exceed</code> and
+<code>on_unknown_cost</code>; the agent's values for those don't replace them. Subagent
+runs are also capped by what is left of the lead's budget.</p>
 <p>The object is read-only: read fields with <code>$</code> and create a new one to change
 a limit.</p>
     </div>
@@ -113,7 +116,8 @@ a limit.</p>
 <span>  max_output_tokens <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_total_tokens <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_cost_usd <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  on_exceed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stop"</span>, <span class="st">"error"</span><span class="op">)</span></span>
+<span>  on_exceed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stop"</span>, <span class="st">"error"</span><span class="op">)</span>,</span>
+<span>  on_unknown_cost <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stop"</span>, <span class="st">"continue"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -148,7 +152,7 @@ tokens are reported separately and aren't added again.</p></dd>
 <dt id="arg-max-cost-usd">max_cost_usd<a class="anchor" aria-label="anchor" href="#arg-max-cost-usd"></a></dt>
 <dd><p>Maximum estimated cost in US dollars. If the cost of a
 response is unknown, the run stops with <code>"cost_unavailable"</code> rather than
-guessing.</p></dd>
+guessing, unless <code>on_unknown_cost = "continue"</code>.</p></dd>
 
 
 <dt id="arg-on-exceed">on_exceed<a class="anchor" aria-label="anchor" href="#arg-on-exceed"></a></dt>
@@ -158,6 +162,14 @@ names the limit, such as <code>"request_limit"</code>, <code>"tool_call_limit"</
 <code>"cost_limit"</code>. <code>"error"</code> ends the run the same way, then signals an error
 that inherits from <code>deputy_budget</code> (see <a href="deputy-errors.html">deputy-errors</a>). The result is
 still available from <code>$last_run()</code>.</p></dd>
+
+
+<dt id="arg-on-unknown-cost">on_unknown_cost<a class="anchor" aria-label="anchor" href="#arg-on-unknown-cost"></a></dt>
+<dd><p>What happens when <code>max_cost_usd</code> is set and the cost
+of a response is unknown. <code>"stop"</code> (the default) ends the run with
+<code>"cost_unavailable"</code>. <code>"continue"</code> lets the run go on. The limit is then
+checked against the cost that is known (<a href="AgentUsage.html">AgentUsage</a>'s <code>known_cost_usd</code>),
+and a subagent's budget is what that leaves.</p></dd>
 
 </dl></div>
     <div class="section level2">

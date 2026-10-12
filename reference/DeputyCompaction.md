@@ -104,4 +104,7 @@ S7::props(outcome$usage)
 #> $cost_usd
 #> [1] 0
 #> 
+#> $known_cost_usd
+#> [1] 0
+#> 
 ```

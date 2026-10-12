@@ -11,7 +11,7 @@ event handlers, forms and external resources removed from its HTML.
 ## Usage
 
 ``` r
-subagent_chat_activity(chat, lead, requester, interval = 100L)
+subagent_chat_activity(chat = NULL, lead, requester, interval = 100L)
 ```
 
 ## Arguments
@@ -20,13 +20,15 @@ subagent_chat_activity(chat, lead, requester, interval = 100L)
 
   The value returned by
   [`shinychat::chat_server()`](https://posit-dev.github.io/shinychat/r/reference/chat_app.html)
-  for the lead's chat.
+  for the lead's chat, or `NULL` (the default) when your app streams the
+  lead's replies into the chat itself.
 
 - lead:
 
   The [Agent](https://jameshwade.github.io/deputy/reference/Agent.md) or
   [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
-  given to `chat_server()` as its client.
+  given to `chat_server()` as its client, or whose replies your app
+  streams into the chat.
 
 - requester:
 
@@ -67,6 +69,15 @@ its `redact` function applies, as for `$inspect_subagents()`. A call cut
 short by cancellation or a failed subagent shows as not completed. Up to
 256 calls appear per reply. Showing a call never runs it again. Needs
 shiny, shinychat (\>= 0.5.0), bslib, commonmark and xml2.
+
+If your app runs the lead's replies itself instead of through
+[`shinychat::chat_server()`](https://posit-dev.github.io/shinychat/r/reference/chat_app.html),
+leave out `chat`. Stream `lead$stream_async(..., stream = "content")`
+into the chat with
+[`shinychat::chat_append()`](https://posit-dev.github.io/shinychat/r/reference/chat_append.html):
+the cards arrive in that stream, and they are in `lead$get_turns()` for
+saving the conversation, for example with
+[`shinychat::chat_enable_history()`](https://posit-dev.github.io/shinychat/r/reference/chat_enable_history.html).
 
 ## See also
 

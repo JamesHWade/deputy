@@ -15,7 +15,7 @@ someone approves it:
 [`tools_interactive()`](https://jameshwade.github.io/deputy/reference/tools_interactive.md)
 returns an `ask_user` tool. The model sends one to four multiple-choice
 questions, and your handler returns the answers as a named list that
-maps each question to the chosen label:
+maps each question’s text to the chosen label:
 
 ``` r
 
@@ -42,7 +42,11 @@ can also type a free answer instead of picking an option.
 
 Each question has `question`, a short `header`, two to four `options`
 (each with a `label` and `description`), and `multiSelect`. For a
-multi-select question, join the chosen labels with `", "`.
+multi-select question, return the chosen labels as a character vector,
+such as `c("Tables", "Charts")`. Any string that isn’t one of the labels
+is passed on as the person’s own answer; give at most one per question.
+The model gets back, for each question, the `selected` labels and that
+`other_text`.
 
 A handler can answer in three ways:
 

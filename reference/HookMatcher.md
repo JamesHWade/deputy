@@ -9,7 +9,7 @@ optionally, a tool-name pattern. Add it to an agent with
 ## Usage
 
 ``` r
-HookMatcher(event, callback, pattern = NULL, timeout = 0)
+HookMatcher(event, callback, pattern = NULL, timeout = 0, promise_timeout = 60)
 ```
 
 ## Arguments
@@ -38,7 +38,14 @@ HookMatcher(event, callback, pattern = NULL, timeout = 0)
   [`callr::r()`](https://callr.r-lib.org/reference/r.html). That process
   can't see your global variables or attached packages (call functions
   as `pkg::fn()`), and its printed output and other side effects stay
-  there.
+  there. Such a callback can't return a promise.
+
+- promise_timeout:
+
+  Time limit, in seconds, for a promise the callback returns. The
+  default is 60. A promise that has not settled by then counts as no
+  answer and is recorded as a hook error. For PreToolUse that denies the
+  call.
 
 ## Value
 

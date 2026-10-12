@@ -19,7 +19,7 @@ as a plain list, which is handy for logging."><meta property="og:image" content=
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -94,7 +94,8 @@ as a plain list, which is handy for logging.</p>
 <span>  input_tokens <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  output_tokens <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  cached_tokens <span class="op">=</span> <span class="fl">0</span>,</span>
-<span>  cost_usd <span class="op">=</span> <span class="fl">0</span></span>
+<span>  cost_usd <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  known_cost_usd <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -127,6 +128,13 @@ aren't added to <code>total_tokens</code>.</p></dd>
 <dd><p>Estimated cost in US dollars, or <code>NA_real_</code> if the cost of
 some responses is unknown.</p></dd>
 
+
+<dt id="arg-known-cost-usd">known_cost_usd<a class="anchor" aria-label="anchor" href="#arg-known-cost-usd"></a></dt>
+<dd><p>The cost of the responses whose cost is known. When
+<code>cost_usd</code> is known this is ignored: the known cost is <code>cost_usd</code>. When
+<code>cost_usd</code> is <code>NA_real_</code>, it is a lower bound and <code>NULL</code> (the default)
+means <code>0</code>.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -138,6 +146,10 @@ some responses is unknown.</p></dd>
 
 <dl><dt><code>@total_tokens</code></dt>
 <dd><p><code>input_tokens + output_tokens</code>.</p></dd>
+
+
+<dt><code>@known_cost_usd</code></dt>
+<dd><p>The cost of the responses whose cost is known.</p></dd>
 
 
 </dl></div>
@@ -181,6 +193,9 @@ some responses is unknown.</p></dd>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $cost_usd</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $known_cost_usd</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 </code></pre></div>
     </div>

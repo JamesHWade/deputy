@@ -23,7 +23,7 @@ or read them with restored()."><meta property="og:image" content="https://jamesh
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9003</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -94,7 +94,13 @@ or read them with <code>restored()</code>.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">subagent_chat_history</span><span class="op">(</span><span class="va">chat</span>, <span class="va">lead</span>, <span class="va">requester</span>, max_bytes <span class="op">=</span> <span class="fl">16</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">^</span><span class="fl">2</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">subagent_chat_history</span><span class="op">(</span></span>
+<span>  chat <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  <span class="va">lead</span>,</span>
+<span>  <span class="va">requester</span>,</span>
+<span>  max_bytes <span class="op">=</span> <span class="fl">16</span> <span class="op">*</span> <span class="fl">1024</span><span class="op">^</span><span class="fl">2</span>,</span>
+<span>  conversation_id <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -103,12 +109,13 @@ or read them with <code>restored()</code>.</p>
 
 <dl><dt id="arg-chat">chat<a class="anchor" aria-label="anchor" href="#arg-chat"></a></dt>
 <dd><p>The value returned by <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">shinychat::chat_server()</a></code> for the lead's
-chat.</p></dd>
+chat, or <code>NULL</code> (the default) when your app runs the lead's replies
+itself.</p></dd>
 
 
 <dt id="arg-lead">lead<a class="anchor" aria-label="anchor" href="#arg-lead"></a></dt>
 <dd><p>The <a href="Agent.html">Agent</a> or <a href="LeadAgent.html">LeadAgent</a> given to <code>chat_server()</code> as its
-client.</p></dd>
+client, or whose replies your app streams into the chat.</p></dd>
 
 
 <dt id="arg-requester">requester<a class="anchor" aria-label="anchor" href="#arg-requester"></a></dt>
@@ -121,6 +128,12 @@ client.</p></dd>
 that don't fit, here or in the <code>max_bytes</code> of the lead's
 <code>delegation_disclosure</code>, keep their outcome without their conversation,
 or are left out, and <code>status()</code> counts them. Defaults to 16 MiB.</p></dd>
+
+
+<dt id="arg-conversation-id">conversation_id<a class="anchor" aria-label="anchor" href="#arg-conversation-id"></a></dt>
+<dd><p>Only without <code>chat</code>: a function returning the ID of
+the conversation open in the chat, or <code>NULL</code> when none is. Defaults to
+reading <code>lead$conversation_id</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -140,6 +153,10 @@ can't be found again, such as an earlier session's or those released
 since), and any problem saving or reading it. A user the lead's
 <code>delegation_disclosure</code> doesn't let see them gets no counts, and a note
 saying so.</p></li>
+<li><p><code>conversation_id()</code>: the open conversation's ID, or <code>NULL</code>.</p></li>
+<li><p>Without <code>chat</code>, also <code>on_save(values)</code> and <code>on_restore(values)</code>, the
+callbacks for <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_enable_history.html" class="external-link">shinychat::chat_enable_history()</a></code>. <code>on_save</code> returns
+<code>values</code> with the conversation's records added.</p></li>
 </ul></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -155,6 +172,54 @@ the lead's <code>delegation_scope</code> and the conversation's ID as
 Large results that subagents saved to disk are kept as references, which
 may no longer resolve. Needs shiny and shinychat (&gt;= 0.5.0) with history
 enabled.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="apps-that-run-the-lead-s-replies-themselves">Apps that run the lead's replies themselves<a class="anchor" aria-label="anchor" href="#apps-that-run-the-lead-s-replies-themselves"></a></h2>
+
+
+<p>If your app streams the lead's replies into the chat itself instead of
+using <code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">shinychat::chat_server()</a></code>, and keeps conversations with
+<code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_enable_history.html" class="external-link">shinychat::chat_enable_history()</a></code>, leave out <code>chat</code>. The returned list then
+also holds <code>on_save</code> and <code>on_restore</code>: pass them to <code>chat_enable_history()</code>.
+If you already have your own <code>on_save</code>, call this one from inside it and
+return what it returns; do the same with <code>on_restore</code>.</p>
+<p>Records are kept under the ID of the conversation open in the chat, which
+<code>chat_server()</code> otherwise looks after. Before each reply, set
+<code>lead$conversation_id</code> to the ID of the conversation the reply belongs to,
+as <code>chat_server()</code> does, so the subagents it starts are saved with that
+conversation. shinychat's "new chat" empties the lead's conversation, which
+sets <code>lead$conversation_id</code> back to <code>NULL</code>, so the previous conversation's
+subagents stop showing until you set the next ID. If you pass your own
+<code>conversation_id</code> function, make it return <code>NULL</code> or the new ID after a new
+chat. shinychat also empties the lead when the first message of a
+conversation is edited, and from the lead the two look the same: the
+example below gives such an edit a new ID, so the subagents from before the
+edit are no longer saved with that conversation. When a conversation is
+reopened, its ID must be the open one
+before <code>on_restore</code> runs: records saved under another ID are not read. By
+default the open conversation's ID is read from <code>lead$conversation_id</code>;
+pass <code>conversation_id</code> to read it from somewhere else. For example, keeping
+the ID with the conversation itself:</p>
+<p></p><div class="sourceCode r"><pre><code><span><span class="va">saved</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/subagent_chat_history.html">subagent_chat_history</a></span><span class="op">(</span>lead <span class="op">=</span> <span class="va">lead</span>, requester <span class="op">=</span> <span class="va">user</span><span class="op">)</span></span>
+<span><span class="fu">shinychat</span><span class="fu">::</span><span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_enable_history.html" class="external-link">chat_enable_history</a></span><span class="op">(</span></span>
+<span>  <span class="st">"chat"</span>,</span>
+<span>  <span class="va">lead</span>,</span>
+<span>  on_save <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">values</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">values</span><span class="op">$</span><span class="va">conversation</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="va">conversation_id</span></span>
+<span>    <span class="va">saved</span><span class="op">$</span><span class="fu">on_save</span><span class="op">(</span><span class="va">values</span><span class="op">)</span></span>
+<span>  <span class="op">}</span>,</span>
+<span>  on_restore <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">values</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">lead</span><span class="op">$</span><span class="va">conversation_id</span> <span class="op">&lt;-</span> <span class="va">values</span><span class="op">$</span><span class="va">conversation</span></span>
+<span>    <span class="va">saved</span><span class="op">$</span><span class="fu">on_restore</span><span class="op">(</span><span class="va">values</span><span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu">shiny</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/observeEvent.html" class="external-link">observeEvent</a></span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">chat_user_input</span>, <span class="op">{</span></span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">lead</span><span class="op">$</span><span class="fu">get_turns</span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">lead</span><span class="op">$</span><span class="va">conversation_id</span> <span class="op">&lt;-</span> <span class="fu">new_conversation_id</span><span class="op">(</span><span class="op">)</span> <span class="co"># your own ID scheme</span></span>
+<span>  <span class="op">}</span></span>
+<span>  <span class="va">stream</span> <span class="op">&lt;-</span> <span class="va">lead</span><span class="op">$</span><span class="fu">stream_async</span><span class="op">(</span><span class="va">input</span><span class="op">$</span><span class="va">chat_user_input</span>, stream <span class="op">=</span> <span class="st">"content"</span><span class="op">)</span></span>
+<span>  <span class="fu">shinychat</span><span class="fu">::</span><span class="fu"><a href="https://posit-dev.github.io/shinychat/r/reference/chat_append.html" class="external-link">chat_append</a></span><span class="op">(</span><span class="st">"chat"</span>, <span class="va">stream</span><span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span></code></pre><p></p></div>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
