@@ -789,10 +789,18 @@ subagent_chat_server <- function(
 #' call never runs it again. Needs shiny, shinychat (>= 0.5.0), bslib,
 #' commonmark and xml2.
 #'
+#' If your app runs the lead's replies itself instead of through
+#' [shinychat::chat_server()], leave out `chat`. Stream
+#' `lead$stream_async(..., stream = "content")` into the chat with
+#' [shinychat::chat_append()]: the cards arrive in that stream, and they are in
+#' `lead$get_turns()` for saving the conversation, for example with
+#' [shinychat::chat_enable_history()].
+#'
 #' @param chat The value returned by [shinychat::chat_server()] for the lead's
-#'   chat.
+#'   chat, or `NULL` (the default) when your app streams the lead's replies
+#'   into the chat itself.
 #' @param lead The [Agent] or [LeadAgent] given to `chat_server()` as its
-#'   client.
+#'   client, or whose replies your app streams into the chat.
 #' @param requester A function returning the current user, as your
 #'   [DelegationDisclosure] expects it. Access is checked each time new calls
 #'   are read.
@@ -806,22 +814,17 @@ subagent_chat_server <- function(
 #' @seealso [subagent_chat_ui()] for a panel with each subagent's full
 #'   conversation.
 #' @export
-subagent_chat_activity <- function(chat, lead, requester, interval = 100L) {
+subagent_chat_activity <- function(
+  chat = NULL,
+  lead,
+  requester,
+  interval = 100L
+) {
   subagent_chat_dependencies()
-  if (
-    !is.environment(chat) ||
-      !is.environment(chat$history) ||
-      !is.function(chat$history$on_save)
-  ) {
-    cli::cli_abort(
-      "{.arg chat} must be the value returned by {.fn shinychat::chat_server}."
-    )
+  if (missing(lead)) {
+    lead <- NULL
   }
-  if (!inherits(lead, "Agent") || !identical(chat$client, lead)) {
-    cli::cli_abort(
-      "{.arg lead} must be the Agent that {.arg chat} runs as its client."
-    )
-  }
+  subagent_chat_check_lead(chat, lead)
   if (!is.function(requester)) {
     cli::cli_abort("{.arg requester} must be a function.")
   }
@@ -839,6 +842,42 @@ subagent_chat_activity <- function(chat, lead, requester, interval = 100L) {
     session$onSessionEnded(stop)
   }
   invisible(list(stop = stop))
+}
+
+# With `chat`, `lead` must be the client it runs; without one, the host runs
+# the lead's replies itself and `lead` is all there is to check.
+subagent_chat_check_lead <- function(chat, lead, callbacks = "on_save") {
+  if (is.null(chat)) {
+    if (!inherits(lead, "Agent")) {
+      cli::cli_abort(c(
+        "{.arg lead} must be an {.cls Agent}.",
+        "i" = paste(
+          "Without {.arg chat}, it is the Agent whose replies your app",
+          "streams into the chat."
+        )
+      ))
+    }
+    return(invisible(NULL))
+  }
+  if (
+    !is.environment(chat) ||
+      !is.environment(chat$history) ||
+      !all(vapply(
+        callbacks,
+        function(name) is.function(chat$history[[name]]),
+        logical(1)
+      ))
+  ) {
+    cli::cli_abort(
+      "{.arg chat} must be the value returned by {.fn shinychat::chat_server}, or {.code NULL}."
+    )
+  }
+  if (!inherits(lead, "Agent") || !identical(chat$client, lead)) {
+    cli::cli_abort(
+      "{.arg lead} must be the Agent that {.arg chat} runs as its client."
+    )
+  }
+  invisible(NULL)
 }
 
 # Keep tool requests and results in the same assistant message so shinychat's

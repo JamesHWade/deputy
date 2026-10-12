@@ -861,6 +861,177 @@ test_that("compaction hooks can cancel, replace, or fail without losing the run"
   }
 })
 
+test_that("automatic compaction waits for a PreCompact hook's promise", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(runtime_reply("Task response")))
+  chat <- runtime_compaction_chat(server)
+  before <- chat$get_turns()
+  agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
+  agent$add_hook(HookMatcher(
+    event = "PreCompact",
+    timeout = 0,
+    callback = function(turns_to_compact, turns_to_keep, context) {
+      later_value(HookResultPreCompact(continue = FALSE))
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("Continue"))
+
+  expect_identical(agent$last_compaction()$method, "cancelled")
+  expect_identical(agent$get_turns()[seq_along(before)], before)
+  expect_identical(result$stop_reason, "complete")
+})
+
+test_that("a PreCompact hook's promised summary is used", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(runtime_reply("Task response")))
+  chat <- runtime_compaction_chat(server)
+  agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
+  agent$add_hook(HookMatcher(
+    event = "PreCompact",
+    timeout = 0,
+    callback = function(turns_to_compact, turns_to_keep, context) {
+      later_value(HookResultPreCompact(
+        summary = "A host supplied continuation."
+      ))
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("Continue"))
+
+  expect_identical(agent$last_compaction()$method, "hook")
+  expect_identical(result$usage$requests, 1L)
+  expect_identical(agent$last_compaction()$usage$requests, 0L)
+  expect_identical(result$stop_reason, "complete")
+})
+
+test_that("automatic compaction waits for a PostCompact hook's promise before the request goes on", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(runtime_reply("Task response")))
+  chat <- runtime_compaction_chat(server)
+  agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
+  agent$add_hook(HookMatcher(
+    event = "PreCompact",
+    timeout = 0,
+    callback = function(turns_to_compact, turns_to_keep, context) {
+      HookResultPreCompact(summary = "A host supplied continuation.")
+    }
+  ))
+  requests_when_resolved <- NULL
+  agent$add_hook(HookMatcher(
+    event = "PostCompact",
+    timeout = 0,
+    callback = function(result, context) {
+      promises::promise(function(resolve, reject) {
+        later::later(
+          function() {
+            requests_when_resolved <<- length(server$requests())
+            resolve(NULL)
+          },
+          0.05
+        )
+      })
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("Continue"))
+
+  expect_identical(requests_when_resolved, 0L)
+  expect_length(server$requests(), 1L)
+  expect_identical(result$stop_reason, "complete")
+})
+
+test_that("a manual compact() does not wait for a PreCompact hook's promise", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(runtime_reply("Task response")))
+  chat <- runtime_compaction_chat(server)
+  chat$set_turns(list(
+    ellmer::UserTurn("Previous task"),
+    ellmer::AssistantTurn("Previous response")
+  ))
+  agent <- Agent$new(chat)
+  agent$add_hook(HookMatcher(
+    event = "PreCompact",
+    timeout = 0,
+    callback = function(turns_to_compact, turns_to_keep, context) {
+      later_value(HookResultPreCompact(continue = FALSE))
+    }
+  ))
+
+  manual <- agent$compact(keep_last = 0, summary = "Manual continuation")
+
+  expect_identical(manual$method, "custom")
+  expect_identical(agent$last_compaction()$method, "custom")
+})
+
+test_that("compact(automatic = TRUE) does not wait for a PreCompact hook's promise either", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(runtime_reply("Task response")))
+  chat <- runtime_compaction_chat(server)
+  chat$set_turns(list(
+    ellmer::UserTurn("Previous task"),
+    ellmer::AssistantTurn("Previous response")
+  ))
+  agent <- Agent$new(chat)
+  agent$add_hook(HookMatcher(
+    event = "PreCompact",
+    timeout = 0,
+    callback = function(turns_to_compact, turns_to_keep, context) {
+      later_value(HookResultPreCompact(continue = FALSE))
+    }
+  ))
+
+  manual <- agent$compact(
+    keep_last = 0,
+    summary = "Automatic label continuation",
+    automatic = TRUE
+  )
+
+  expect_s7_class(manual, DeputyCompaction)
+  expect_identical(manual$method, "custom")
+  expect_identical(agent$last_compaction()$method, "custom")
+})
+
+test_that("compact(automatic = TRUE) does not wait for a PostCompact hook's promise either", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(runtime_reply("Task response")))
+  chat <- runtime_compaction_chat(server)
+  chat$set_turns(list(
+    ellmer::UserTurn("Previous task"),
+    ellmer::AssistantTurn("Previous response")
+  ))
+  agent <- Agent$new(chat)
+  agent$add_hook(HookMatcher(
+    event = "PostCompact",
+    timeout = 0,
+    callback = function(result, context) {
+      later_value(NULL)
+    }
+  ))
+
+  manual <- agent$compact(
+    keep_last = 0,
+    summary = "Automatic label continuation",
+    automatic = TRUE
+  )
+
+  expect_s7_class(manual, DeputyCompaction)
+  expect_identical(manual$method, "custom")
+})
+
+
 test_that("compaction IDs distinguish automatic no-ops from manual work after a run", {
   server <- local_runtime_server(list(runtime_reply("Task complete")))
   chat <- runtime_compaction_chat(server)
@@ -880,4 +1051,116 @@ test_that("compaction IDs distinguish automatic no-ops from manual work after a 
   expect_null(manual$run_id)
   expect_identical(agent$last_run()$run_id, result$run_id)
   expect_null(agent$compact()$run_id)
+})
+
+test_that("PostModelRequest fires after a compaction summary request, with its usage", {
+  server <- local_runtime_server(list(
+    runtime_reply("A summary of the earlier turns."),
+    runtime_reply("Task response")
+  ))
+  chat <- runtime_compaction_chat(server)
+  agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
+  seen <- list()
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context) {
+      seen[[length(seen) + 1L]] <<- list(
+        request_number = context$request_number,
+        requests = context$usage$requests,
+        tokens = context$usage$total_tokens
+      )
+      NULL
+    }
+  ))
+
+  result <- agent$run_sync("Continue")
+
+  expect_identical(agent$last_compaction()$method, "llm")
+  expect_identical(result$usage$requests, 2L)
+  expect_identical(
+    vapply(seen, function(x) x$request_number, integer(1)),
+    c(1L, 2L)
+  )
+  expect_identical(vapply(seen, function(x) x$requests, integer(1)), c(1L, 2L))
+  # The summary's own tokens are in the usage the hook is given.
+  expect_gt(seen[[1L]]$tokens, 0)
+})
+
+test_that("the task request waits for a PostModelRequest hook's promise after a compaction request", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply("A summary of the earlier turns."),
+    runtime_reply("Task response")
+  ))
+  chat <- runtime_compaction_chat(server)
+  agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
+  served <- integer()
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context) {
+      promises::then(later_value(NULL, 0.1), function(value) {
+        served <<- c(served, length(server$requests()))
+        value
+      })
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("Continue"), max_polls = 500L)
+
+  expect_identical(served, c(1L, 2L))
+  expect_identical(result$stop_reason, "complete")
+})
+
+test_that("an interrupt while a compaction request's PostModelRequest hook is pending ends the run before the task", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply("A summary of the earlier turns."),
+    runtime_reply("Task response")
+  ))
+  chat <- runtime_compaction_chat(server)
+  agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context) {
+      later::later(function() agent$interrupt("enough"), 0.05)
+      later_value(NULL, 0.3)
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("Continue"), max_polls = 500L)
+
+  expect_length(server$requests(), 1L)
+  expect_identical(result$stop_reason, "enough")
+  expect_false(agent$.__enclos_env__$private$run_active)
+})
+
+test_that("PostModelRequest fires for a compaction summary that is rejected as empty", {
+  server <- local_runtime_server(list(
+    runtime_reply(" "),
+    runtime_reply("Task response")
+  ))
+  agent <- Agent$new(
+    runtime_compaction_chat(server),
+    context_policy = ContextPolicy(max_tokens = 50, fallback = "text")
+  )
+  seen <- integer()
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context) {
+      seen <<- c(seen, context$request_number)
+      NULL
+    }
+  ))
+
+  result <- suppressWarnings(agent$run_sync("Continue"))
+
+  # The summary request got a response, so the hook is told of it, though
+  # the response was no use and the text fallback was taken.
+  expect_identical(agent$last_compaction()$method, "text")
+  expect_identical(result$usage$requests, 2L)
+  expect_identical(seen, c(1L, 2L))
 })

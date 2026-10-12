@@ -15,7 +15,9 @@ DelegationManifest(
   tools,
   policies,
   size,
-  schema_version = 1L
+  provider = "",
+  params = list(),
+  schema_version = 2L
 )
 }
 \arguments{
@@ -45,15 +47,20 @@ settings, with hashes that identify them. Callbacks are not recorded.}
 \item{size}{\code{text_bytes}, \code{manifest_bytes} and \code{estimated_tokens} (\code{NULL}
 when unknown). The token count is an estimate, not a billed count.}
 
-\item{schema_version}{Format version; must be \code{1L}.}
+\item{provider}{The name of the subagent's provider, such as \code{"OpenAI"}.}
+
+\item{params}{The request parameters set with \code{\link[ellmer:params]{ellmer::params()}} on the
+subagent's chat, such as \code{reasoning_effort}; \code{extra_args} are left out.}
+
+\item{schema_version}{Format version; must be \code{2L}.}
 }
 \value{
 A \code{DelegationManifest} object.
 }
 \description{
 Holds what a subagent was given when a delegation started: the task,
-evidence, system prompt, first message, model, tool names, and its
-permission and context settings. A \link{LeadAgent} keeps one in memory for each
+evidence, system prompt, first message, provider, model and request
+parameters, tool names, and its permission and context settings. A \link{LeadAgent} keeps one in memory for each
 delegation; read them with \verb{$get_subagent_contexts()}. A manifest covers
 the starting point only, not what happened during the run.
 }

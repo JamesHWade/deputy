@@ -11,7 +11,8 @@ result_is_success(result)
 }
 \value{
 \code{TRUE} if the stop reason is \code{"complete"}, meaning the model
-finished on its own. It doesn't check the answer.
+finished on its own. It doesn't check the answer, and it is \code{TRUE} for an
+answer the provider cut short: the result's \code{ending} tells those apart.
 }
 \description{
 Check whether a run completed

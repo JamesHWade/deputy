@@ -142,18 +142,17 @@ lead_parallel_delegate <- function(
       },
       add = TRUE
     )
-    initialize_agent_run(
-      lead,
-      state,
-      lapply(
-        selected$tasks,
-        delegation_task_label,
-        max_bytes = private$delegation_max_bytes
-      ),
-      limits,
-      context,
-      controller
+    labels <- lapply(
+      selected$tasks,
+      delegation_task_label,
+      max_bytes = private$delegation_max_bytes
     )
+    initialize_agent_run(lead, state, labels, limits, context, controller)
+    # No task is admitted until the batch's own start hooks have answered.
+    started <- run_start_hooks(lead, state, labels)
+    if (promises::is.promising(started)) {
+      coro::await(started)
+    }
     count <- length(selected$tasks)
     # Admit every selected task before preparing children. Failed preparation
     # must retain the failing record and unstarted siblings without paid work.
@@ -171,66 +170,72 @@ lead_parallel_delegate <- function(
       admitted <<- c(admitted, id)
       list(definition = definition, correlation = correlation, task = task)
     })
-    # Resolve every reference before constructing any Subagent.
-    prepared <- lapply(prepared, function(item) {
-      item$prepared <- tryCatch(
-        resolve_delegation_input(lead, item$definition, item$task),
-        error = function(condition) {
-          lead_settle_delegation(
-            lead,
-            item$correlation$delegation_id,
-            error = condition,
-            stop_reason = "setup_error"
-          )
-          rlang::cnd_signal(condition)
-        }
-      )
-      item
-    })
-    # Prepare the complete batch before any provider request.
-    prepared <- lapply(prepared, function(item) {
-      id <- item$correlation$delegation_id
-      item$child <- tryCatch(
-        private$create_sub_agent(
-          item$definition,
-          item$correlation,
-          UsageLimits(
-            max_requests = min(1L, item$definition$max_requests %||% 1L),
-            max_tool_calls = 0L
+    # A batch that was stopped at its start admits its tasks, so each has a
+    # record, and prepares none of them: no input is resolved and no
+    # Subagent is made.
+    if (!isTRUE(private$should_stop)) {
+      # Resolve every reference before constructing any Subagent.
+      prepared <- lapply(prepared, function(item) {
+        item$prepared <- tryCatch(
+          resolve_delegation_input(lead, item$definition, item$task),
+          error = function(condition) {
+            lead_settle_delegation(
+              lead,
+              item$correlation$delegation_id,
+              error = condition,
+              stop_reason = "setup_error"
+            )
+            rlang::cnd_signal(condition)
+          }
+        )
+        item
+      })
+      # Prepare the complete batch before any provider request.
+      prepared <- lapply(prepared, function(item) {
+        id <- item$correlation$delegation_id
+        item$child <- tryCatch(
+          private$create_sub_agent(
+            item$definition,
+            item$correlation,
+            UsageLimits(
+              max_requests = min(1L, item$definition$max_requests %||% 1L),
+              max_tool_calls = 0L,
+              on_unknown_cost = limits$on_unknown_cost
+            ),
+            stateless = TRUE
           ),
-          stateless = TRUE
-        ),
-        error = function(condition) {
-          lead_settle_delegation(
+          error = function(condition) {
+            lead_settle_delegation(
+              lead,
+              id,
+              error = condition,
+              stop_reason = "setup_error"
+            )
+            stop(condition)
+          }
+        )
+        item$manifest <- tryCatch(
+          prepare_delegation_manifest(
             lead,
-            id,
-            error = condition,
-            stop_reason = "setup_error"
-          )
-          stop(condition)
-        }
-      )
-      item$manifest <- tryCatch(
-        prepare_delegation_manifest(
-          lead,
-          item$definition,
-          item$prepared,
-          item$child
-        ),
-        error = function(condition) {
-          lead_settle_delegation(
-            lead,
-            id,
-            item$child,
-            error = condition,
-            stop_reason = "setup_error"
-          )
-          rlang::cnd_signal(condition)
-        }
-      )
-      lead_bind_delegation(lead, id, item$child, item$manifest)
-      item
-    })
+            item$definition,
+            item$prepared,
+            item$child
+          ),
+          error = function(condition) {
+            lead_settle_delegation(
+              lead,
+              id,
+              item$child,
+              error = condition,
+              stop_reason = "setup_error"
+            )
+            rlang::cnd_signal(condition)
+          }
+        )
+        lead_bind_delegation(lead, id, item$child, item$manifest)
+        item
+      })
+    }
     outcomes <- rep(
       list(list(
         result = NULL,
@@ -300,6 +305,16 @@ lead_parallel_delegate <- function(
       state$reason <- "complete"
     }
     completed <- TRUE
+    # The batch waits for its own Stop and SessionEnd hooks, as a streamed run
+    # does. A batch has no answer of its own, so Stop cannot send it on.
+    stopped <- private$stop_in_body(state)
+    if (promises::is.promising(stopped)) {
+      coro::await(stopped)
+    }
+    ended <- private$session_end_in_body(state)
+    if (promises::is.promising(ended)) {
+      coro::await(ended)
+    }
     private$finish_callback_run(state)
     list(
       mode = "stateless",

@@ -1,6 +1,10 @@
 # Shared lifecycle for model runs and host-driven delegation batches.
 record_run_failure <- function(agent, phase, condition) {
   private <- agent$.__enclos_env__$private
+  state <- private$current_run_state
+  if (!is.null(state)) {
+    state$run_error <- list(phase = phase, condition = condition)
+  }
   private$record_run_event(private$agent_event(
     "run_error",
     phase = phase,
@@ -50,6 +54,7 @@ initialize_agent_run <- function(
     limits$max_tool_calls
   private$should_stop <- FALSE
   private$stop_reason_from_hook <- NULL
+  private$stop_requested_by <- NULL
   private$current_usage_limits <- limits
   private$current_usage_baseline <-
     agent_usage_snapshot(private$.chat)
@@ -79,6 +84,13 @@ initialize_agent_run <- function(
   private$current_stream_content <-
     identical(stream_mode, "content")
   private$current_run_state <- state
+  private$release_unstarted_run(state)
+  if (!is.null(state$interrupt_before_start)) {
+    private$request_stream_stop(
+      state$interrupt_before_start,
+      by = state$interrupt_before_start_by %||% "caller"
+    )
+  }
   state$response_seen <- FALSE
   state$fallback_index <- private$.fallback_position
   state$request_number <- 0L
@@ -145,24 +157,80 @@ initialize_agent_run <- function(
     )
   }
 
+  invisible(state)
+}
+
+# A stream that fails before its run has an ID leaves no result and nothing
+# to finish. It is no longer waiting to start, and whoever holds the promise
+# of its result is told why.
+refuse_unstarted_run <- function(agent, state, error) {
+  if (!is.null(state$active_run_id) || isTRUE(state$finished)) {
+    return(invisible(NULL))
+  }
+  private <- agent$.__enclos_env__$private
+  state$finished <- TRUE
+  state$start_error <- error
+  private$release_unstarted_run(state)
+  if (is.function(state$reject_result)) {
+    state$reject_result(error)
+  }
+  invisible(NULL)
+}
+
+# The hooks at a run's start: SessionStart, then UserPromptSubmit, then the
+# check of limits the run has already reached. Returns a promise when a
+# callback returned one, for the run to wait on.
+run_start_hooks <- function(agent, state, messages) {
+  private <- agent$.__enclos_env__$private
+  stopped_before <- isTRUE(private$should_stop)
+  started <- fire_session_start(agent, state)
+  hook_then(started, function(value) {
+    state$session_started <- TRUE
+    # A stop that came while SessionStart was being asked takes effect now,
+    # whether its promise was pending or its callback made the stop: the
+    # prompt is not submitted, and no later hook can hold the stop.
+    stopped_meanwhile <- !stopped_before && isTRUE(private$should_stop)
+    submitted <- if (!stopped_meanwhile) {
+      fire_prompt_submit(agent, state, messages)
+    }
+    hook_then(submitted, function(value) {
+      check_initial_run_limits(agent, state)
+      invisible(NULL)
+    })
+  })
+}
+
+# The SessionStart hook for a run. Returns what `fire_hook()` returned: a
+# value, or a promise when a callback returned one.
+fire_session_start <- function(agent, state) {
+  private <- agent$.__enclos_env__$private
   private$fire_hook(
     "SessionStart",
     context = private$hook_context(
       permissions = agent$permissions,
       provider = agent$provider(),
       tools_count = length(private$.chat$get_tools()),
-      run_id = active_run_id
+      run_id = state$active_run_id
     )
   )
-  state$session_started <- TRUE
+}
+
+# The UserPromptSubmit hook for a run's messages. Returns what `fire_hook()`
+# returned: a value, or a promise when a callback returned one.
+fire_prompt_submit <- function(agent, state, messages) {
+  private <- agent$.__enclos_env__$private
   private$fire_hook(
     "UserPromptSubmit",
     prompt = if (length(messages) == 1L) messages[[1L]] else messages,
     context = private$hook_context(
-      run_id = active_run_id
+      run_id = state$active_run_id
     )
   )
+}
 
+# Ends the run before its first request when its limits are already reached.
+check_initial_run_limits <- function(agent, state) {
+  private <- agent$.__enclos_env__$private
   initial_limit_status <- tree_usage_status(agent) %||%
     usage_limit_status(
       private$current_run_usage(),
@@ -173,6 +241,5 @@ initialize_agent_run <- function(
     private$mark_usage_limit(initial_limit_status)
     state$reason <- initial_limit_status$reason
   }
-
   invisible(state)
 }

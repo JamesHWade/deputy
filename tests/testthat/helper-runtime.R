@@ -319,3 +319,10 @@ create_checkpoint_callback_chat <- function() {
     result_callback = function() result_callback
   )
 }
+
+# A promise that resolves to `value` after `delay` seconds of the event loop.
+later_value <- function(value, delay = 0.02) {
+  promises::promise(function(resolve, reject) {
+    later::later(function() resolve(value), delay)
+  })
+}

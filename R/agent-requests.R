@@ -56,6 +56,14 @@ install_request_callbacks <- function(agent) {
 request_start_async <- coro::async(function(agent, private, turns) {
   tryCatch(
     {
+      # PostToolUse promises are waited for here because ellmer does not wait
+      # for the tool-result callback. A stop a hook promised takes effect in
+      # begin_model_request().
+      held <- private$take_held_hooks()
+      if (length(held)) {
+        coro::await(promises::promise_all(.list = held))
+      }
+
       # All tool results have settled; ellmer has not stored or dispatched
       # the pending user turn yet. Count its contents without appending it.
       if (private$current_run_state$task_requests > 0L) {
@@ -188,6 +196,27 @@ end_model_request <- function(agent, turn) {
     model = agent$get_model(),
     outcome = "response"
   ))
+  # ellmer awaits this callback's promise, so the next request waits for it.
+  fire_post_model_request(agent, state)
+}
+
+# PostModelRequest, with the run's usage so far. Every model request of a run
+# ends here: the task's, a structured request's and a compaction summary's.
+# Returns a promise when a callback returned one, for the run to wait on.
+fire_post_model_request <- function(agent, state) {
+  private <- agent$.__enclos_env__$private
+  fired <- private$fire_hook(
+    "PostModelRequest",
+    context = private$hook_context(
+      usage = private$current_run_usage(),
+      usage_limits = private$current_usage_limits,
+      request_number = state$request_number,
+      run_id = state$active_run_id
+    )
+  )
+  if (promises::is.promising(fired)) {
+    return(promises::then(fired, function(value) invisible(NULL)))
+  }
   invisible(NULL)
 }
 

@@ -377,3 +377,174 @@ test_that("released ellmer Chats preserve transport and isolate runtime callback
     expect_identical(input$resolved_evidence, list())
   }
 })
+
+test_that("a delegate batch fires SessionStart and UserPromptSubmit as before", {
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  fired <- character()
+  lead$add_hook(HookMatcher("SessionStart", callback = function(...) {
+    fired <<- c(fired, "SessionStart")
+    NULL
+  }))
+  lead$add_hook(HookMatcher("UserPromptSubmit", callback = function(...) {
+    fired <<- c(fired, "UserPromptSubmit")
+    NULL
+  }))
+
+  batch <- lead$parallel_delegate(c(a = "one", b = "two"))
+
+  expect_identical(batch$status, c(a = "completed", b = "completed"))
+  expect_identical(fired, c("SessionStart", "UserPromptSubmit"))
+})
+
+test_that("a delegate batch waits for its SessionStart and UserPromptSubmit hooks", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  log <- character()
+  for (event in c("SessionStart", "UserPromptSubmit")) {
+    local({
+      name <- event
+      lead$add_hook(HookMatcher(
+        event = name,
+        timeout = 0,
+        callback = function(...) {
+          log <<- c(log, paste(name, "fired"))
+          promises::promise(function(resolve, reject) {
+            later::later(
+              function() {
+                log <<- c(log, paste(name, "settled"))
+                resolve(NULL)
+              },
+              0.05
+            )
+          })
+        }
+      ))
+    })
+  }
+  lead$add_hook(HookMatcher(
+    event = "SubagentStart",
+    timeout = 0,
+    callback = function(...) {
+      log <<- c(log, "SubagentStart")
+      NULL
+    }
+  ))
+
+  batch <- resolve_async_value(lead$parallel_delegate_async(c(
+    a = "one",
+    b = "two"
+  )))
+
+  expect_identical(batch$status, c(a = "completed", b = "completed"))
+  expect_identical(
+    log,
+    c(
+      "SessionStart fired",
+      "SessionStart settled",
+      "UserPromptSubmit fired",
+      "UserPromptSubmit settled",
+      "SubagentStart",
+      "SubagentStart"
+    )
+  )
+})
+
+test_that("an interrupt while a batch's SessionStart hook is pending starts no subagent", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  fired <- character()
+  lead$add_hook(HookMatcher(
+    event = "SessionStart",
+    timeout = 0,
+    callback = function(...) {
+      fired <<- c(fired, "SessionStart")
+      later::later(function() lead$interrupt(), 0.01)
+      later_value(NULL, 0.05)
+    }
+  ))
+  lead$add_hook(HookMatcher(
+    event = "UserPromptSubmit",
+    timeout = 0,
+    callback = function(...) {
+      fired <<- c(fired, "UserPromptSubmit")
+      NULL
+    }
+  ))
+
+  batch <- resolve_async_value(lead$parallel_delegate_async(c(
+    a = "one",
+    b = "two"
+  )))
+
+  expect_identical(fired, "SessionStart")
+  expect_identical(state$started, character())
+  expect_identical(batch$status, c(a = "not_started", b = "not_started"))
+  expect_identical(batch$run$stop_reason, "interrupted")
+  expect_true(S7::S7_inherits(batch$run$ending, RunEndingStopped))
+  expect_identical(batch$run$ending@by, "caller")
+  expect_false(lead$.__enclos_env__$private$run_active)
+})
+
+test_that("a batch that goes on without a cost still gives its next subagent a budget", {
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  # The failed request of `b` has no cost, so the batch's cost is unknown.
+  state$fail <- "b"
+
+  batch <- lead$parallel_delegate(
+    c(a = "first", b = "second", c = "third"),
+    max_active = 1,
+    usage_limits = UsageLimits(max_cost_usd = 0.5, on_unknown_cost = "continue")
+  )
+
+  expect_identical(
+    batch$status,
+    c(a = "completed", b = "failed", c = "completed")
+  )
+  expect_identical(batch$run$stop_reason, "delegation_error")
+  expect_identical(batch$run$usage$cost_usd, NA_real_)
+  expect_equal(batch$run$usage$known_cost_usd, 0.002)
+})
+
+test_that("a batch stopped at its start prepares no subagent", {
+  state <- new.env(parent = emptyenv())
+  chat <- create_parallel_chat(state)
+  clones <- 0L
+  clone <- chat$clone
+  chat$clone <- function(...) {
+    clones <<- clones + 1L
+    clone(...)
+  }
+  lead <- LeadAgent$new(
+    chat,
+    sub_agents = lapply(c("a", "b"), function(name) {
+      agent_definition(name, paste("Responder", name), name)
+    })
+  )
+  lead$add_hook(HookMatcher(
+    event = "SessionStart",
+    timeout = 0,
+    callback = function(...) {
+      lead$interrupt("not today")
+      NULL
+    }
+  ))
+  clones_before <- clones
+
+  batch <- lead$parallel_delegate(c(a = "one", b = "two"))
+
+  expect_identical(clones, clones_before)
+  expect_identical(state$started, character())
+  expect_identical(batch$status, c(a = "not_started", b = "not_started"))
+  expect_identical(batch$run$stop_reason, "not today")
+  expect_named(batch$outcomes, c("a", "b"))
+  expect_false(lead$.__enclos_env__$private$run_active)
+  expect_length(lead$.__enclos_env__$private$active_subagents, 0L)
+})

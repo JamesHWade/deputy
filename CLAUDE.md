@@ -66,6 +66,7 @@ deputy/
 │   ├── agent-definition.R # S7 AgentDefinition values and routing normalization
 │   ├── agent-definition-files.R # Portable YAML AgentDefinitions
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
+│   ├── run-ending.R        # RunEnding values and the stop-reason mapping
 │   ├── run-usage.R         # Run accounting and fail-closed limits
 │   ├── stall-detection.R   # Canonical repeated-tool progress signal
 │   ├── permissions.R       # S7 permission configuration and public evaluation
@@ -296,6 +297,11 @@ submission is blocked until then.
   explicit source loading. Tools nested in Skills retain caller-owned state.
   ADR-0015 records callback result validation, S7 family membership, and
   lifecycle interpretation. Nested tool-output payloads retain their identity.
+  ADR-0036 records run endings (`RunEnding` values on `AgentResult`), hooks
+  that answer with a promise and where each event waits, `Stop` sending a run
+  on, and why `Stop` and `SessionEnd` fire from the run's body. A hook that
+  returns a plain value must stay synchronous: use `hook_then()` and
+  `hook_unawaited()`, and never `coro::await()` a plain value.
 - **Printing**: Format summaries with `cli::cli_format_method()` and write the
   resulting lines with `cli::cat_line()` so printing remains on stdout. Pass
   user strings as interpolated values, never as cli templates, and return the
@@ -503,7 +509,12 @@ Owned factories return `DelegationResources` through public Agent/RSession/MCP
 interfaces; cleanup runs after settlement and preparation failure. Definition MCP
 selections require owned factories. Shared closures and workspaces are not isolated.
 Delegated durable approval/continuation is rejected until #152/#42 supports it.
-See ADR-0019 and `R/delegation-binding.R`.
+See ADR-0019 and `R/delegation-binding.R`. `DelegationPolicy(chat = )` builds
+every subagent's Chat (parallel responders included); the result is treated
+like a clone and refused if it is the lead's or owned by a live Agent.
+`AgentDefinition(params = )` holds standard `ellmer::params()`; clone-form
+definitions with params need that factory. Manifests (schema 2) record
+`provider` and `params` (ADR-0037).
 
 ### Child inspection
 
@@ -555,6 +566,19 @@ unserializes; restore checks envelope, scope (`delegation_scope` plus
 `chat_conversation_id`), settled status and every transcript, and creates no
 records or agents. `subagent_chat_server(conversation = )` follows the open
 conversation.
+
+Hosts with their own turn loop (they stream `lead$stream_async()` into the chat
+and keep conversations with `shinychat::chat_enable_history()`, whose
+controller is private in shinychat 0.5.0) leave out `chat` in both functions
+(#252). `subagent_chat_activity(lead = , requester = )` only checks the lead
+is an Agent. `subagent_chat_history(lead = , requester = , conversation_id = )`
+registers nothing and also returns `on_save`/`on_restore` for the host to pass
+to `chat_enable_history()`; the open conversation's ID comes from the
+`conversation_id` function, else `lead$conversation_id`, which the host sets
+before each reply (as `chat_server()` does) and before `on_restore` runs.
+Giving both `chat` and `conversation_id` is an error. `Agent$set_turns(list())`
+clears `conversation_id`: shinychat's new chat (and deleting the open
+conversation) only empties the client, never calling `on_restore`.
 
 ### Optional child chat panel
 
@@ -723,6 +747,16 @@ answers arrive as the next user message; delegated children reject deferral.
 `set_ask_user_callback()` is only a legacy
 process-wide fallback for single-Agent scripts; do not use it for Shiny or
 other concurrent hosts.
+
+`ask_user` declares `questions` as a typed array with `convert = FALSE`; a
+string (JSON text, a path or a URL) is rejected, never parsed or read.
+`validate_questions()` rejects bad questions with `tool_reject()` and
+normalizes them before any handler runs. Handlers return a named list keyed
+by exact question text, each value a character vector; `ask_user_answers()`
+splits it into `selected` labels and at most one `other_text`, and a bad
+shape is a handler error. Answered results are JSON (`ask_user_json()`:
+`selected` always an array, `other_text` null), the same for the delegated
+`human_input` tool; deferred results are unchanged (#218).
 
 ### Conversation R workers
 

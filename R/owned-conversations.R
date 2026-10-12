@@ -175,29 +175,22 @@ retain_conversation <- function(
 }
 
 conversation_remaining <- function(limits, usage) {
-  fields <- c(
-    max_requests = "requests",
-    max_tool_calls = "tool_calls",
-    max_input_tokens = "input_tokens",
-    max_output_tokens = "output_tokens",
-    max_total_tokens = "total_tokens",
-    max_cost_usd = "cost_usd"
-  )
-  values <- lapply(names(fields), function(field) {
-    limit <- S7::prop(limits, field)
-    if (is.null(limit)) {
-      return(NULL)
-    }
-    used <- S7::prop(usage, fields[[field]])
-    if (is.na(used)) {
-      conversation_abort(
-        "Cumulative usage is unavailable for the requested budget."
+  values <- usage_limits_remaining(limits, usage)
+  if (anyNA(unlist(values))) {
+    conversation_abort(
+      "Cumulative usage is unavailable for the requested budget."
+    )
+  }
+  do.call(
+    UsageLimits,
+    c(
+      values,
+      list(
+        on_unknown_cost = limits$on_unknown_cost,
+        on_exceed = limits$on_exceed
       )
-    }
-    max(0, limit - used)
-  })
-  names(values) <- names(fields)
-  do.call(UsageLimits, c(values, list(on_exceed = limits$on_exceed)))
+    )
+  )
 }
 
 continue_conversation <- function(

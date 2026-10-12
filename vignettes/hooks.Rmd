@@ -70,11 +70,12 @@ hook_matches(watch_writes, "read_file")
 | `PreToolUse` | before a tool runs | `tool_name, tool_input, context` |
 | `PostToolUse` | after a tool returns | `tool_name, tool_result, tool_error, context` |
 | `PostToolUseFailure` | after a tool fails | `tool_name, tool_result, tool_error, context` |
+| `PostModelRequest` | after each model request of a run | `context` |
 | `PermissionRequest` | when the permission policy denies a call | `tool_name, tool_input, permission_result, context` |
 | `SessionStart` | at the start of each run | `context` |
 | `UserPromptSubmit` | at the start of each run, with the task | `prompt, context` |
-| `Stop` | at the end of each run | `reason, context` |
-| `SessionEnd` | at the end of each run, after `Stop` | `reason, context` |
+| `Stop` | at each stop of a run | `reason, context` |
+| `SessionEnd` | once, when the run has ended | `reason, context` |
 | `SubagentStart` | when a subagent starts a delegated task | `agent_name, task, context` |
 | `SubagentStop` | when a subagent finishes | `agent_name, task, result, context` |
 | `PreCompact` | before older turns are summarised | `turns_to_compact, turns_to_keep, context` |
@@ -85,6 +86,23 @@ hook_matches(watch_writes, "read_file")
 `context` is a named list with the working directory, the agent and run
 identifiers, and fields specific to the event, such as the tool's annotations
 for `PreToolUse` or the run's usage for `Stop`. `?HookEvent` lists them all.
+
+`Stop` and `SessionEnd` also get the run's `ending` in `context`: a
+`RunEnding` value that says whether the run was answered, stopped, hit a
+limit, was cut off by the provider or failed. `PostModelRequest` gets the
+run's usage so far, so you can show what a run is spending while it runs:
+
+```{r}
+agent$add_hook(HookMatcher(
+  event = "PostModelRequest",
+  callback = function(context) {
+    cli::cli_alert_info(
+      "Request {context$request_number}: {context$usage$total_tokens} tokens so far"
+    )
+    NULL
+  }
+))
+```
 
 ## Block a tool call
 
@@ -155,6 +173,85 @@ stop_on_error <- HookMatcher(
 `HookResultPreToolUse()` also takes `continue` and `stop_reason`. Both take
 `additional_context`, text that Deputy appends to the system prompt.
 
+## Check an answer and send the run on
+
+A `Stop` hook sees a run that has just stopped. Return `HookResultStop()` to
+send an answered run on: Deputy asks the model again with your message, in the
+same run, so the run keeps its ID, its limits and its usage, and a stream
+carries on. This is how to check an answer and ask for a fix without starting
+a second run:
+
+```{r}
+needs_sources <- HookMatcher(
+  event = "Stop",
+  callback = function(reason, context) {
+    # Only an answered run, and only once.
+    if (!S7::S7_inherits(context$ending, RunEndingAnswered)) {
+      return(NULL)
+    }
+    if (context$stop_hook_active) {
+      return(NULL)
+    }
+    answer <- agent$last_turn()@text
+    if (!grepl("Sources:", answer, fixed = TRUE)) {
+      return(HookResultStop("Add a 'Sources:' line listing what you read."))
+    }
+    NULL
+  }
+)
+agent$add_hook(needs_sources)
+```
+
+`Stop` fires again when the run next stops, with `context$stop_hook_active`
+set to `TRUE`. Check it, as the hook above does, or the hook can send the run
+on for ever; the run's limits are the only other thing that would stop it.
+`SessionEnd` fires once, when the run has really ended. Only an answered run
+is sent on: a run that was stopped, hit a limit or failed ends as it stands.
+The result's `response` is the text of the last pass, and its `turns` hold
+them all.
+
+## Wait for something
+
+A callback can return a promise of its result. Deputy waits for it before
+going on, so a hook can ask a person, call another model or read a file
+without blocking your R session:
+
+```{r}
+ask_reviewer <- HookMatcher(
+  event = "PreToolUse",
+  pattern = "^run_bash$",
+  promise_timeout = 300,
+  callback = function(tool_name, tool_input, context) {
+    # ask_someone() returns a promise that resolves to TRUE or FALSE.
+    promises::then(ask_someone(tool_input$command), function(approved) {
+      if (approved) NULL else HookResultPreToolUse("deny", reason = "Not approved.")
+    })
+  }
+)
+```
+
+`promise_timeout` is how long Deputy waits, in seconds; the default is 60. A
+promise that is rejected or hasn't settled by then counts as no answer and is
+recorded as a hook error, and for `PreToolUse` that denies the call. Where the
+wait happens depends on the event:
+
+* `PreToolUse` and `PermissionRequest`: before the tool runs.
+* `PostToolUse` and `PostToolUseFailure`: before the next model request. The
+  tool's result is already recorded when the hook answers.
+* `PostModelRequest`, `SessionStart`, `UserPromptSubmit`, `SubagentStart`,
+  `SubagentStop`, and `PreCompact` and `PostCompact` during automatic
+  compaction: before the run goes on.
+* `Stop` and `SessionEnd`: before the run finishes. While a `Stop` hook waits,
+  the agent is still running, so it refuses a new run until the hook answers.
+* `Notification` and `ConfigChange`, and any hook fired by `$compact()`:
+  Deputy doesn't wait.
+
+If you call `agent$interrupt()` while a hook is waiting, the run stops when
+the hook's promise settles: a tool that was waiting doesn't run, and a `Stop`
+hook's answer no longer sends the run on. The same goes for a callback that
+calls `agent$interrupt()` itself: the tool it was asked about doesn't run.
+Otherwise a hook that returns a plain value behaves as it always has.
+
 ## Built-in hooks
 
 `hook_log_tools()` prints a line after each tool call saying whether it
@@ -190,7 +287,8 @@ a call before hooks that might allow it. The built-in hooks return `NULL`
 unless they deny a call.
 
 If a `PreToolUse` hook throws an error, Deputy denies the tool call. An error
-in any other hook is reported and the run carries on. `agent$hooks$last_errors()`
+in any other hook is reported and the run carries on. A promise that is
+rejected or times out is handled the same way. `agent$hooks$last_errors()`
 lists recent hook errors.
 
 ## Run a hook in a separate process
@@ -199,14 +297,16 @@ Hooks run in your R session by default, so they can read and update your
 objects. Give `HookMatcher()` a positive `timeout` (in seconds) to run the
 callback in a fresh R process that is killed if it takes too long. That
 process can't see your session's objects, so refer to package functions with
-`::`, for example `deputy::HookResultPreToolUse()`.
+`::`, for example `deputy::HookResultPreToolUse()`. It can't return a promise
+either.
 
 ## Hooks or results?
 
 Hooks are for reacting while a run is in progress. To analyse a run afterwards,
 use the `AgentResult` instead: `result_tool_calls()`, `result_tool_results()`
 and `result$events` hold the same information, without any hook state to
-manage.
+manage, and `result$ending` says how the run ended. With `$stream_async()`,
+`stream_result(stream)` gives a promise of that result.
 
 [Human input and approvals](approvals.html) shows hooks that ask a person to
 approve a tool call before it runs.

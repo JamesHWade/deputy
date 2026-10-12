@@ -12,7 +12,6 @@ test_that("required feature dependencies provide installation guidance", {
   expect_snapshot(error = TRUE, tool_web_fetch("https://example.com"))
   expect_snapshot(error = TRUE, tool_web_search("deputy"))
   expect_snapshot(error = TRUE, tools_mcp_repl())
-  expect_snapshot(error = TRUE, parse_multi_edits("[]"))
 
   skill_dir <- withr::local_tempdir()
   writeLines("name: example", file.path(skill_dir, "SKILL.yaml"))

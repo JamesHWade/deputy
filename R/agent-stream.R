@@ -70,6 +70,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       force(extraction)
       limits <- normalize_usage_limits(limits)
       state <- private$new_callback_run_state()
+      private$hold_unstarted_run(state)
       governed <- private$callback_run_stream(
         messages = messages,
         limits = limits,
@@ -87,13 +88,19 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       reg.finalizer(
         environment(governed),
         function(environment) {
+          # A stream dropped before it was read is no longer waiting to start,
+          # so an interrupt has nothing of it to stop.
+          agent$.__enclos_env__$private$release_unstarted_run(state)
           if (
             !isTRUE(state$finished) &&
               !is.null(state$active_run_id)
           ) {
             state$reason <- "abandoned"
             try(
-              agent$.__enclos_env__$private$request_stream_stop("abandoned"),
+              agent$.__enclos_env__$private$request_stream_stop(
+                "abandoned",
+                by = "abandoned"
+              ),
               silent = TRUE
             )
             try(
@@ -170,10 +177,19 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       )
     },
 
-    request_stream_stop = function(reason) {
+    # `by` names who asked for the stop (see RunEnding). A stop with no `by`
+    # clears any earlier one, so a limit's stop is not credited to a caller.
+    request_stream_stop = function(reason, by = NULL) {
       private$should_stop <- TRUE
       private$stop_reason_from_hook <- reason
-      graph_cancel_descendants(self, reason)
+      private$stop_requested_by <- by
+      # The runs below are stopped by their caller, this run, unless the stop
+      # is a parent's end coming down the tree.
+      graph_cancel_descendants(
+        self,
+        reason,
+        by = if (identical(by, "parent")) "parent" else "caller"
+      )
       cancel_active_mcp_tools(
         c(private$.chat$get_tools(), private$active_owned_tools),
         self,
@@ -221,6 +237,17 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       state$limits <- NULL
       state$result <- NULL
       state$turns_before <- 0L
+      state$ending <- NULL
+      state$run_error <- NULL
+      state$cost_warned <- FALSE
+      state$stop_hook_active <- FALSE
+      state$stop_hook_fired <- FALSE
+      state$session_end_fired <- FALSE
+      state$ended <- FALSE
+      state$result_promise <- NULL
+      state$resolve_result <- NULL
+      state$reject_result <- NULL
+      state$interrupt_before_start <- NULL
       state
     },
 
@@ -240,6 +267,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       }
 
       AgentResult(
+        ending = state$ending,
         response = response,
         turns = private$.chat$get_turns(),
         cost = state$cost %||% self$cost(),
@@ -290,6 +318,169 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       )
     },
 
+    # Settles the run's reason, usage, cost and limit, the facts a Stop hook
+    # reads. Called from the run's body before Stop and from
+    # finish_callback_run(); each block checks what an earlier call set.
+    settle_run = function(state) {
+      # Once SessionEnd has been told how the run ended, that is how it
+      # ended: a stop that arrives while that hook is pending has nothing
+      # left to stop.
+      if (isTRUE(state$ended)) {
+        return(invisible(NULL))
+      }
+      # The last turn is read before the reason is settled, as the finishing
+      # code always did: a Chat may deliver a pending tool result when its
+      # last turn is read, and a hook's stop from that result counts.
+      tryCatch(private$.chat$last_turn(), error = function(e) NULL)
+      if (isTRUE(private$should_stop) && identical(state$reason, "complete")) {
+        state$reason <- private$stop_reason_from_hook %||%
+          "hook_requested_stop"
+      }
+      incomplete_tool_call <-
+        private$current_tool_calls > private$current_tool_results
+      private$finalize_pending_checkpoints()
+      usage <- private$current_run_usage()
+      state$usage <- usage
+      state$cost <- tryCatch(self$cost(), error = function(e) NULL)
+      if (!is.null(state$cost) && is.na(usage$cost_usd)) {
+        state$cost$total <- NA_real_
+        state$cost$complete <- FALSE
+        state$cost$missing <- max(1L, state$cost$missing %||% 0L)
+      }
+      private$last_run_usage <- usage
+      limits <- private$current_usage_limits
+      if (
+        identical(state$reason, "complete") &&
+          isTRUE(incomplete_tool_call)
+      ) {
+        state$reason <- "provider_error"
+        private$notify(
+          "Provider stream ended before a tool result arrived.",
+          level = "warning",
+          code = "provider_error",
+          usage = usage
+        )
+      }
+      if (identical(state$reason, "complete") && !is.null(limits)) {
+        limit_status <- tree_usage_status(
+          self,
+          require_followup = FALSE
+        ) %||%
+          usage_limit_status(usage, limits)
+        if (!is.null(limit_status)) {
+          private$last_limit_status <- limit_status
+          state$reason <- limit_status$reason
+          private$notify(
+            usage_limit_message(limit_status),
+            level = "warning",
+            code = limit_status$reason,
+            usage = usage,
+            limit = limit_status$limit
+          )
+        }
+      }
+      # settle_run() runs again after a Stop hook, so the warning is guarded.
+      # It reads the cost the limit is checked against.
+      limited_cost <- if (!is.null(limits$max_cost_usd)) {
+        usage_against_limits(usage, limits)$max_cost_usd
+      }
+      if (
+        is.null(private$last_limit_status) &&
+          !isTRUE(state$cost_warned) &&
+          !is.null(limited_cost) &&
+          is.finite(limited_cost) &&
+          limited_cost >= limits$max_cost_usd * 0.9
+      ) {
+        state$cost_warned <- TRUE
+        private$notify(
+          paste0(
+            "Approaching run cost limit: ",
+            format_cost(limited_cost),
+            " / ",
+            format_cost(limits$max_cost_usd)
+          ),
+          level = "warning",
+          code = "cost_limit_warning",
+          usage = usage,
+          max_cost_usd = limits$max_cost_usd
+        )
+        cli::cli_warn(
+          "Approaching run cost limit: {format_cost(limited_cost)} / {format_cost(limits$max_cost_usd)}"
+        )
+      }
+      invisible(NULL)
+    },
+
+    # The run's RunEnding as it stands. Built from the same facts for the
+    # hooks that read it and for the run's result.
+    run_ending_now = function(state) {
+      turns <- private$.chat$get_turns()
+      last_turn <- if (length(turns) > state$turns_before) {
+        tryCatch(private$.chat$last_turn(), error = function(e) NULL)
+      }
+      finish_reason <- tryCatch(last_turn@finish_reason, error = function(e) {
+        NULL
+      })
+      run_ending_for(
+        state$reason,
+        # Who asked matters only when the run's reason is the one they gave.
+        by = if (
+          isTRUE(private$should_stop) &&
+            identical(state$reason, private$stop_reason_from_hook)
+        ) {
+          private$stop_requested_by
+        },
+        limit_status = private$last_limit_status,
+        finish_reason = finish_reason,
+        error = state$run_error$condition,
+        phase = state$run_error$phase
+      )
+    },
+
+    # Fires "Stop" or "SessionEnd" for the run and returns what fire_hook
+    # returned.
+    fire_end_hook = function(event, state) {
+      context <- private$hook_context(
+        cost = self$cost(),
+        usage = state$usage,
+        run_id = state$active_run_id,
+        ending = private$run_ending_now(state)
+      )
+      if (identical(event, "Stop")) {
+        context$stop_hook_active <- isTRUE(state$stop_hook_active)
+      }
+      private$fire_hook(event, reason = state$reason, context = context)
+    },
+
+    # Stop, fired from the body of a run, where the run can wait for the
+    # answer. Returns the hook's answer, or a promise of it.
+    stop_in_body = function(state) {
+      # Stop and SessionEnd fire only once the run has started a session, as
+      # finish_callback_run() has it for the other endings.
+      if (!isTRUE(state$session_started)) {
+        return(NULL)
+      }
+      private$settle_run(state)
+      state$stop_hook_fired <- TRUE
+      hook_then(private$fire_end_hook("Stop", state), function(answer) {
+        # An interrupt that arrived while the hook was pending takes effect now.
+        private$settle_run(state)
+        answer
+      })
+    },
+
+    # SessionEnd, fired from the body of a run once nothing can send it on.
+    # Returns a promise when a callback returned one.
+    session_end_in_body = function(state) {
+      graph_cancel_descendants(self, "parent_completed", by = "parent")
+      if (!isTRUE(state$session_started)) {
+        return(NULL)
+      }
+      state$session_end_fired <- TRUE
+      state$ended <- TRUE
+      private$fire_end_hook("SessionEnd", state)
+    },
+
     # Terminal accounting for a callback-driven run: settles the stop reason,
     # fires Stop/SessionEnd, records
     # run-scoped usage and cost on `state`, and releases the active run.
@@ -303,7 +494,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
         return(invisible(NULL))
       }
       state$finished <- TRUE
-      graph_cancel_descendants(self, "parent_completed")
+      graph_cancel_descendants(self, "parent_completed", by = "parent")
       on.exit(finish_run_trace(state), add = TRUE)
       on.exit(remove_request_callbacks(private$.chat), add = TRUE)
       on.exit(
@@ -328,96 +519,20 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             private$.chat$last_turn(),
             error = function(e) NULL
           )
-          if (
-            isTRUE(private$should_stop) && identical(state$reason, "complete")
-          ) {
-            state$reason <- private$stop_reason_from_hook %||%
-              "hook_requested_stop"
-          }
-          incomplete_tool_call <-
-            private$current_tool_calls > private$current_tool_results
-          private$finalize_pending_checkpoints()
-          usage <- private$current_run_usage()
-          state$usage <- usage
-          state$cost <- tryCatch(self$cost(), error = function(e) NULL)
-          if (!is.null(state$cost) && is.na(usage$cost_usd)) {
-            state$cost$total <- NA_real_
-            state$cost$complete <- FALSE
-            state$cost$missing <- max(1L, state$cost$missing %||% 0L)
-          }
-          private$last_run_usage <- usage
+          private$settle_run(state)
+          usage <- state$usage
           limits <- private$current_usage_limits
-          if (
-            identical(state$reason, "complete") &&
-              isTRUE(incomplete_tool_call)
-          ) {
-            state$reason <- "provider_error"
-            private$notify(
-              "Provider stream ended before a tool result arrived.",
-              level = "warning",
-              code = "provider_error",
-              usage = usage
-            )
-          }
-          if (identical(state$reason, "complete") && !is.null(limits)) {
-            limit_status <- tree_usage_status(
-              self,
-              require_followup = FALSE
-            ) %||%
-              usage_limit_status(usage, limits)
-            if (!is.null(limit_status)) {
-              private$last_limit_status <- limit_status
-              state$reason <- limit_status$reason
-              private$notify(
-                usage_limit_message(limit_status),
-                level = "warning",
-                code = limit_status$reason,
-                usage = usage,
-                limit = limit_status$limit
-              )
-            }
-          }
-          if (
-            is.null(private$last_limit_status) &&
-              !is.null(limits$max_cost_usd) &&
-              is.finite(usage$cost_usd) &&
-              usage$cost_usd >= limits$max_cost_usd * 0.9
-          ) {
-            private$notify(
-              paste0(
-                "Approaching run cost limit: ",
-                format_cost(usage$cost_usd),
-                " / ",
-                format_cost(limits$max_cost_usd)
-              ),
-              level = "warning",
-              code = "cost_limit_warning",
-              usage = usage,
-              max_cost_usd = limits$max_cost_usd
-            )
-            cli::cli_warn(
-              "Approaching run cost limit: {format_cost(usage$cost_usd)} / {format_cost(limits$max_cost_usd)}"
-            )
-          }
+          # A run that ends outside its body cannot wait for a promise, so a
+          # hook the body did not fire is fired here and not waited for.
           if (isTRUE(state$session_started)) {
-            private$fire_hook(
-              "Stop",
-              reason = state$reason,
-              context = private$hook_context(
-                cost = self$cost(),
-                usage = usage,
-                run_id = active_run_id
-              )
-            )
-            private$fire_hook(
-              "SessionEnd",
-              reason = state$reason,
-              context = private$hook_context(
-                cost = self$cost(),
-                usage = usage,
-                run_id = active_run_id
-              )
-            )
+            if (!isTRUE(state$stop_hook_fired)) {
+              state$stop_hook_fired <- TRUE
+              hook_unawaited(private$fire_end_hook("Stop", state))
+            }
+            if (!isTRUE(state$session_end_fired)) {
+              state$session_end_fired <- TRUE
+              hook_unawaited(private$fire_end_hook("SessionEnd", state))
+            }
           }
 
           if (length(state$response_parts) > 0L) {
@@ -440,6 +555,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
               turn_number = max(1L, usage$requests)
             ))
           }
+          state$ending <- private$run_ending_now(state)
           private$record_run_event(private$agent_event(
             "usage",
             usage = usage,
@@ -450,7 +566,8 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
             reason = state$reason,
             cost = state$cost,
             usage = usage,
-            limit = private$last_limit_status
+            limit = private$last_limit_status,
+            ending = state$ending
           ))
           private$commit_approval_state(
             if (identical(state$reason, "complete")) "completed" else "stopped",
@@ -482,6 +599,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       private$consecutive_tool_cycles <- 0L
       private$should_stop <- FALSE
       private$stop_reason_from_hook <- NULL
+      private$stop_requested_by <- NULL
       tryCatch(
         private$finish_active_run(),
         error = function(error) {
@@ -490,14 +608,48 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           }
         }
       )
+      # Settled after the agent is free, so a caller's then() can start the next run.
+      if (is.function(state$resolve_result)) {
+        if (!is.null(state$result)) {
+          state$resolve_result(state$result)
+        } else {
+          state$reject_result(
+            cleanup_error %||% run_without_result_error()
+          )
+        }
+      }
       if (!is.null(cleanup_error)) {
         stop(cleanup_error)
       }
       invisible(NULL)
     },
 
+    # A stream that was made waits to start until it is first read. The agent
+    # holds the state of each one, so an interrupt reaches them all.
+    hold_unstarted_run = function(state) {
+      private$unstarted_runs <- c(private$unstarted_runs, list(state))
+      invisible(NULL)
+    },
+
+    # The stream has started, was refused, or was dropped unread.
+    release_unstarted_run = function(state) {
+      private$unstarted_runs <- Filter(
+        function(waiting) !identical(waiting, state),
+        private$unstarted_runs
+      )
+      invisible(NULL)
+    },
+
+    # Promises of hooks that ellmer does not wait for. Taking them empties the list.
+    take_held_hooks = function() {
+      held <- private$held_hooks
+      private$held_hooks <- list()
+      held
+    },
+
     finish_active_run = function() {
       tree_run_finished(self)
+      private$release_unstarted_run(private$current_run_state)
       checkpoint_error <- NULL
       tryCatch(
         private$finalize_pending_checkpoints(),
@@ -519,6 +671,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       private$tool_event_overrides <- list()
       private$tool_call_records <- list()
       private$pending_delegations <- list()
+      private$held_hooks <- list()
       private$original_tool_results <- list()
       private$last_tool_cycle_signature <- NULL
       private$consecutive_tool_cycles <- 0L
@@ -540,6 +693,13 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
 # coro caches each factory's state machine, so these factories are defined once
 # and receive per-run values as arguments instead of closing over a method
 # frame. Their bodies reference only arguments and namespace functions.
+
+# A stream that ends at once: for a run that is stopped before it asks the
+# model. Defined once, as the factories below are.
+empty_run_stream <- coro::async_generator(function() {
+  # jarl-ignore unreachable_code: the yield is never run; it makes this a generator
+  if (FALSE) coro::yield("unreachable")
+})
 
 collect_governed_stream_async <- coro::async(function(stream, state) {
   repeat {
@@ -612,30 +772,46 @@ governed_run_stream <- coro::async_generator(function(
   stream_type,
   conversation_token
 ) {
-  check_conversation_lease(agent, conversation_token)
-  if (isTRUE(agent$.__enclos_env__$private$run_active)) {
-    cli::cli_abort(
-      "This agent already has an active run",
-      class = c("deputy_run_active", "deputy_error")
-    )
-  }
+  tryCatch(
+    {
+      check_conversation_lease(agent, conversation_token)
+      if (isTRUE(agent$.__enclos_env__$private$run_active)) {
+        cli::cli_abort(
+          "This agent already has an active run",
+          class = c("deputy_run_active", "deputy_error")
+        )
+      }
+    },
+    error = function(error) {
+      refuse_unstarted_run(agent, stream_state, error)
+      rlang::cnd_signal(error)
+    }
+  )
 
   on.exit(
     agent$.__enclos_env__$private$finish_callback_run(stream_state),
     add = TRUE
   )
   tryCatch(
-    initialize_agent_run(
-      agent,
-      stream_state,
-      messages,
-      run_limits,
-      effective_run_context,
-      controller,
-      stream_mode
-    ),
+    {
+      initialize_agent_run(
+        agent,
+        stream_state,
+        messages,
+        run_limits,
+        effective_run_context,
+        controller,
+        stream_mode
+      )
+      started <- run_start_hooks(agent, stream_state, messages)
+      if (promises::is.promising(started)) {
+        coro::await(started)
+      }
+    },
     error = function(error) {
       stream_state$reason <- "error"
+      # A Chat another Agent holds refuses the run before it has an ID.
+      refuse_unstarted_run(agent, stream_state, error)
       record_run_failure(agent, "initialization", error)
       rlang::cnd_signal(error)
     }
@@ -671,9 +847,7 @@ governed_run_stream <- coro::async_generator(function(
   active_run_id <- stream_state$active_run_id
 
   if (agent$.__enclos_env__$private$should_stop) {
-    stream <- coro::async_generator(function() {
-      if (FALSE) coro::yield("unreachable")
-    })()
+    stream <- empty_run_stream()
   } else {
     stream <- tryCatch(
       agent$.__enclos_env__$private$start_async_stream(
@@ -691,177 +865,233 @@ governed_run_stream <- coro::async_generator(function(
   }
   is_generator <- inherits(stream, "coro_generator_instance")
 
+  # One pass per iteration: a model stream, then the hooks at its stop.
   repeat {
-    if (agent$.__enclos_env__$private$should_stop) {
-      stream_state$reason <-
-        agent$.__enclos_env__$private$stop_reason_from_hook %||%
-        "interrupted"
-      break
-    }
-
-    stream_error <- NULL
-    chunk <- NULL
-    if (isTRUE(is_generator)) {
-      chunk <- tryCatch(
-        with_run_trace(stream_state, stream()),
-        error = function(error) {
-          stream_error <<- error
-          NULL
-        }
-      )
-    } else {
-      chunk <- stream
-    }
-
-    if (is.null(stream_error) && promises::is.promising(chunk)) {
-      chunk <- tryCatch(
-        coro::await(chunk),
-        error = function(error) {
-          stream_error <<- error
-          NULL
-        }
-      )
-    }
-
-    if (!is.null(stream_error)) {
+    repeat {
       if (agent$.__enclos_env__$private$should_stop) {
         stream_state$reason <-
           agent$.__enclos_env__$private$stop_reason_from_hook %||%
           "interrupted"
         break
       }
-      stream_state$reason <- "error"
-      # Structured requests record dispatch errors before applying
-      # validation; a rejected value is a separate run outcome.
-      if (is.null(structured) && is.null(stream_state$failure_phase)) {
-        record_model_failure(agent, stream_error)
-      }
-      if (
-        is.null(stream_state$failure_phase) &&
-          try_chat_fallback(agent, stream_error)
-      ) {
-        stream <- tryCatch(
-          agent$.__enclos_env__$private$start_async_stream(
-            messages,
-            tool_mode,
-            stream_mode,
-            agent$.__enclos_env__$private$current_stream_controller,
-            structured,
-            stream_type
-          ),
-          error = function(error) promises::promise_reject(error)
+
+      stream_error <- NULL
+      chunk <- NULL
+      if (isTRUE(is_generator)) {
+        chunk <- tryCatch(
+          with_run_trace(stream_state, stream()),
+          error = function(error) {
+            stream_error <<- error
+            NULL
+          }
         )
-        stream_state$reason <- "complete"
-        is_generator <- inherits(stream, "coro_generator_instance")
-        next
+      } else {
+        chunk <- stream
       }
+
+      if (is.null(stream_error) && promises::is.promising(chunk)) {
+        chunk <- tryCatch(
+          coro::await(chunk),
+          error = function(error) {
+            stream_error <<- error
+            NULL
+          }
+        )
+      }
+
+      if (!is.null(stream_error)) {
+        if (agent$.__enclos_env__$private$should_stop) {
+          stream_state$reason <-
+            agent$.__enclos_env__$private$stop_reason_from_hook %||%
+            "interrupted"
+          break
+        }
+        stream_state$reason <- "error"
+        # Structured requests record dispatch errors before applying
+        # validation; a rejected value is a separate run outcome.
+        if (is.null(structured) && is.null(stream_state$failure_phase)) {
+          record_model_failure(agent, stream_error)
+        }
+        if (
+          is.null(stream_state$failure_phase) &&
+            try_chat_fallback(agent, stream_error)
+        ) {
+          stream <- tryCatch(
+            agent$.__enclos_env__$private$start_async_stream(
+              messages,
+              tool_mode,
+              stream_mode,
+              agent$.__enclos_env__$private$current_stream_controller,
+              structured,
+              stream_type
+            ),
+            error = function(error) promises::promise_reject(error)
+          )
+          stream_state$reason <- "complete"
+          is_generator <- inherits(stream, "coro_generator_instance")
+          next
+        }
+        if (agent$.__enclos_env__$private$should_stop) {
+          stream_state$reason <- agent$.__enclos_env__$private$stop_reason_from_hook
+          break
+        }
+        stream_state$reason <- "error"
+        record_run_failure(
+          agent,
+          stream_state$failure_phase %||%
+            if (is.null(structured)) "stream" else "structured_output",
+          stream_error
+        )
+        rlang::cnd_signal(stream_error)
+      }
+
       if (agent$.__enclos_env__$private$should_stop) {
-        stream_state$reason <- agent$.__enclos_env__$private$stop_reason_from_hook
+        stream_state$reason <-
+          agent$.__enclos_env__$private$stop_reason_from_hook %||%
+          "interrupted"
         break
       }
-      stream_state$reason <- "error"
-      record_run_failure(
-        agent,
-        stream_state$failure_phase %||%
-          if (is.null(structured)) "stream" else "structured_output",
-        stream_error
-      )
-      rlang::cnd_signal(stream_error)
-    }
 
-    if (agent$.__enclos_env__$private$should_stop) {
-      stream_state$reason <-
-        agent$.__enclos_env__$private$stop_reason_from_hook %||%
-        "interrupted"
-      break
-    }
-
-    if (coro::is_exhausted(chunk)) {
-      break
-    }
-
-    stream_state$response_seen <- TRUE
-    if (!is.null(structured)) {
-      stream_state$structured_output <- chunk
-    }
-
-    if (inherits(chunk, "ellmer::ContentToolRequest")) {
-      extracted <- agent$.__enclos_env__$private$extract_tool_request_data(
-        chunk
-      )
-      agent$.__enclos_env__$private$record_run_event(
-        agent$.__enclos_env__$private$tool_start_event(extracted)
-      )
-    } else if (inherits(chunk, "ellmer::ContentToolResult")) {
-      stream_state$response_parts <- character()
-    } else if (inherits(chunk, "ellmer::ContentText")) {
-      stream_state$response_parts <- c(
-        stream_state$response_parts,
-        chunk@text
-      )
-      agent$.__enclos_env__$private$record_run_event(
-        AgentEvent(
-          "text",
-          run_id = active_run_id,
-          text = chunk@text,
-          is_complete = FALSE
-        )
-      )
-    } else if (is.character(chunk) && length(chunk) == 1L) {
-      stream_state$response_parts <- c(
-        stream_state$response_parts,
-        chunk
-      )
-      agent$.__enclos_env__$private$record_run_event(
-        AgentEvent(
-          "text",
-          run_id = active_run_id,
-          text = chunk,
-          is_complete = FALSE
-        )
-      )
-    } else if (
-      !inherits(chunk, "ellmer::ContentToolRequest") &&
-        !inherits(chunk, "ellmer::ContentToolResult")
-    ) {
-      agent$.__enclos_env__$private$record_run_event(
-        AgentEvent(
-          "content",
-          run_id = active_run_id,
-          content = chunk,
-          content_type = class(chunk)[[1L]] %||% "unknown"
-        )
-      )
-    }
-
-    coro::yield(chunk)
-    if (!isTRUE(is_generator)) {
-      break
-    }
-  }
-  if (
-    !is.null(extraction) &&
-      !agent$.__enclos_env__$private$should_stop &&
-      agent$.__enclos_env__$private$current_tool_calls <=
-        agent$.__enclos_env__$private$current_tool_results
-  ) {
-    extracted_output <- tryCatch(
-      coro::await(governed_structured_request(
-        agent,
-        list(
-          "Extract the requested structured result from the completed task and conversation."
-        ),
-        extraction
-      )),
-      error = function(error) {
-        if (!agent$.__enclos_env__$private$should_stop) {
-          record_run_failure(agent, "extraction", error)
-          stream_state$reason <- "error"
-          rlang::cnd_signal(error)
-        }
-        NULL
+      if (coro::is_exhausted(chunk)) {
+        break
       }
-    )
-    stream_state$structured_output <- extracted_output
+
+      stream_state$response_seen <- TRUE
+      if (!is.null(structured)) {
+        stream_state$structured_output <- chunk
+      }
+
+      if (inherits(chunk, "ellmer::ContentToolRequest")) {
+        extracted <- agent$.__enclos_env__$private$extract_tool_request_data(
+          chunk
+        )
+        agent$.__enclos_env__$private$record_run_event(
+          agent$.__enclos_env__$private$tool_start_event(extracted)
+        )
+      } else if (inherits(chunk, "ellmer::ContentToolResult")) {
+        stream_state$response_parts <- character()
+      } else if (inherits(chunk, "ellmer::ContentText")) {
+        stream_state$response_parts <- c(
+          stream_state$response_parts,
+          chunk@text
+        )
+        agent$.__enclos_env__$private$record_run_event(
+          AgentEvent(
+            "text",
+            run_id = active_run_id,
+            text = chunk@text,
+            is_complete = FALSE
+          )
+        )
+      } else if (is.character(chunk) && length(chunk) == 1L) {
+        stream_state$response_parts <- c(
+          stream_state$response_parts,
+          chunk
+        )
+        agent$.__enclos_env__$private$record_run_event(
+          AgentEvent(
+            "text",
+            run_id = active_run_id,
+            text = chunk,
+            is_complete = FALSE
+          )
+        )
+      } else if (
+        !inherits(chunk, "ellmer::ContentToolRequest") &&
+          !inherits(chunk, "ellmer::ContentToolResult")
+      ) {
+        agent$.__enclos_env__$private$record_run_event(
+          AgentEvent(
+            "content",
+            run_id = active_run_id,
+            content = chunk,
+            content_type = class(chunk)[[1L]] %||% "unknown"
+          )
+        )
+      }
+
+      coro::yield(chunk)
+      if (!isTRUE(is_generator)) {
+        break
+      }
+    }
+    if (
+      !is.null(extraction) &&
+        !agent$.__enclos_env__$private$should_stop &&
+        agent$.__enclos_env__$private$current_tool_calls <=
+          agent$.__enclos_env__$private$current_tool_results
+    ) {
+      extracted_output <- tryCatch(
+        coro::await(governed_structured_request(
+          agent,
+          list(
+            "Extract the requested structured result from the completed task and conversation."
+          ),
+          extraction
+        )),
+        error = function(error) {
+          if (!agent$.__enclos_env__$private$should_stop) {
+            record_run_failure(agent, "extraction", error)
+            stream_state$reason <- "error"
+            rlang::cnd_signal(error)
+          }
+          NULL
+        }
+      )
+      stream_state$structured_output <- extracted_output
+    }
+    held <- agent$.__enclos_env__$private$take_held_hooks()
+    if (length(held)) {
+      coro::await(promises::promise_all(.list = held))
+    }
+    stop_answer <- agent$.__enclos_env__$private$stop_in_body(stream_state)
+    if (promises::is.promising(stop_answer)) {
+      stop_answer <- coro::await(stop_answer)
+    }
+    # A Stop hook may send an answered run on. Nothing else is sent on: a run
+    # that was stopped, hit a limit or failed ends as it stands.
+    if (
+      S7::S7_inherits(stop_answer, HookResultStop) &&
+        # The ending, not the reason: an answer the provider cut short has
+        # the reason "complete" too.
+        S7::S7_inherits(
+          agent$.__enclos_env__$private$run_ending_now(stream_state),
+          RunEndingAnswered
+        ) &&
+        !agent$.__enclos_env__$private$should_stop &&
+        is.null(structured)
+    ) {
+      stream_state$stop_hook_active <- TRUE
+      stream_state$stop_hook_fired <- FALSE
+      # The result's response is the last pass's text.
+      stream_state$response_parts <- character()
+      stream_state$structured_output <- NULL
+      stream <- tryCatch(
+        agent$.__enclos_env__$private$start_async_stream(
+          messages = list(stop_answer@message),
+          tool_mode = tool_mode,
+          stream = stream_mode,
+          controller = agent$.__enclos_env__$private$current_stream_controller,
+          structured = NULL,
+          stream_type = stream_type
+        ),
+        error = function(error) {
+          # A limit can refuse the request as the stream is made. The loop
+          # then ends the run on its first check and never reads the stream,
+          # so a rejected promise here would have nobody to handle it.
+          if (agent$.__enclos_env__$private$should_stop) {
+            return(empty_run_stream())
+          }
+          promises::promise_reject(error)
+        }
+      )
+      is_generator <- inherits(stream, "coro_generator_instance")
+      next
+    }
+    break
+  }
+  ended <- agent$.__enclos_env__$private$session_end_in_body(stream_state)
+  if (promises::is.promising(ended)) {
+    coro::await(ended)
   }
 })

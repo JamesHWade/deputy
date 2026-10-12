@@ -301,6 +301,34 @@ test_that("a rejected graph binding leaves every ledger unchanged", {
   expect_identical(job_graph_snapshot(restored), before)
 })
 
+test_that("a job saved under another deputy version is refused before anything is compared", {
+  # A manifest's limits and usage records are plain property lists, so their
+  # shape changes when a property is added. The recorded version is what
+  # keeps a job saved by another build from being compared at all.
+  working_dir <- withr::local_tempdir(pattern = "deputy-job-version-")
+  source <- job_runtime_test_graph(working_dir, "version")
+  on.exit(try(source$release_agent_graph(), silent = TRUE), add = TRUE)
+  manifest <- job_agent_manifest(source)
+  expect_identical(
+    manifest$runtime$deputy,
+    as.character(utils::packageVersion("deputy"))
+  )
+  manifest$runtime$deputy <- "0.0.0.9002"
+  for (name in names(manifest$graph$members)) {
+    manifest$graph$members[[name]]$limits$on_unknown_cost <- NULL
+    manifest$graph$members[[name]]$usage$known_cost_usd <- NULL
+  }
+  restored <- job_runtime_test_graph(working_dir, "version")
+  on.exit(try(restored$release_agent_graph(), silent = TRUE), add = TRUE)
+  before <- job_graph_snapshot(restored)
+
+  expect_error(
+    job_bind_agent(restored, list(status = "queued", manifest = manifest)),
+    "original compatible runtime versions"
+  )
+  expect_identical(job_graph_snapshot(restored), before)
+})
+
 test_that("rebinding cannot erase root-only work after history replacement", {
   working_dir <- withr::local_tempdir()
   root <- job_runtime_test_graph(working_dir, "advanced")

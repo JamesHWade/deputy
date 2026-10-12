@@ -98,6 +98,8 @@ reference:
   contents:
   - Agent
   - AgentResult
+  - RunEnding
+  - stream_result
   - result_is_success
   - result_n_turns
   - result_text_chunks
@@ -197,6 +199,7 @@ reference:
   - HookResultPreToolUse
   - HookResultPostToolUse
   - HookResultPreCompact
+  - HookResultStop
   - CallbackResult
 
 - title: Skills

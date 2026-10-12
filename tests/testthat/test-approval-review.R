@@ -650,3 +650,14 @@ test_that("enum values that browsers rewrite are read-only", {
   )
   expect_identical(field$mode, "readonly")
 })
+
+test_that("the approval review refreshes when a run has ended, not at each stop", {
+  agent <- Agent$new(chat = create_mock_chat())
+  stops <- length(agent$hooks$get_hooks("Stop"))
+  session_ends <- length(agent$hooks$get_hooks("SessionEnd"))
+
+  shiny::testServer(approval_review_server, args = list(agent = agent), {})
+
+  expect_length(agent$hooks$get_hooks("SessionEnd"), session_ends + 1L)
+  expect_length(agent$hooks$get_hooks("Stop"), stops)
+})

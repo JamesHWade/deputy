@@ -633,6 +633,33 @@ test_that("multi_edit keeps CRLF line endings and the final newline state", {
   expect_identical(edit_test_bytes(path), "one\r\ntwo\r\nthree")
 })
 
+test_that("multi_edit takes an array of edits, never text to parse", {
+  path <- edit_test_file("alpha\nbeta\n")
+  saved <- withr::local_tempfile(fileext = ".json")
+  writeLines('[{"old_text": "alpha", "new_text": "one"}]', saved)
+  invalid <- list(
+    saved,
+    "http://127.0.0.1:9/edits.json",
+    '[{"old_text": "alpha", "new_text": "one"}]',
+    list(),
+    list(list(old_string = "alpha", new_string = "one")),
+    list(list(old_text = "", new_text = "one")),
+    list(list(old_text = "alpha", new_text = "one", replace_all = "yes"))
+  )
+  for (edits in invalid) {
+    expect_error(tool_multi_edit(path, edits), "Error applying edits")
+  }
+  expect_identical(edit_test_bytes(path), "alpha\nbeta\n")
+
+  tool_multi_edit(path, list(list(old_text = "alpha", new_text = "one")))
+  expect_identical(edit_test_bytes(path), "one\nbeta\n")
+  expect_false(tool_multi_edit@convert)
+  expect_true(inherits(
+    tool_multi_edit@arguments@properties$edits,
+    "ellmer::TypeArray"
+  ))
+})
+
 test_that("edit tools leave mixed line endings outside the edit unchanged", {
   path <- edit_test_file("alpha\r\nbeta\ngamma\r\n")
 

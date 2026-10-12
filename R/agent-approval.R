@@ -104,7 +104,7 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
         tool_input = request@arguments,
         reason = reason
       ))
-      private$request_stream_stop("approval_pending")
+      private$request_stream_stop("approval_pending", by = "approval")
       approval_abort(
         "Run suspended for approval.",
         class = "approval_pending",
@@ -328,7 +328,10 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
         # wrappers remain in force for the restored operation.
         output <- tryCatch(
           {
-            private$handle_tool_request(request)
+            # A current hook may answer with a promise, which is waited for
+            # as the tool's own promise is below: a denial or a stop rejects
+            # it, as a plain denial throws.
+            private$resolve_promise(private$handle_tool_request(request))
             # Returning from admission authorizes this operation. A current
             # hook may request stopping after it; denials already throw above.
             ellmer::with_tool_context(

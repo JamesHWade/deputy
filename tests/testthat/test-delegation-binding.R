@@ -55,7 +55,14 @@ test_that("binding configuration is immutable and rejects unsupported combinatio
 })
 
 test_that("concurrent owners receive only their own routed human requests and policy", {
-  question <- '[{"question":"Continue?","header":"Choice","options":[{"label":"Yes","description":"Continue"},{"label":"No","description":"Stop"}]}]'
+  question <- list(list(
+    question = "Continue?",
+    header = "Choice",
+    options = list(
+      list(label = "Yes", description = "Continue"),
+      list(label = "No", description = "Stop")
+    )
+  ))
   responses <- list(
     runtime_reply(tool = "ask_user", arguments = list(questions = question)),
     runtime_reply(tool = "effect"),
@@ -647,6 +654,49 @@ test_that("forwarded governance failures are retained with their delegation", {
     callback = function(...) cli::cli_abort("host governance failed")
   ))
   expect_snapshot(binding_run(lead))
+  expect_identical(effects, 0L)
+  expect_match(
+    lead$list_subagents()$hook_error,
+    "PreToolUse: host governance failed"
+  )
+  expect_identical(lead$list_subagents()$status, "completed")
+})
+
+test_that("a forwarded hook's rejected promise is retained with its delegation", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "effect"),
+    runtime_reply("done")
+  ))
+  effects <- 0L
+  lead <- LeadAgent$new(
+    runtime_chat(server),
+    sub_agents = list(agent_definition(
+      "a",
+      "A",
+      "a",
+      tools = list(binding_tool(function() {
+        effects <<- effects + 1L
+        "ok"
+      }))
+    ))
+  )
+  lead$add_hook(HookMatcher(
+    "PreToolUse",
+    timeout = 0,
+    callback = function(...) {
+      promises::promise(function(resolve, reject) {
+        later::later(
+          function() reject(simpleError("host governance failed")),
+          0.05
+        )
+      })
+    }
+  ))
+  # ellmer warns that the rejected call failed; that warning is the point here.
+  invisible(suppressWarnings(binding_run(lead)))
   expect_identical(effects, 0L)
   expect_match(
     lead$list_subagents()$hook_error,

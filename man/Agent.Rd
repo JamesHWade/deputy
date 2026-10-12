@@ -76,10 +76,11 @@ agent$add_hook(HookMatcher(
 
     \item{\code{conversation_id}}{The host conversation the agent is answering
 in, or \code{NULL}. shinychat's \code{chat_server()} sets it before each reply;
-set it yourself before starting a run outside a reply. Each delegation
-keeps the value it had when the delegation started, so
-\code{\link[=subagent_chat_history]{subagent_chat_history()}} can save a conversation's subagents with it.
-It isn't sent to the model.}
+set it yourself before starting a run outside a reply. Emptying the
+conversation with \verb{$set_turns(list())}, as shinychat does for a new
+chat, sets it back to \code{NULL}. Each delegation keeps the value it had
+when the delegation started, so \code{\link[=subagent_chat_history]{subagent_chat_history()}} can save a
+conversation's subagents with it. It isn't sent to the model.}
 
     \item{\code{run_context}}{The \code{run_context} attached to every run. Read-only.}
 
@@ -1038,7 +1039,8 @@ permissions, hooks and usage limits applied.
   stream = c("text", "content"),
   controller = NULL,
   run_context = list(),
-  type = NULL
+  type = NULL,
+  usage_limits = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -1055,6 +1057,8 @@ this run.}
       \item{\code{type}}{Optional ellmer type for structured streaming, passed to
 ellmer. If the provider can't stream structured output, use
 \verb{$chat_structured()} instead.}
+      \item{\code{usage_limits}}{\link{UsageLimits} for this run. \code{NULL} fields use the
+agent's limits.}
     }
     \if{html}{\out{</div>}}
   }
@@ -1078,7 +1082,8 @@ usage limits and compaction applied.
   stream = c("text", "content"),
   controller = NULL,
   run_context = list(),
-  type = NULL
+  type = NULL,
+  usage_limits = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -1098,11 +1103,14 @@ this run.}
       \item{\code{type}}{Optional ellmer type for structured streaming, passed to
 ellmer. If the provider can't stream structured output, use
 \verb{$chat_structured()} instead.}
+      \item{\code{usage_limits}}{\link{UsageLimits} for this run. \code{NULL} fields use the
+agent's limits.}
     }
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
     An asynchronous generator suitable for \code{shinychat::chat_append()}.
+\code{\link[=stream_result]{stream_result()}} gives a promise of this run's \link{AgentResult}.
   }
 }
 
@@ -1839,6 +1847,10 @@ The run stops as soon as ellmer allows, usually during the current model
 request or before the next tool call. An \link{McpConnection} call in progress
 is stopped by closing its connection, which loses the server's session
 state.
+
+A stream that has been made but not yet read has not started, so it is
+stopped when it starts, without a model request. So is every other
+stream of this agent that is waiting to start.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$interrupt(reason = "interrupted")}
@@ -1853,7 +1865,8 @@ result.}
     \if{html}{\out{</div>}}
   }
   \subsection{Returns}{
-    \code{TRUE}, invisibly, if anything was running.
+    \code{TRUE}, invisibly, if anything was running or a stream made but
+not yet read was waiting to start; \code{FALSE} otherwise.
   }
 }
 

@@ -25,14 +25,6 @@
 ---
 
     Code
-      parse_multi_edits("[]")
-    Condition
-      Error in `rlang::check_installed()`:
-      ! The package "jsonlite" (>= 9999) is required to parse JSON edits
-
----
-
-    Code
       skill_load(skill_dir)
     Condition
       Error in `rlang::check_installed()`:

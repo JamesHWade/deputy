@@ -487,10 +487,15 @@ r_session_tool_dispatcher <- function(
       value <- tryCatch(
         {
           live()
-          with_r_session_tool_context(
+          admitted <- with_r_session_tool_context(
             tool_context,
             private$handle_tool_request(request)
           )
+          # A hook may answer with a promise. A denial or a stop rejects it,
+          # as a plain denial throws.
+          if (promises::is.promising(admitted)) {
+            coro::await(admitted)
+          }
           coro::await(r_session_tool_notify_observers(
             private,
             "request",

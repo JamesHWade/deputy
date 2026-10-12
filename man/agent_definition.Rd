@@ -17,7 +17,8 @@ AgentDefinition(
   mcp_servers = NULL,
   initial_prompt = NULL,
   max_requests = NULL,
-  permission_mode = NULL
+  permission_mode = NULL,
+  params = list()
 )
 
 agent_definition(
@@ -32,7 +33,8 @@ agent_definition(
   mcp_servers = NULL,
   initial_prompt = NULL,
   max_requests = NULL,
-  permission_mode = NULL
+  permission_mode = NULL,
+  params = list()
 )
 }
 \arguments{
@@ -76,6 +78,14 @@ budget of the lead's run also applies.}
 \item{permission_mode}{Permission mode for the subagent; defaults to the
 lead's. It can otherwise only be \code{"readonly"}, unless the lead's mode is
 \code{"full"}. Use \code{disallowed_tools} and \code{max_requests} for finer limits.}
+
+\item{params}{Request parameters for the subagent's model, made with
+\code{\link[ellmer:params]{ellmer::params()}}, such as \code{ellmer::params(reasoning_effort = "low")}.
+They apply to a \code{"provider/model"} model. A copy of the lead's chat
+(\code{"inherit"} or a bare model id) keeps the lead's parameters, so a
+definition with \code{params} and such a model needs a lead whose
+\link{DelegationPolicy} has a \code{chat} function, which receives the definition
+and applies them. \code{extra_args} aren't supported.}
 }
 \value{
 An \code{AgentDefinition} object.

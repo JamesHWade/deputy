@@ -357,6 +357,20 @@ test_that("bridge transfer rejects runtime attributes and retains portable data"
   expect_snapshot(error = TRUE, r_session_tool_read_json(path, 128, "request"))
 })
 
+test_that("a mailbox holding a path or URL is malformed, not followed", {
+  target <- withr::local_tempfile(fileext = ".json")
+  writeLines('{"tool": "fetch_measurements"}', target)
+  for (text in c(target, "http://127.0.0.1:9/request.json")) {
+    mailbox <- withr::local_tempfile()
+    writeLines(text, mailbox)
+    error <- expect_error(
+      r_session_tool_read_json(mailbox, 4096, "request"),
+      class = "deputy_r_session_tool_protocol"
+    )
+    expect_match(conditionMessage(error), "lexical error")
+  }
+})
+
 test_that("request identity and raw JSON never restore worker classes", {
   request <- list(
     protocol = 1L,
@@ -486,4 +500,61 @@ test_that("replacing a selected tool during an observer prevents its effect", {
     "replaced after dispatcher admission",
     fixed = TRUE
   )
+})
+
+test_that("a nested tool call waits for a PreToolUse hook's promised denial", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  calls <- 0L
+  fixture <- local_r_tool_journey(
+    r_bridge_test_tool(function() {
+      calls <<- calls + 1L
+      "effect"
+    }),
+    "tools$fetch()"
+  )
+  fixture$agent$add_hook(HookMatcher(
+    event = "PreToolUse",
+    pattern = "^fetch$",
+    callback = function(tool_name, tool_input, context) {
+      later_value(
+        HookResultPreToolUse(permission = "deny", reason = "Not this one"),
+        0.05
+      )
+    }
+  ))
+
+  suppressWarnings(fixture$agent$chat("Try the tool."))
+
+  expect_identical(calls, 0L)
+  expect_match(r_bridge_outer_text(fixture$agent), "Not this one", fixed = TRUE)
+})
+
+test_that("an interrupt while a nested tool call's hook is pending keeps the tool from running", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  calls <- 0L
+  fixture <- local_r_tool_journey(
+    r_bridge_test_tool(function() {
+      calls <<- calls + 1L
+      "effect"
+    }),
+    "tools$fetch()"
+  )
+  agent <- fixture$agent
+  agent$add_hook(HookMatcher(
+    event = "PreToolUse",
+    pattern = "^fetch$",
+    callback = function(tool_name, tool_input, context) {
+      later::later(function() agent$interrupt("stop now"), 0.02)
+      later_value(NULL, 0.1)
+    }
+  ))
+
+  suppressWarnings(agent$chat("Try the tool."))
+
+  expect_identical(calls, 0L)
+  expect_identical(agent$last_run()$stop_reason, "stop now")
 })

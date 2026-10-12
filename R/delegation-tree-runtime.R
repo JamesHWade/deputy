@@ -81,7 +81,9 @@ graph_descendants <- function(root, id = NULL) {
   selected
 }
 
-graph_cancel_descendants <- function(agent, reason) {
+# Stops the runs below `agent`. `by` is who is recorded as having stopped
+# them: their caller, or the parent when it is the parent's run that ended.
+graph_cancel_descendants <- function(agent, reason, by = "caller") {
   private <- agent$.__enclos_env__$private
   tree <- private$.delegation_tree
   if (is.null(tree)) {
@@ -95,13 +97,13 @@ graph_cancel_descendants <- function(agent, reason) {
   ids <- setdiff(graph_descendants(root, id), id)
   interrupted <- FALSE
   for (child_id in rev(ids)) {
-    interrupted <- isTRUE(interrupt_delegation(root, child_id, reason)) ||
+    interrupted <- isTRUE(interrupt_delegation(root, child_id, reason, by)) ||
       interrupted
   }
   invisible(interrupted)
 }
 
-interrupt_delegation <- function(owner, id, reason) {
+interrupt_delegation <- function(owner, id, reason, by = "caller") {
   private <- owner$.__enclos_env__$private
   record <- private$subagent_runs[[id]]
   if (
@@ -114,12 +116,10 @@ interrupt_delegation <- function(owner, id, reason) {
   private$subagent_runs[[id]]$cancel_reason <- reason
   child <- private$active_subagents[[id]]
   if (!is.null(child)) {
-    if (!is.null(record$conversation_handle)) {
-      entry <- conversation_entry(owner, record$conversation_handle)
-      child$.__enclos_env__$private$interrupt_run(reason, entry$token)
-    } else {
-      child$interrupt(reason)
+    token <- if (!is.null(record$conversation_handle)) {
+      conversation_entry(owner, record$conversation_handle)$token
     }
+    child$.__enclos_env__$private$interrupt_run(reason, token, by = by)
   }
   invisible(TRUE)
 }
@@ -136,29 +136,48 @@ graph_fire_hooks <- function(agent, event, tool_name = NULL, ...) {
     return(agent$hooks$fire(event, tool_name = tool_name, ...))
   }
   root <- delegation_tree_root(private$.delegation_tree)
+  args <- list(...)
   results <- lapply(c(ancestors, list(agent)), function(source) {
     registry <- source$hooks
-    before <- length(registry$last_errors())
-    value <- registry$fire(event, tool_name = tool_name, ...)
-    errors <- registry$last_errors()
-    if (length(errors) > before) {
-      rp <- root$.__enclos_env__$private
-      record <- rp$subagent_runs[[private$.delegation_id]]
-      record$hook_error <- paste(
-        c(
-          record$hook_error,
-          vapply(
-            errors[seq.int(before + 1L, length(errors))],
-            function(x) paste0(x$event, ": ", x$error),
-            character(1)
-          )
-        ),
-        collapse = "\n"
-      )
-      rp$subagent_runs[[private$.delegation_id]] <- record
-    }
-    value
+    fire_with_errors(
+      registry,
+      function() {
+        do.call(registry$fire, c(list(event, tool_name = tool_name), args))
+      },
+      function(errors) {
+        rp <- root$.__enclos_env__$private
+        record <- rp$subagent_runs[[private$.delegation_id]]
+        record$hook_error <- paste(
+          c(
+            record$hook_error,
+            vapply(
+              errors,
+              function(x) paste0(x$event, ": ", x$error),
+              character(1)
+            )
+          ),
+          collapse = "\n"
+        )
+        rp$subagent_runs[[private$.delegation_id]] <- record
+      }
+    )
   })
+  if (any(vapply(results, promises::is.promising, logical(1)))) {
+    return(promises::then(
+      promises::promise_all(
+        .list = lapply(results, function(r) {
+          if (promises::is.promising(r)) r else promises::promise_resolve(r)
+        })
+      ),
+      function(results) merge_tool_hook_results(event, results)
+    ))
+  }
+  merge_tool_hook_results(event, results)
+}
+
+# Merges the results of the hooks that ran for one tool event across a
+# delegation tree: a denial wins, any stop stops, and contexts are joined.
+merge_tool_hook_results <- function(event, results) {
   class <- if (event == "PreToolUse") {
     HookResultPreToolUse
   } else {

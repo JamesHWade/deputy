@@ -372,6 +372,24 @@ test_that("direct delegation can be interrupted without an active lead run", {
   expect_identical(tail(lead$list_subagents()$status, 1L), "completed")
 })
 
+test_that("an interrupt while a SubagentStart hook is pending keeps the child from starting", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    later::later(function() lead$interrupt("before_request"), 0.05)
+    promises::promise(function(resolve, reject) {
+      later::later(function() resolve(NULL), 0.3)
+    })
+  }))
+  resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
+  expect_length(state$started, 0L)
+  expect_identical(lead$list_subagents()$status, "not_started")
+  expect_identical(lead$list_subagents()$stop_reason, "before_request")
+})
+
 test_that("direct start-hook cancellation prevents the first Subagent request", {
   state <- new.env(parent = emptyenv())
   lead <- parallel_test_lead(state)
@@ -383,4 +401,147 @@ test_that("direct start-hook cancellation prevents the first Subagent request", 
   expect_length(state$started, 0L)
   expect_identical(lead$list_subagents()$status, "not_started")
   expect_identical(lead$list_subagents()$stop_reason, "before_request")
+})
+
+test_that("a delegated run waits for a SubagentStart hook's promise before the child starts", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  started_when_resolved <- NULL
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    promises::promise(function(resolve, reject) {
+      later::later(
+        function() {
+          started_when_resolved <<- state$started
+          resolve(NULL)
+        },
+        0.05
+      )
+    })
+  }))
+
+  answer <- resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
+
+  expect_identical(jsonlite::fromJSON(answer)$answer, "a task")
+  expect_identical(started_when_resolved, character())
+  expect_identical(state$started, "a")
+})
+
+test_that("a delegation waits for a SubagentStop hook's promise before it returns", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  moments <- character()
+  lead$add_hook(HookMatcher("SubagentStop", callback = function(...) {
+    promises::promise(function(resolve, reject) {
+      later::later(
+        function() {
+          moments <<- c(moments, "SubagentStop resolved")
+          resolve(NULL)
+        },
+        0.05
+      )
+    })
+  }))
+
+  delegation <- lead$get_tools()$delegate_to_agent("a", "task")
+  promises::then(delegation, function(value) {
+    moments <<- c(moments, "delegation returned")
+  })
+  answer <- resolve_async_value(delegation)
+
+  expect_identical(jsonlite::fromJSON(answer)$answer, "a task")
+  expect_identical(moments, c("SubagentStop resolved", "delegation returned"))
+})
+
+test_that("a rejected SubagentStart promise is kept with the delegation", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    promises::promise(function(resolve, reject) {
+      later::later(
+        function() {
+          reject(simpleError("fixture start promise failed"))
+        },
+        0.02
+      )
+    })
+  }))
+
+  answer <- resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
+
+  expect_identical(jsonlite::fromJSON(answer)$answer, "a task")
+  runs <- lead$list_subagents()
+  expect_identical(runs$status, "completed")
+  expect_match(runs$hook_error, "SubagentStart: fixture start promise failed")
+})
+
+test_that("a SubagentStart hook's error is kept once when a later hook answers with a promise", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    stop("first failed")
+  }))
+  lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
+    later_value(NULL, 0.05)
+  }))
+
+  answer <- resolve_async_value(lead$get_tools()$delegate_to_agent("a", "task"))
+
+  expect_identical(jsonlite::fromJSON(answer)$answer, "a task")
+  hook_error <- lead$list_subagents()$hook_error
+  expect_identical(
+    lengths(regmatches(
+      hook_error,
+      gregexpr("first failed", hook_error, fixed = TRUE)
+    )),
+    1L
+  )
+})
+
+test_that("a rejected SubagentStart promise is kept with its own delegation, not its sibling's", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  state <- new.env(parent = emptyenv())
+  lead <- parallel_test_lead(state)
+  lead$add_hook(HookMatcher(
+    "SubagentStart",
+    callback = function(agent_name, ...) {
+      if (identical(agent_name, "a")) {
+        return(promises::promise(function(resolve, reject) {
+          later::later(
+            function() reject(simpleError("fixture first start failed")),
+            0.05
+          )
+        }))
+      }
+      promises::promise(function(resolve, reject) {
+        later::later(function() resolve(NULL), 0.2)
+      })
+    }
+  ))
+
+  resolve_async_value(lead$parallel_delegate_async(c(
+    a = "first",
+    b = "second"
+  )))
+
+  runs <- lead$list_subagents()
+  expect_identical(runs$agent_name, c("a", "b"))
+  expect_match(
+    runs$hook_error[[1L]],
+    "SubagentStart: fixture first start failed"
+  )
+  expect_identical(is.na(runs$hook_error[[2L]]), TRUE)
 })

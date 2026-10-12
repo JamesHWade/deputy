@@ -867,12 +867,7 @@ Agent <- R6::R6Class(
         run_context
       )
 
-      limits <- if (is.null(usage_limits)) {
-        self$usage_limits
-      } else {
-        merge_usage_limits(usage_limits, self$usage_limits)
-      }
-      limits <- normalize_usage_limits(limits)
+      limits <- private$run_usage_limits(usage_limits)
 
       governed_run <- private$start_governed_stream(
         messages = list(task),
@@ -1110,6 +1105,8 @@ Agent <- R6::R6Class(
     #'   cancelled controller is reset when the new run starts.
     #' @param run_context Named list merged into the agent's `run_context` for
     #'   this run.
+    #' @param usage_limits [UsageLimits] for this run. `NULL` fields use the
+    #'   agent's limits.
     #' @return A generator.
     #' @param type Optional ellmer type for structured streaming, passed to
     #'   ellmer. If the provider can't stream structured output, use
@@ -1119,16 +1116,18 @@ Agent <- R6::R6Class(
       stream = c("text", "content"),
       controller = NULL,
       run_context = list(),
-      type = NULL
+      type = NULL,
+      usage_limits = NULL
     ) {
       stream <- match.arg(stream)
       effective_run_context <- merge_run_context(
         private$.run_context,
         run_context
       )
+      limits <- private$run_usage_limits(usage_limits)
       governed_run <- private$start_governed_stream(
         messages = rlang::list2(...),
-        limits = self$usage_limits,
+        limits = limits,
         run_context = effective_run_context,
         stream = stream,
         controller = controller,
@@ -1152,7 +1151,10 @@ Agent <- R6::R6Class(
     #'   cancelled controller is reset when the new run starts.
     #' @param run_context Named list merged into the agent's `run_context` for
     #'   this run.
+    #' @param usage_limits [UsageLimits] for this run. `NULL` fields use the
+    #'   agent's limits.
     #' @return An asynchronous generator suitable for `shinychat::chat_append()`.
+    #'   [stream_result()] gives a promise of this run's [AgentResult].
     #' @param type Optional ellmer type for structured streaming, passed to
     #'   ellmer. If the provider can't stream structured output, use
     #'   `$chat_structured()` instead.
@@ -1162,7 +1164,8 @@ Agent <- R6::R6Class(
       stream = c("text", "content"),
       controller = NULL,
       run_context = list(),
-      type = NULL
+      type = NULL,
+      usage_limits = NULL
     ) {
       tool_mode <- match.arg(tool_mode)
       stream <- match.arg(stream)
@@ -1170,9 +1173,10 @@ Agent <- R6::R6Class(
         private$.run_context,
         run_context
       )
+      limits <- private$run_usage_limits(usage_limits)
       governed_run <- private$start_governed_stream(
         messages = rlang::list2(...),
-        limits = self$usage_limits,
+        limits = limits,
         run_context = effective_run_context,
         tool_mode = tool_mode,
         stream = stream,
@@ -1180,10 +1184,13 @@ Agent <- R6::R6Class(
         stream_type = type
       )
       reset_stream_controller(controller)
-      if (!is.null(private$.activity) && identical(stream, "content")) {
-        return(activity_stream(self, governed_run$stream, private$.activity))
+      out <- if (!is.null(private$.activity) && identical(stream, "content")) {
+        activity_stream(self, governed_run$stream, private$.activity)
+      } else {
+        governed_run$stream
       }
-      governed_run$stream
+      attr(out, "deputy_run_state") <- governed_run$state
+      out
     },
 
     #' @description
@@ -1299,6 +1306,13 @@ Agent <- R6::R6Class(
       # Subagent activity shown in the conversation never reaches the model.
       split <- activity_split(value)
       private$.conversation_state$replace(private$.chat, split$turns)
+      # An emptied conversation is a new one: shinychat's "new chat" and
+      # deleting the open conversation both end here, and neither tells the
+      # host's callbacks. Keeping the old ID would file subagents started
+      # before the host sets the next one under the conversation just left.
+      if (length(value) == 0L) {
+        private$.conversation_id <- NULL
+      }
       preserve_run_usage(self, usage)
       private$.activity_overlay <- split$overlay
       activity_reset(self)
@@ -1668,13 +1682,13 @@ Agent <- R6::R6Class(
 
       private$.permissions <- narrowed_permissions
 
-      private$fire_hook(
+      hook_unawaited(private$fire_hook(
         "ConfigChange",
         key = "permission_mode",
         old_value = old_mode,
         new_value = mode,
         context = private$hook_context()
-      )
+      ))
 
       private$notify(
         paste0("Permission mode changed from ", old_mode, " to ", mode, "."),
@@ -1730,9 +1744,14 @@ Agent <- R6::R6Class(
     #' is stopped by closing its connection, which loses the server's session
     #' state.
     #'
+    #' A stream that has been made but not yet read has not started, so it is
+    #' stopped when it starts, without a model request. So is every other
+    #' stream of this agent that is waiting to start.
+    #'
     #' @param reason Stop reason recorded on the run's `"stop"` event and
     #'   result.
-    #' @return `TRUE`, invisibly, if anything was running.
+    #' @return `TRUE`, invisibly, if anything was running or a stream made but
+    #'   not yet read was waiting to start; `FALSE` otherwise.
     interrupt = function(reason = "interrupted") {
       private$interrupt_run(reason)
     },
@@ -2452,12 +2471,7 @@ Agent <- R6::R6Class(
         run_context
       )
 
-      limits <- if (is.null(usage_limits)) {
-        self$usage_limits
-      } else {
-        merge_usage_limits(usage_limits, self$usage_limits)
-      }
-      limits <- normalize_usage_limits(limits)
+      limits <- private$run_usage_limits(usage_limits)
 
       governed_run <- private$start_governed_stream(
         messages = list(task),
@@ -2490,10 +2504,11 @@ Agent <- R6::R6Class(
 
     #' @field conversation_id The host conversation the agent is answering
     #'   in, or `NULL`. shinychat's `chat_server()` sets it before each reply;
-    #'   set it yourself before starting a run outside a reply. Each delegation
-    #'   keeps the value it had when the delegation started, so
-    #'   [subagent_chat_history()] can save a conversation's subagents with it.
-    #'   It isn't sent to the model.
+    #'   set it yourself before starting a run outside a reply. Emptying the
+    #'   conversation with `$set_turns(list())`, as shinychat does for a new
+    #'   chat, sets it back to `NULL`. Each delegation keeps the value it had
+    #'   when the delegation started, so [subagent_chat_history()] can save a
+    #'   conversation's subagents with it. It isn't sent to the model.
     conversation_id = function(value) {
       if (missing(value)) {
         return(private$.conversation_id)
@@ -2583,28 +2598,11 @@ Agent <- R6::R6Class(
         } else {
           AgentUsage()
         }
-        usage_fields <- c(
-          max_requests = "requests",
-          max_tool_calls = "tool_calls",
-          max_input_tokens = "input_tokens",
-          max_output_tokens = "output_tokens",
-          max_total_tokens = "total_tokens",
-          max_cost_usd = "cost_usd"
+        remaining <- usage_limits_remaining(
+          limits,
+          current,
+          private$reserved_delegation_usage()
         )
-        reserved <- private$reserved_delegation_usage()
-        remaining <- lapply(names(usage_fields), function(limit_field) {
-          limit <- S7::prop(limits, limit_field)
-          if (is.null(limit)) {
-            return(NULL)
-          }
-          max(
-            0,
-            limit -
-              S7::prop(current, usage_fields[[limit_field]]) -
-              reserved[[limit_field]]
-          )
-        })
-        names(remaining) <- names(usage_fields)
         if (!is.null(def$max_requests)) {
           remaining$max_requests <- if (is.null(remaining$max_requests)) {
             def$max_requests
@@ -2615,7 +2613,13 @@ Agent <- R6::R6Class(
 
         do.call(
           UsageLimits,
-          c(remaining, list(on_exceed = limits$on_exceed))
+          c(
+            remaining,
+            list(
+              on_unknown_cost = limits$on_unknown_cost,
+              on_exceed = limits$on_exceed
+            )
+          )
         )
       },
 
@@ -2718,6 +2722,12 @@ Agent <- R6::R6Class(
       # Flag to signal stopping from hooks
       should_stop = FALSE,
       stop_reason_from_hook = NULL,
+      stop_requested_by = NULL,
+      # The states of the streams that were made and have not started yet, so
+      # an interrupt before their first pull is kept for their start.
+      unstarted_runs = list(),
+      # Promises of hooks the run does not wait for; see take_held_hooks().
+      held_hooks = list(),
 
       # Pending executions retain cancellation even if registered tools change.
       active_owned_tools = list(),
@@ -2783,17 +2793,37 @@ Agent <- R6::R6Class(
         private$.conversation_state$transcript(private$.chat)
       },
 
-      interrupt_run = function(reason, conversation_token = NULL) {
+      # The limits for one run: the run's own, merged over the agent's.
+      run_usage_limits = function(usage_limits) {
+        limits <- if (is.null(usage_limits)) {
+          self$usage_limits
+        } else {
+          merge_usage_limits(usage_limits, self$usage_limits)
+        }
+        normalize_usage_limits(limits)
+      },
+
+      interrupt_run = function(
+        reason,
+        conversation_token = NULL,
+        by = "caller"
+      ) {
         check_conversation_access(self, conversation_token)
-        interrupted <- isTRUE(graph_cancel_descendants(self, reason))
+        interrupted <- isTRUE(graph_cancel_descendants(self, reason, by = by))
         for (id in names(private$active_subagents)) {
           interrupted <- isTRUE(self$interrupt_subagent(id, reason)) ||
             interrupted
         }
-        if (!isTRUE(private$run_active)) {
-          return(invisible(interrupted))
+        # Every stream that is waiting to start is stopped when it starts,
+        # whether or not a run is going now.
+        for (waiting in private$unstarted_runs) {
+          waiting$interrupt_before_start <- as.character(reason[[1]])
+          waiting$interrupt_before_start_by <- by
         }
-        private$request_stream_stop(as.character(reason[[1]]))
+        if (!isTRUE(private$run_active)) {
+          return(invisible(interrupted || length(private$unstarted_runs) > 0L))
+        }
+        private$request_stream_stop(as.character(reason[[1]]), by = by)
         invisible(TRUE)
       },
 
@@ -2815,6 +2845,8 @@ Agent <- R6::R6Class(
         cloned <- private$.r6_clone(deep = TRUE)
         reg.finalizer(cloned, finalize_owned_conversations, onexit = TRUE)
         cloned$.__enclos_env__$private$active_owned_tools <- list()
+        # Streams waiting to start belong to the Agent that made them.
+        cloned$.__enclos_env__$private$unstarted_runs <- list()
         cloned$.__enclos_env__$private$rewire_chat_runtime()
         cloned$.__enclos_env__$private$.compaction_artifacts <- NULL
         # A clone, such as shinychat's title generator, shows no activity.
@@ -3324,7 +3356,7 @@ Agent <- R6::R6Class(
       appended_hook_context_hashes = character(),
 
       notify = function(message, level = "info", code = NULL, ...) {
-        private$fire_hook(
+        hook_unawaited(private$fire_hook(
           "Notification",
           message = message,
           context = private$hook_context(
@@ -3332,7 +3364,7 @@ Agent <- R6::R6Class(
             code = code,
             ...
           )
-        )
+        ))
         invisible(NULL)
       },
 
@@ -3463,6 +3495,7 @@ Agent <- R6::R6Class(
         }
         private$should_stop <- TRUE
         private$stop_reason_from_hook <- status$reason
+        private$stop_requested_by <- NULL
 
         message <- usage_limit_message(status)
         private$notify(

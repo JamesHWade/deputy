@@ -50,8 +50,12 @@ governed_compaction_async <- coro::async(function(
     NULL,
     policy$fallback,
     TRUE,
-    estimated
+    estimated,
+    wait = TRUE
   )
+  if (promises::is.promising(plan)) {
+    plan <- coro::await(plan)
+  }
   if (!is.null(plan$result)) {
     return(plan$result)
   }
@@ -89,8 +93,12 @@ governed_compaction_async <- coro::async(function(
     generated$summary,
     generated$method,
     generated$usage,
-    generated$attempts
+    generated$attempts,
+    wait = TRUE
   )
+  if (promises::is.promising(result)) {
+    result <- coro::await(result)
+  }
   compaction_can_continue(agent)
   result
 })
@@ -241,6 +249,7 @@ compaction_summary_attempt_async <- coro::async(function(
 ) {
   chat <- NULL
   dispatched <- 0L
+  responded <- FALSE
   provider <- template$get_provider()@name
   model <- template$get_model()
   condition <- NULL
@@ -274,6 +283,7 @@ compaction_summary_attempt_async <- coro::async(function(
         ))
       })
       chat$on_request_end(function(turn) {
+        responded <<- TRUE
         private$record_run_event(private$agent_event(
           "request_end",
           phase = "compaction",
@@ -324,12 +334,23 @@ compaction_summary_attempt_async <- coro::async(function(
     input_tokens = usage@input_tokens,
     output_tokens = usage@output_tokens,
     cached_tokens = usage@cached_tokens,
-    cost_usd = usage@cost_usd
+    cost_usd = usage@cost_usd,
+    known_cost_usd = usage@known_cost_usd
   )
   private$current_external_usage <- agent_usage_add(
     private$current_external_usage,
     settled
   )
+  # A summary request is a model request of the run. Its hook fires here,
+  # once its tokens and cost are in the run's usage, and the run waits for
+  # it before it goes on to the task. A response that is then rejected as a
+  # summary was still a response, so the hook is told of it too.
+  if (responded) {
+    ended <- fire_post_model_request(agent, state)
+    if (promises::is.promising(ended)) {
+      coro::await(ended)
+    }
+  }
   last_turn <- NULL
   if (!is.null(chat)) {
     last_turn <- tryCatch(chat$last_turn(), error = function(e) NULL)

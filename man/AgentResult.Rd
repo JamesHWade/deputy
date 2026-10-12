@@ -21,7 +21,8 @@ AgentResult(
   parent_agent_id = NULL,
   parent_run_id = NULL,
   delegation_id = NULL,
-  run_context = list()
+  run_context = list(),
+  ending = NULL
 )
 }
 \arguments{
@@ -48,6 +49,11 @@ subagent, to the parent run and delegation.}
 \item{usage}{\link{AgentUsage} for this run only, or \code{NULL}.}
 
 \item{run_context}{The run's \code{run_context}, a named list.}
+
+\item{ending}{How the run ended, as a \link{RunEnding} object, or \code{NULL} to
+derive it from \code{stop_reason}. The five classes are \code{\link[=RunEndingAnswered]{RunEndingAnswered()}},
+\code{\link[=RunEndingStopped]{RunEndingStopped()}}, \code{\link[=RunEndingLimit]{RunEndingLimit()}}, \code{\link[=RunEndingCutOff]{RunEndingCutOff()}} and
+\code{\link[=RunEndingFailed]{RunEndingFailed()}}.}
 }
 \value{
 An \code{AgentResult} object.
@@ -62,6 +68,9 @@ session.
 Results are read-only. Read fields with \code{$}, for example
 \code{result$response}, or use \code{\link[=result_n_turns]{result_n_turns()}}, \code{\link[=result_tool_calls]{result_tool_calls()}},
 \code{\link[=result_tool_results]{result_tool_results()}}, \code{\link[=result_text_chunks]{result_text_chunks()}} and \code{\link[=result_is_success]{result_is_success()}}.
+
+\code{ending} says how the run ended in terms of its own classes, so a host need
+not parse \code{stop_reason}; see \link{RunEnding}.
 
 \code{usage} covers this run only, but \code{cost} covers the whole conversation,
 including earlier runs and turns that compaction removed from the model

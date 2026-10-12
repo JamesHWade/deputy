@@ -155,6 +155,40 @@ test_that("sub-agents retain inherited prompt-tool gates", {
   }
 })
 
+test_that("the limits a lead derives for a subagent carry on_unknown_cost", {
+  definition <- agent_definition(
+    name = "bounded",
+    description = "Uses bounded resources",
+    prompt = "You help",
+    max_requests = 3
+  )
+  lead <- LeadAgent$new(
+    chat = create_mock_chat(),
+    sub_agents = list(definition),
+    usage_limits = UsageLimits(
+      max_cost_usd = 0.50,
+      on_unknown_cost = "continue"
+    )
+  )
+
+  child <- local_test_subagent(lead, definition)
+  expect_identical(child$usage_limits$on_unknown_cost, "continue")
+
+  remaining <- conversation_remaining(
+    UsageLimits(max_cost_usd = 0.50, on_unknown_cost = "continue"),
+    AgentUsage(cost_usd = 0.20)
+  )
+  expect_identical(remaining$on_unknown_cost, "continue")
+
+  allocated <- parallel_child_limits(
+    UsageLimits(max_cost_usd = 0.30, on_unknown_cost = "continue"),
+    definition,
+    count = 2,
+    index = 1
+  )
+  expect_identical(allocated$on_unknown_cost, "continue")
+})
+
 test_that("sub-agents inherit remaining lead run budgets", {
   definition <- agent_definition(
     name = "bounded",

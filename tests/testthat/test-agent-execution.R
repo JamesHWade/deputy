@@ -398,6 +398,199 @@ test_that("run_sync fires SessionStart hook before first turn", {
   expect_true(!is.null(session_start_context$permissions))
 })
 
+test_that("an interrupt while a SessionStart hook is pending stops the run before any model request", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  model_asked <- FALSE
+  chat <- create_mock_chat()
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    model_asked <<- TRUE
+    coro::async_generator(function() {
+      coro::yield(ellmer::ContentText("Done"))
+    })()
+  }
+  agent <- Agent$new(chat = chat)
+  agent$hooks$add(HookMatcher(
+    event = "SessionStart",
+    timeout = 0,
+    callback = function(context) {
+      promises::promise(function(resolve, reject) {
+        later::later(function() resolve(NULL), 0.1)
+      })
+    }
+  ))
+  later::later(function() agent$interrupt("no"), 0.02)
+
+  result <- resolve_async_value(agent$run_async("Test task"))
+
+  expect_false(model_asked)
+  expect_identical(result$stop_reason, "no")
+})
+
+test_that("an interrupt while a SessionStart hook is pending keeps UserPromptSubmit from firing", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  model_asked <- FALSE
+  submitted <- 0L
+  chat <- create_mock_chat()
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    model_asked <<- TRUE
+    coro::async_generator(function() {
+      coro::yield(ellmer::ContentText("Done"))
+    })()
+  }
+  agent <- Agent$new(chat = chat)
+  agent$hooks$add(HookMatcher(
+    event = "SessionStart",
+    timeout = 0,
+    callback = function(context) {
+      later::later(function() agent$interrupt("no"), 0.05)
+      later_value(NULL, 0.2)
+    }
+  ))
+  agent$hooks$add(HookMatcher(
+    event = "UserPromptSubmit",
+    timeout = 0,
+    callback = function(prompt, context) {
+      submitted <<- submitted + 1L
+      NULL
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("Test task"), max_polls = 300L)
+
+  expect_identical(submitted, 0L)
+  expect_false(model_asked)
+  expect_identical(result$stop_reason, "no")
+})
+
+test_that("a SessionStart hook that interrupts the run keeps UserPromptSubmit from firing", {
+  model_asked <- FALSE
+  submitted <- 0L
+  chat <- create_mock_chat()
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    model_asked <<- TRUE
+    coro::async_generator(function() {
+      coro::yield(ellmer::ContentText("Done"))
+    })()
+  }
+  agent <- Agent$new(chat = chat)
+  # The hook answers at once, with a plain value, having stopped the run.
+  agent$hooks$add(HookMatcher(
+    event = "SessionStart",
+    timeout = 0,
+    callback = function(context) {
+      agent$interrupt("no")
+      NULL
+    }
+  ))
+  agent$hooks$add(HookMatcher(
+    event = "UserPromptSubmit",
+    timeout = 0,
+    callback = function(prompt, context) {
+      submitted <<- submitted + 1L
+      NULL
+    }
+  ))
+
+  result <- agent$run_sync("Test task")
+
+  expect_identical(submitted, 0L)
+  expect_false(model_asked)
+  expect_identical(result$stop_reason, "no")
+  expect_identical(result$ending@by, "caller")
+})
+
+test_that("a run waits for a UserPromptSubmit hook's promise, after SessionStart", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  moments <- character()
+  chat <- create_mock_chat()
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    moments <<- c(moments, "model asked")
+    coro::async_generator(function() {
+      coro::yield(ellmer::ContentText("Done"))
+    })()
+  }
+  agent <- Agent$new(chat = chat)
+  agent$hooks$add(HookMatcher(
+    event = "SessionStart",
+    timeout = 0,
+    callback = function(context) {
+      promises::promise(function(resolve, reject) {
+        later::later(
+          function() {
+            moments <<- c(moments, "SessionStart resolved")
+            resolve(NULL)
+          },
+          0.05
+        )
+      })
+    }
+  ))
+  agent$hooks$add(HookMatcher(
+    event = "UserPromptSubmit",
+    timeout = 0,
+    callback = function(prompt, context) {
+      promises::promise(function(resolve, reject) {
+        later::later(
+          function() {
+            moments <<- c(moments, "UserPromptSubmit resolved")
+            resolve(NULL)
+          },
+          0.05
+        )
+      })
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("Test task"))
+
+  expect_s7_class(result, AgentResult)
+  expect_identical(
+    moments,
+    c("SessionStart resolved", "UserPromptSubmit resolved", "model asked")
+  )
+})
+
+test_that("a run waits for a SessionStart hook's promise before its first model request", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  moments <- character()
+  chat <- create_mock_chat()
+  chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
+    moments <<- c(moments, "model asked")
+    coro::async_generator(function() {
+      coro::yield(ellmer::ContentText("Done"))
+    })()
+  }
+  agent <- Agent$new(chat = chat)
+  agent$hooks$add(HookMatcher(
+    event = "SessionStart",
+    timeout = 0,
+    callback = function(context) {
+      promises::promise(function(resolve, reject) {
+        later::later(
+          function() {
+            moments <<- c(moments, "SessionStart resolved")
+            resolve(NULL)
+          },
+          0.05
+        )
+      })
+    }
+  ))
+
+  result <- resolve_async_value(agent$run_async("Test task"))
+
+  expect_s7_class(result, AgentResult)
+  expect_identical(moments, c("SessionStart resolved", "model asked"))
+})
+
 test_that("run_sync fires Stop and SessionEnd hooks after completion", {
   stop_fired <- FALSE
   session_end_fired <- FALSE

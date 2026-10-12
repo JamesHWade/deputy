@@ -14,6 +14,29 @@ The first callback that returns a non-\code{NULL} value decides the outcome, and
 the remaining hooks for that event don't run. If a PreToolUse callback
 errors or times out, the tool call is denied. Errors in other callbacks are
 reported and the run continues.
+
+A callback may return a promise of what it would have returned, so a hook
+can wait for a person, a model or a file. Deputy waits for the promise, up
+to the hook's \code{promise_timeout}, before it goes on:
+\itemize{
+\item \code{PreToolUse}, \code{PermissionRequest}: before the tool runs.
+\item \code{PostToolUse}, \code{PostToolUseFailure}: before the next model request. The
+tool's result has already been recorded when the hook answers.
+\item \code{PostModelRequest}, \code{SessionStart}, \code{UserPromptSubmit}, \code{SubagentStart},
+\code{SubagentStop}, and \code{PreCompact} and \code{PostCompact} during automatic
+compaction: before the run goes on.
+\item \code{Stop}, \code{SessionEnd}: before the run finishes.
+}
+
+A promise that is rejected, or has not settled in time, counts as no answer
+and is recorded as a hook error; for \code{PreToolUse} that denies the call.
+Deputy does not wait for \code{Notification} or \code{ConfigChange} hooks, for a hook
+fired by \verb{$compact()}, or for \code{Stop} and \code{SessionEnd} when a run ends with
+an error or its stream is abandoned. With tools run concurrently, other
+tool calls of the same response may start or finish while a hook waits. If
+\verb{$interrupt()} is called while a hook waits, or by the callback itself, the
+run stops when the hook answers, and a tool it was asked about does not
+run.
 }
 \section{Events}{
 
@@ -27,13 +50,19 @@ the permission policy has allowed it.
 call finishes, whether or not it failed.
 \item \code{PostToolUseFailure(tool_name, tool_result, tool_error, context)}: after
 \code{PostToolUse}, when the tool failed.
+\item \code{PostModelRequest(context)}: after each model request of a run, once its
+response has arrived: the task's requests, a structured request, and the
+summary request of an automatic compaction. It needs ellmer's request
+callbacks, so a stand-in for a Chat that lacks them never fires it.
 \item \code{PermissionRequest(tool_name, tool_input, permission_result, context)}:
 when the permission policy denies a call.
 \item \code{SessionStart(context)}: at the start of each run.
 \item \code{UserPromptSubmit(prompt, context)}: at the start of each run, after
 \code{SessionStart}.
-\item \code{Stop(reason, context)}: at the end of each run.
-\item \code{SessionEnd(reason, context)}: at the end of each run, after \code{Stop}.
+\item \code{Stop(reason, context)}: at each stop of a run. A \code{Stop} hook may return
+\code{\link[=HookResultStop]{HookResultStop()}} to send an answered run on, so a run can stop more
+than once.
+\item \code{SessionEnd(reason, context)}: once, when the run has ended.
 \item \code{SubagentStart(agent_name, task, context)}: when a subagent starts a
 delegated task.
 \item \code{SubagentStop(agent_name, task, result, context)}: when a subagent
@@ -55,7 +84,7 @@ as a denied call.
 result for \code{SubagentStop} and the \link{DeputyCompaction} for \code{PostCompact}. For
 \code{ConfigChange}, \code{key} is \code{"permission_mode"}.
 
-Four events use the callback's return value:
+Five events use the callback's return value:
 \itemize{
 \item \code{PreToolUse}: return \code{\link[=HookResultPreToolUse]{HookResultPreToolUse()}} to allow or deny the call,
 or to stop the run.
@@ -65,7 +94,13 @@ change what the \code{tool_end} event shows.
 anyway, or \code{\link[=PermissionResultDeny]{PermissionResultDeny()}} to change the reason.
 \item \code{PreCompact}: return \code{\link[=HookResultPreCompact]{HookResultPreCompact()}} to cancel compaction or to
 supply your own summary.
+\item \code{Stop}: return \code{\link[=HookResultStop]{HookResultStop()}} to send the run on.
 }
+
+A run that is sent on keeps its run ID, its limits and its usage. The
+result's \code{response} is the text of the last pass, and its \code{turns} hold
+every pass. Only an answered run is sent on, and a run that extracts
+structured output with \verb{$chat_structured()} never is.
 
 Other events ignore the return value. Returning \code{NULL} means "no decision".
 }
@@ -87,11 +122,17 @@ Some events add fields:
 \item \code{tool_call_id}, \code{permission_mode}, \code{usage}, \code{usage_limits} (tool events):
 the call's ID, the permission mode, the run's \link{AgentUsage} so far and its
 \link{UsageLimits}.
+\item \code{usage}, \code{usage_limits}, \code{request_number} (PostModelRequest): the run's
+\link{AgentUsage} so far, its \link{UsageLimits} and the request's number in the
+run.
 \item \code{tool_annotations}, \code{tool_arguments}, \code{tool_metadata} (PreToolUse,
 PermissionRequest): the tool's annotations, declared arguments and
 \code{\link[=tool_metadata]{tool_metadata()}}, when available.
-\item \code{usage}, \code{cost} (Stop, SessionEnd): the run's \link{AgentUsage} and the
-conversation's cost, as returned by \code{agent$cost()}.
+\item \code{usage}, \code{cost}, \code{ending} (Stop, SessionEnd): the run's \link{AgentUsage}, the
+conversation's cost, as returned by \code{agent$cost()}, and the run's
+\link{RunEnding} as it stands.
+\item \code{stop_hook_active} (Stop): \code{TRUE} when a hook has already sent this run
+on.
 \item \code{total_turns}, \code{compact_count} (PreCompact, PostCompact): the number of
 turns in the conversation and the number being summarised.
 \item \code{automatic} (PostCompact): \code{TRUE} when compaction ran automatically

@@ -1,7 +1,9 @@
 # ADR-0034: Subagent records saved with the host conversation
 
 Status: accepted for implementation in #238. Builds on ADR-0017, ADR-0020,
-ADR-0022, ADR-0032 and ADR-0033.
+ADR-0022, ADR-0032 and ADR-0033. Amended 2026-10-11 (#252): hosts that run
+their own turn loop take the callbacks and supply the conversation ID (see the
+last section).
 
 ## Context
 
@@ -159,3 +161,60 @@ back from storage Deputy doesn't control.
   live children.
 - Each save rewrites the conversation's whole record. Hosts with many large
   displays should lower `max_bytes` or rely on the named omissions.
+
+## Hosts with their own turn loop
+
+Amended for #252. A host that streams the lead's replies itself and keeps
+conversations with `chat_enable_history(id, client, on_save = , on_restore =
+)` has no `chat_server()` value. `chat_enable_history()` returns only a cancel
+function; its controller, which holds the callbacks and the open
+conversation's ID, sits in shinychat 0.5.0's private session storage, which
+Deputy does not read. So Deputy takes the callbacks' place in the host's
+hands and the ID from the host:
+
+- `subagent_chat_history(chat = NULL, lead, requester, max_bytes,
+  conversation_id = NULL)`. Given a `chat`, nothing changes. Without one,
+  Deputy registers nothing; the returned list also holds `on_save(values)`,
+  which returns `values` with the record added (shinychat's `on_save`
+  contract), and `on_restore(values)`, for the host to pass to
+  `chat_enable_history()` or call from its own callbacks. `restored()`,
+  `status()` and `conversation_id()` are there in both forms, so
+  `subagent_chat_server(conversation = )` is unchanged.
+- The open conversation's ID comes from `conversation_id`, a host function,
+  or from `lead$conversation_id` when it is omitted. It is checked as
+  `Agent$conversation_id` is (one non-empty string of at most 256 bytes, or
+  `NULL`); a save under an invalid one saves nothing, and `status()`,
+  `restored()` and `conversation_id()` signal the error. Passing both `chat`
+  and `conversation_id` is an error: with `chat`, the ID is shinychat's.
+- `chat_server()` sets `client$conversation_id` before each reply; a host loop
+  must set `lead$conversation_id` itself, or its delegations carry no (or the
+  wrong) `host_conversation_id` and are not saved with the conversation.
+  shinychat calls `on_restore` after restoring a conversation's turns, so the
+  reopened conversation's ID must be the open one by then; a host typically
+  saves its ID in `values` and sets it from there before calling Deputy's
+  `on_restore`.
+
+The record format, codec, scope (`delegation_scope` plus
+`chat_conversation_id`), disclosure checks and the read-only restore are
+unchanged; only where the callbacks and the ID come from differs. Restore
+still runs no tool, resumes no subagent and creates no records.
+
+shinychat's "new chat" (and deleting the open conversation) saves the
+conversation being left, then empties the client's turns without calling
+`on_restore`. That `$set_turns(list())` is the only signal Deputy gets, so an
+Agent whose conversation is emptied sets `conversation_id` back to `NULL`. With
+the `lead$conversation_id` fallback, `restored()` then shows nothing and
+`on_save` saves nothing until the host sets the new conversation's ID, and a
+subagent started in the meantime carries no `host_conversation_id` instead of
+the conversation just left. `chat_server()` sets the ID before every reply, so
+it is unaffected. A host passing its own `conversation_id` function must
+return `NULL` (or the new ID) after a new chat itself.
+
+shinychat's `handle_edit()` also empties the client when the first message of
+a conversation is edited (the new branch starts at the root), and from the
+client that is indistinguishable from a new chat. A host that mints an ID
+whenever the lead is empty (as the documented example does, and as it would
+without Deputy clearing the ID) gives that edit a new ID; the record's saved
+subagents are then replaced by the new branch's. Telling the two apart needs
+the controller's conversation ID, which shinychat 0.5.0 keeps private; that is
+the upstream ask that would remove the host's own ID altogether.

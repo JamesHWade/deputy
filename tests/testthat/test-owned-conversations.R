@@ -799,3 +799,48 @@ test_that("retained hook registries cannot widen policy before dispatch", {
   expect_identical(trimws(released$response), "settled")
   expect_identical(effects, 1L)
 })
+
+test_that("a retained conversation that goes on without a cost can be continued", {
+  go_on <- function(...) UsageLimits(..., on_unknown_cost = "continue")
+  owner <- owned_test_owner(usage_limits = go_on(max_requests = 25))
+  child <- owned_test_agent(usage_limits = go_on(max_requests = 25))
+  chat <- child$.__enclos_env__$private$.chat
+  chat$get_tokens <- function() {
+    count <- sum(vapply(
+      chat$get_turns(),
+      inherits,
+      logical(1),
+      what = "ellmer::AssistantTurn"
+    ))
+    data.frame(
+      input = rep(10, count),
+      output = rep(5, count),
+      cached_input = rep(0, count),
+      cost = rep(NA_real_, count)
+    )
+  }
+  handle <- owner$retain_agent(child, go_on(max_cost_usd = 1))
+
+  first <- owner$continue_agent(handle, "first", go_on(max_requests = 1))
+  second <- owner$continue_agent(handle, "second", go_on(max_requests = 1))
+
+  expect_identical(first$stop_reason, "complete")
+  expect_identical(first$usage$cost_usd, NA_real_)
+  expect_identical(second$stop_reason, "complete")
+})
+
+test_that("a retained budget is worked out from the known cost only when its limits go on", {
+  spent <- AgentUsage(cost_usd = NA_real_, known_cost_usd = 0.20)
+
+  remaining <- conversation_remaining(
+    UsageLimits(max_cost_usd = 0.50, on_unknown_cost = "continue"),
+    spent
+  )
+  expect_equal(remaining$max_cost_usd, 0.30)
+  expect_identical(remaining$on_unknown_cost, "continue")
+
+  expect_error(
+    conversation_remaining(UsageLimits(max_cost_usd = 0.50), spent),
+    "Cumulative usage is unavailable"
+  )
+})

@@ -80,7 +80,16 @@ governed_structured_request <- function(agent, messages, spec) {
         record_model_failure(agent, condition, structured = TRUE)
         rlang::cnd_signal(condition)
       }
-      end_model_request(agent, turn)
+      # ellmer's request callbacks do not run for a structured request, so
+      # the wait for a PostModelRequest hook's promise is here.
+      ended <- end_model_request(agent, turn)
+      if (promises::is.promising(ended)) {
+        coro::await(ended)
+      }
+      # A stop from the hook, or one that arrived while it was pending.
+      if (isTRUE(private$should_stop)) {
+        return(NULL)
+      }
       feedback <- NULL
       if (!is.null(condition)) {
         feedback <- conditionMessage(condition)

@@ -56,6 +56,48 @@ validate_agent_definition_character <- function(
   unique(value)
 }
 
+# Request parameters a definition can carry: the named arguments of
+# ellmer::params(), each a single value or (for stop_sequences) a character
+# vector, so they survive YAML.
+agent_definition_param_names <- function() {
+  setdiff(names(formals(ellmer::params)), "...")
+}
+
+validate_agent_definition_params <- function(params) {
+  if (!is.list(params)) {
+    cli_abort("{.arg params} must be a list made by {.fn ellmer::params}")
+  }
+  if (length(params) == 0L) {
+    return(list())
+  }
+  known <- agent_definition_param_names()
+  keys <- names(params)
+  if (is.null(keys) || !all(nzchar(keys)) || anyDuplicated(keys)) {
+    cli_abort("{.arg params} must have unique names")
+  }
+  unknown <- setdiff(keys, known)
+  if ("extra_args" %in% keys) {
+    unknown <- c(setdiff(unknown, "extra_args"), names(params$extra_args))
+  }
+  if (length(unknown) > 0L) {
+    cli_abort(c(
+      "{.arg params} can only hold the parameters of {.fn ellmer::params}",
+      "x" = "Not supported: {.val {unknown}}",
+      "i" = paste(
+        "For other request settings, build the subagent's chat yourself",
+        "with {.code DelegationPolicy(chat = )}."
+      )
+    ))
+  }
+  validated <- tryCatch(do.call(ellmer::params, params), error = identity)
+  if (inherits(validated, "error")) {
+    cli_abort("{.arg params} is invalid: {conditionMessage(validated)}")
+  }
+  # Names on a value (such as a named stop_sequences vector) mean nothing to
+  # the provider and would turn a YAML sequence into a mapping.
+  lapply(validated[intersect(known, names(validated))], unname)
+}
+
 copy_agent_definition <- function(definition, arg = "definition") {
   if (!S7::S7_inherits(definition, AgentDefinition)) {
     cli_abort("{.arg {arg}} must be an AgentDefinition object")
@@ -132,6 +174,13 @@ normalize_agent_definitions <- function(definitions, arg = "sub_agents") {
 #' @param permission_mode Permission mode for the subagent; defaults to the
 #'   lead's. It can otherwise only be `"readonly"`, unless the lead's mode is
 #'   `"full"`. Use `disallowed_tools` and `max_requests` for finer limits.
+#' @param params Request parameters for the subagent's model, made with
+#'   [ellmer::params()], such as `ellmer::params(reasoning_effort = "low")`.
+#'   They apply to a `"provider/model"` model. A copy of the lead's chat
+#'   (`"inherit"` or a bare model id) keeps the lead's parameters, so a
+#'   definition with `params` and such a model needs a lead whose
+#'   [DelegationPolicy] has a `chat` function, which receives the definition
+#'   and applies them. `extra_args` aren't supported.
 #'
 #' @details
 #' An `AgentDefinition` is read-only; read its fields with `$`. To change a
@@ -201,7 +250,8 @@ AgentDefinition <- S7::new_class(
     permission_mode = readonly_property(
       "permission_mode",
       S7::new_union(NULL, S7::class_character)
-    )
+    ),
+    params = readonly_property("params", S7::class_list)
   ),
   constructor = function(
     name,
@@ -215,7 +265,8 @@ AgentDefinition <- S7::new_class(
     mcp_servers = NULL,
     initial_prompt = NULL,
     max_requests = NULL,
-    permission_mode = NULL
+    permission_mode = NULL,
+    params = list()
   ) {
     name <- normalize_agent_definition_name(name)
     description <- validate_agent_definition_text(description, "description")
@@ -248,6 +299,7 @@ AgentDefinition <- S7::new_class(
         arg = "permission_mode"
       )
     }
+    params <- validate_agent_definition_params(params)
     if (!is.null(max_requests)) {
       max_requests <- validate_usage_limit(
         max_requests,
@@ -269,7 +321,8 @@ AgentDefinition <- S7::new_class(
       mcp_servers = mcp_servers,
       initial_prompt = initial_prompt,
       max_requests = max_requests,
-      permission_mode = permission_mode
+      permission_mode = permission_mode,
+      params = params
     )
     freeze_value(value)
   }
@@ -293,6 +346,16 @@ S7::method(print, AgentDefinition) <- function(x, ...) {
     cli::cli_text("model: {x$model}")
     if (!is.null(x$permission_mode)) {
       cli::cli_text("permission_mode: {x$permission_mode}")
+    }
+    if (length(x$params)) {
+      params <- vapply(
+        names(x$params),
+        function(name) {
+          paste0(name, " = ", paste(format(x$params[[name]]), collapse = ", "))
+        },
+        character(1)
+      )
+      cli::cli_text("params: {paste(params, collapse = '; ')}")
     }
   }))
   invisible(x)

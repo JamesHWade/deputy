@@ -1,4 +1,4 @@
-#' @include value-properties.R run-usage.R
+#' @include value-properties.R run-usage.R run-ending.R
 NULL
 
 # Agent result and event types for deputy
@@ -140,7 +140,7 @@ S7::method(print, AgentEvent) <- function(x, ...) {
       } else if (S7::S7_inherits(value, UsageLimits)) {
         configured <- Filter(
           Negate(is.null),
-          S7::props(value)[setdiff(names(S7::props(value)), "on_exceed")]
+          S7::props(value)[usage_limit_fields()]
         )
         value <- paste0(
           paste(
@@ -178,6 +178,9 @@ S7::method(print, AgentEvent) <- function(x, ...) {
 #' `result$response`, or use [result_n_turns()], [result_tool_calls()],
 #' [result_tool_results()], [result_text_chunks()] and [result_is_success()].
 #'
+#' `ending` says how the run ended in terms of its own classes, so a host need
+#' not parse `stop_reason`; see [RunEnding].
+#'
 #' `usage` covers this run only, but `cost` covers the whole conversation,
 #' including earlier runs and turns that compaction removed from the model
 #' context.
@@ -197,6 +200,10 @@ S7::method(print, AgentEvent) <- function(x, ...) {
 #'   subagent, to the parent run and delegation.
 #' @param usage [AgentUsage] for this run only, or `NULL`.
 #' @param run_context The run's `run_context`, a named list.
+#' @param ending How the run ended, as a [RunEnding] object, or `NULL` to
+#'   derive it from `stop_reason`. The five classes are [RunEndingAnswered()],
+#'   [RunEndingStopped()], [RunEndingLimit()], [RunEndingCutOff()] and
+#'   [RunEndingFailed()].
 #' @return An `AgentResult` object.
 #' @examples
 #' result <- AgentResult(response = "Done", events = list(
@@ -257,7 +264,8 @@ AgentResult <- S7::new_class(
       "delegation_id",
       S7::new_union(NULL, S7::class_character)
     ),
-    run_context = readonly_property("run_context", S7::class_list)
+    run_context = readonly_property("run_context", S7::class_list),
+    ending = readonly_property("ending", RunEnding)
   ),
   constructor = function(
     response = NULL,
@@ -282,7 +290,8 @@ AgentResult <- S7::new_class(
     parent_agent_id = NULL,
     parent_run_id = NULL,
     delegation_id = NULL,
-    run_context = list()
+    run_context = list(),
+    ending = NULL
   ) {
     ids <- list(
       session_id = session_id,
@@ -323,6 +332,10 @@ AgentResult <- S7::new_class(
       cli_abort("{.arg events} must be a list of AgentEvent objects")
     }
     run_context <- normalize_run_context(run_context)
+    if (!is.null(ending) && !S7::S7_inherits(ending, RunEnding)) {
+      cli_abort("{.arg ending} must be NULL or a RunEnding")
+    }
+    ending <- ending %||% run_ending_for(stop_reason)
     value <- S7::new_object(
       S7::S7_object(),
       response = response,
@@ -340,7 +353,8 @@ AgentResult <- S7::new_class(
       parent_agent_id = parent_agent_id,
       parent_run_id = parent_run_id,
       delegation_id = delegation_id,
-      run_context = run_context
+      run_context = run_context,
+      ending = ending
     )
     freeze_value(value)
   }
@@ -424,7 +438,8 @@ S7::method(result_text_chunks, AgentResult) <- function(result) {
 #'
 #' @param result An [AgentResult].
 #' @return `TRUE` if the stop reason is `"complete"`, meaning the model
-#'   finished on its own. It doesn't check the answer.
+#'   finished on its own. It doesn't check the answer, and it is `TRUE` for an
+#'   answer the provider cut short: the result's `ending` tells those apart.
 #' @export
 result_is_success <- S7::new_generic(
   "result_is_success",
@@ -480,4 +495,58 @@ S7::method(print, AgentResult) <- function(x, ...) {
     }
   }))
   invisible(x)
+}
+
+# The condition a result promise rejects with when a run left no result.
+run_without_result_error <- function() {
+  rlang::error_cnd(
+    class = "deputy_error",
+    message = "The run ended without an AgentResult"
+  )
+}
+
+#' Get the result of a streamed run
+#'
+#' @description
+#' `stream_result()` takes the stream that [Agent]`$stream_async()` returned
+#' and gives a promise of that run's [AgentResult]. The promise resolves when
+#' the run has finished, however it ended: a run that was stopped, hit a limit
+#' or failed resolves too, and its `ending` says which. Draining the stream is
+#' still what makes the run go; a stream that is never read never resolves.
+#' The promise is rejected only when there is no result to give: the run could
+#' not start, as when the agent was already running, or finishing it failed.
+#'
+#' @param stream A stream returned by `Agent$stream_async()`.
+#' @return A promise of an [AgentResult].
+#' @examples
+#' \dontrun{
+#' stream <- agent$stream_async(input$message)
+#' promises::then(stream_result(stream), function(result) {
+#'   if (!S7::S7_inherits(result$ending, RunEndingAnswered)) {
+#'     shiny::showNotification(paste("The run ended early:", result$stop_reason))
+#'   }
+#' })
+#' shinychat::chat_append("chat", stream)
+#' }
+#' @export
+stream_result <- function(stream) {
+  state <- attr(stream, "deputy_run_state", exact = TRUE)
+  if (!is.environment(state)) {
+    cli_abort(
+      "{.arg stream} must be a stream returned by {.code Agent$stream_async()}"
+    )
+  }
+  if (is.null(state$result_promise)) {
+    state$result_promise <- promises::promise(function(resolve, reject) {
+      if (!is.null(state$result)) {
+        resolve(state$result)
+      } else if (isTRUE(state$finished)) {
+        reject(state$start_error %||% run_without_result_error())
+      } else {
+        state$resolve_result <- resolve
+        state$reject_result <- reject
+      }
+    })
+  }
+  state$result_promise
 }

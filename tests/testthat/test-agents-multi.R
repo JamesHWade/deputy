@@ -557,6 +557,36 @@ test_that("LeadAgent register_sub_agent updates system prompt", {
   expect_true(grepl("newly added helper", prompt_after))
 })
 
+test_that("replacing a definition with the same one keeps the lead's prompt", {
+  helper <- function(description = "Searches") {
+    agent_definition(
+      name = "research",
+      description = description,
+      prompt = "Search."
+    )
+  }
+  for (base in list("Lead.", NULL)) {
+    lead <- LeadAgent$new(
+      chat = create_mock_chat(),
+      sub_agents = list(helper()),
+      system_prompt = base
+    )
+    lead$.__enclos_env__$private$append_hook_context("Hook context")
+    original <- lead$get_system_prompt()
+
+    lead$register_sub_agent(helper(), replace = TRUE)
+    expect_identical(lead$get_system_prompt(), original)
+
+    lead$register_sub_agent(helper("Searches papers"), replace = TRUE)
+    expect_match(lead$get_system_prompt(), "Searches papers", fixed = TRUE)
+    for (i in 1:3) {
+      lead$register_sub_agent(helper(), replace = TRUE)
+    }
+    expect_identical(lead$get_system_prompt(), original)
+    expect_match(original, "Hook context", fixed = TRUE)
+  }
+})
+
 test_that("register_sub_agent preserves prompt content outside routing", {
   chat <- create_mock_chat()
   chat$set_turns(list(

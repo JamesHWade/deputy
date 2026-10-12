@@ -7,13 +7,12 @@
 tools_interactive(callback = NULL, context = list())
 }
 \arguments{
-\item{callback}{A function of \code{questions} and \code{context} that returns a
-named list mapping each question's text to the chosen label or labels, a
-promise for that list, or \code{\link[=AskUserDeferred]{AskUserDeferred()}} when the answers will come in
-the person's next message. Shiny apps can't wait for input, so they return
-a promise or \code{AskUserDeferred()}. If \code{NULL}, the tool uses the
+\item{callback}{A function of \code{questions} and \code{context} that returns the
+answers, a promise for them, or \code{\link[=AskUserDeferred]{AskUserDeferred()}} when the answers will
+come in the person's next message. Shiny apps can't wait for input, so
+they return a promise or \code{AskUserDeferred()}. If \code{NULL}, the tool uses the
 \code{\link[=set_ask_user_callback]{set_ask_user_callback()}} callback if one is set, and otherwise
-\code{readline()} in an interactive session.}
+\code{readline()} in an interactive session. See "Answers" below.}
 
 \item{context}{A named list passed to \code{callback}, such as \code{agent_id} and
 \code{session_id} values that tell your app where to show the questions, or a
@@ -28,6 +27,27 @@ Returns a list holding one \code{ask_user} tool (see \link{tool_ask_user}) that 
 questions to \code{callback}. Give each agent its own tool when several agents or
 Shiny sessions share one R process, or when the session isn't interactive.
 }
+\section{Answers}{
+
+The answers are a named list. Each name is the exact text of a question,
+and each value is a character vector:
+\itemize{
+\item the chosen option labels: one for an ordinary question, any number for a
+question with \code{multiSelect = TRUE};
+\item at most one other string, the answer the person typed themselves. For an
+ordinary question it takes the place of a label.
+}
+
+Leave a question out, or give it \code{character()}, if it wasn't answered.
+Give each chosen label as its own element; a string that isn't a label is
+the person's own answer. A name that isn't one of the questions, a value
+that isn't a character vector, or too many answers for a question is an
+error, and the model is told the answers couldn't be collected.
+
+The model receives, for each question, the \code{selected} labels and the
+\code{other_text}; see \link{tool_ask_user} for the exact result.
+}
+
 \examples{
 \dontrun{
 agent_id <- "agent-review"
