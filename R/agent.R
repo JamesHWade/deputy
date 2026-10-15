@@ -1331,13 +1331,19 @@ Agent <- R6::R6Class(
     #' @description Replace the system prompt, as ellmer's
     #' `$set_system_prompt()` does. After compaction, this also drops the
     #' conversation summary unless `value` still contains it.
+    #'
+    #' Skills loaded with `$load_skill()` stay loaded, so their prompts are
+    #' added back after `value`, in the order they were loaded. A skill whose
+    #' prompt `value` already contains is not added twice. With `value =
+    #' NULL`, the system prompt holds only the loaded skills' prompts, or is
+    #' `NULL` if there are none.
     #' @param value The new system prompt or `NULL`.
     #' @return The agent, invisibly.
     set_system_prompt = function(value) {
       check_conversation_lease(self, NULL)
       private$.conversation_state$set_prompt(
         private$.chat,
-        value
+        prompt_with_skill_prompts(value, self$skills())
       )
       private$appended_hook_context_hashes <- character()
       invisible(self)
@@ -2215,13 +2221,7 @@ Agent <- R6::R6Class(
       # Append prompt to system prompt
       if (!is.null(skill$prompt) && nchar(skill$prompt) > 0) {
         current_prompt <- private$.chat$get_system_prompt() %||% ""
-        new_prompt <- paste(
-          current_prompt,
-          "",
-          paste0("# Skill: ", skill$name),
-          skill$prompt,
-          sep = "\n"
-        )
+        new_prompt <- paste0(current_prompt, skill_prompt_block(skill))
         private$.conversation_state$set_prompt(
           private$.chat,
           new_prompt,

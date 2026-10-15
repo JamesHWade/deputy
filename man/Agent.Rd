@@ -1299,6 +1299,11 @@ does. After compaction it includes the conversation summary.
   Replace the system prompt, as ellmer's
 \verb{$set_system_prompt()} does. After compaction, this also drops the
 conversation summary unless \code{value} still contains it.
+
+Skills loaded with \verb{$load_skill()} stay loaded, so their prompts are
+added back after \code{value}, in the order they were loaded. A skill whose
+prompt \code{value} already contains is not added twice. With \code{value = NULL}, the system prompt holds only the loaded skills' prompts, or is
+\code{NULL} if there are none.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_system_prompt(value)}
