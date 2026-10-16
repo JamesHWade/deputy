@@ -2218,7 +2218,7 @@ name clash is an error.}
 \if{html}{\out{<a id="method-Agent-skills"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-skills}{}}}
 \subsection{\code{Agent$skills()}}{
-  Get the loaded skills.
+  Get the loaded skills, in the order they were last loaded.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$skills()}

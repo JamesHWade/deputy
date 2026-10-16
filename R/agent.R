@@ -2233,6 +2233,7 @@ Agent <- R6::R6Class(
       if (is.null(private$loaded_skills)) {
         private$loaded_skills <- list()
       }
+      private$loaded_skills[[skill$name]] <- NULL
       private$loaded_skills[[skill$name]] <- skill
 
       cli_alert_success("Loaded skill: {.val {skill$name}}")
@@ -2240,7 +2241,7 @@ Agent <- R6::R6Class(
     },
 
     #' @description
-    #' Get the loaded skills.
+    #' Get the loaded skills, in the order they were last loaded.
     #'
     #' @return Named list of [Skill] objects.
     skills = function() {

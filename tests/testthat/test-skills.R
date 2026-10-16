@@ -770,3 +770,21 @@ test_that("a skill survives compaction and a later set_system_prompt()", {
     fixed = TRUE
   )
 })
+
+test_that("set_system_prompt() puts a reloaded skill where it was last loaded", {
+  agent <- Agent$new(chat = create_mock_chat())
+  suppressMessages({
+    agent$load_skill(Skill("first", prompt = "Old one."))
+    agent$load_skill(Skill("second", prompt = "Two."))
+    agent$load_skill(Skill("first", prompt = "New one."))
+  })
+
+  expect_identical(names(agent$skills()), c("second", "first"))
+
+  agent$set_system_prompt("Base.")
+
+  expect_identical(
+    agent$get_system_prompt(),
+    "Base.\n\n# Skill: second\nTwo.\n\n# Skill: first\nNew one."
+  )
+})
