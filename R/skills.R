@@ -391,3 +391,28 @@ skills_list <- function(path = "skills") {
 
   skills
 }
+
+# The text `$load_skill()` appends to the system prompt for one skill.
+skill_prompt_block <- function(skill) {
+  paste0("\n\n# Skill: ", skill$name, "\n", skill$prompt)
+}
+
+# `prompt` followed by the block of each skill with a prompt that `prompt`
+# does not already contain.
+prompt_with_skill_prompts <- function(prompt, skills) {
+  blocks <- vapply(
+    Filter(function(skill) nzchar(skill$prompt %||% ""), skills),
+    skill_prompt_block,
+    character(1)
+  )
+  if (length(blocks) == 0L) {
+    return(prompt)
+  }
+  base <- prompt %||% ""
+  missing <- blocks[!vapply(
+    blocks,
+    function(block) grepl(block, base, fixed = TRUE),
+    logical(1)
+  )]
+  paste0(base, paste(missing, collapse = ""))
+}

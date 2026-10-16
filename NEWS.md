@@ -1,5 +1,12 @@
 # deputy (development version)
 
+* `Agent$set_system_prompt()` keeps the prompts of skills loaded with
+  `$load_skill()`. It used to replace them along with the rest of the prompt,
+  while `$skills()` still listed the skills as loaded. A skill prompt that the
+  new value already contains is not added twice. A skill that is loaded again
+  moves to the end, so `$skills()` lists skills in the order they were last
+  loaded.
+
 * `subagent_chat_activity()` and `subagent_chat_history()` work in apps that
   run the lead's replies themselves instead of through
   `shinychat::chat_server()`. Leave out `chat`: subagent tool calls then appear
