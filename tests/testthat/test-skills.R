@@ -666,3 +666,125 @@ test_that("skill_load composes sourced tools once and preserves metadata precede
   expect_identical(markdown$tools, list())
   expect_identical(markdown$requires, list(providers = "openai"))
 })
+
+test_that("set_system_prompt() keeps the prompt of a loaded skill", {
+  agent <- Agent$new(chat = create_mock_chat())
+  suppressMessages(agent$load_skill(
+    Skill("plain", prompt = "Use plain words.")
+  ))
+
+  agent$set_system_prompt("You answer chemistry questions.")
+
+  expect_identical(
+    agent$get_system_prompt(),
+    "You answer chemistry questions.\n\n# Skill: plain\nUse plain words."
+  )
+})
+
+test_that("set_system_prompt() keeps skills in the order they were loaded", {
+  agent <- Agent$new(chat = create_mock_chat())
+  suppressMessages({
+    agent$load_skill(Skill("first", prompt = "One."))
+    agent$load_skill(Skill("second", prompt = "Two."))
+  })
+
+  agent$set_system_prompt("Base.")
+
+  expect_identical(
+    agent$get_system_prompt(),
+    "Base.\n\n# Skill: first\nOne.\n\n# Skill: second\nTwo."
+  )
+})
+
+test_that("set_system_prompt() does not add a skill prompt twice", {
+  agent <- Agent$new(chat = create_mock_chat())
+  suppressMessages(agent$load_skill(
+    Skill("plain", prompt = "Use plain words.")
+  ))
+  saved <- agent$get_system_prompt()
+
+  agent$set_system_prompt(saved)
+  agent$set_system_prompt(agent$get_system_prompt())
+
+  expect_identical(agent$get_system_prompt(), saved)
+})
+
+test_that("set_system_prompt(NULL) leaves only the loaded skills' prompts", {
+  agent <- Agent$new(chat = create_mock_chat())
+  agent$set_system_prompt(NULL)
+  expect_null(agent$get_system_prompt())
+
+  suppressMessages(agent$load_skill(
+    Skill("plain", prompt = "Use plain words.")
+  ))
+  agent$set_system_prompt(NULL)
+
+  expect_identical(
+    agent$get_system_prompt(),
+    "\n\n# Skill: plain\nUse plain words."
+  )
+})
+
+test_that("set_system_prompt() ignores a loaded skill with no prompt", {
+  agent <- Agent$new(chat = create_mock_chat())
+  suppressMessages(agent$load_skill(Skill("toolbox")))
+
+  agent$set_system_prompt("Base.")
+
+  expect_identical(agent$get_system_prompt(), "Base.")
+})
+
+test_that("a skill survives compaction and a later set_system_prompt()", {
+  chat <- create_mock_chat()
+  chat$set_turns(list(
+    ellmer::UserTurn("Question 1"),
+    ellmer::AssistantTurn("Answer 1"),
+    ellmer::UserTurn("Question 2"),
+    ellmer::AssistantTurn("Answer 2")
+  ))
+  agent <- Agent$new(chat)
+  agent$set_system_prompt("Base.")
+  suppressMessages(agent$load_skill(
+    Skill("plain", prompt = "Use plain words.")
+  ))
+  suppressMessages(agent$compact(keep_last = 2, summary = "Earlier answers."))
+  compacted <- agent$get_system_prompt()
+
+  expect_match(compacted, "# Skill: plain\nUse plain words.", fixed = TRUE)
+  expect_match(compacted, "Earlier answers.", fixed = TRUE)
+
+  agent$set_system_prompt(compacted)
+  expect_identical(agent$get_system_prompt(), compacted)
+
+  agent$set_system_prompt("Rebuilt base.")
+  rebuilt <- agent$get_system_prompt()
+  expect_identical(
+    rebuilt,
+    "Rebuilt base.\n\n# Skill: plain\nUse plain words."
+  )
+  agent$compact(keep_last = 0, summary = "Later answers.") |>
+    suppressMessages()
+  expect_match(
+    agent$get_system_prompt(),
+    "Rebuilt base.\n\n# Skill: plain\nUse plain words.",
+    fixed = TRUE
+  )
+})
+
+test_that("set_system_prompt() puts a reloaded skill where it was last loaded", {
+  agent <- Agent$new(chat = create_mock_chat())
+  suppressMessages({
+    agent$load_skill(Skill("first", prompt = "Old one."))
+    agent$load_skill(Skill("second", prompt = "Two."))
+    agent$load_skill(Skill("first", prompt = "New one."))
+  })
+
+  expect_identical(names(agent$skills()), c("second", "first"))
+
+  agent$set_system_prompt("Base.")
+
+  expect_identical(
+    agent$get_system_prompt(),
+    "Base.\n\n# Skill: second\nTwo.\n\n# Skill: first\nNew one."
+  )
+})
