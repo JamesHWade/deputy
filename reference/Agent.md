@@ -1587,6 +1587,12 @@ Replace the system prompt, as ellmer's `$set_system_prompt()` does.
 After compaction, this also drops the conversation summary unless
 `value` still contains it.
 
+Skills loaded with `$load_skill()` stay loaded, so their prompts are
+added back after `value`, in the order they were loaded. A skill whose
+prompt `value` already contains is not added twice. With `value = NULL`,
+the system prompt holds only the loaded skills' prompts, or is `NULL` if
+there are none.
+
 #### Usage
 
     Agent$set_system_prompt(value)
@@ -2506,7 +2512,7 @@ The agent, invisibly, for chaining.
 
 ### `Agent$skills()`
 
-Get the loaded skills.
+Get the loaded skills, in the order they were last loaded.
 
 #### Usage
 

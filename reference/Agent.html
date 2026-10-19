@@ -1408,7 +1408,11 @@ does. After compaction it includes the conversation summary.</p><div class="sect
 <h3 id="agent-set-system-prompt-"><code>Agent$set_system_prompt()</code><a class="anchor" aria-label="anchor" href="#agent-set-system-prompt-"></a></h3>
 <p>Replace the system prompt, as ellmer's
 <code>$set_system_prompt()</code> does. After compaction, this also drops the
-conversation summary unless <code>value</code> still contains it.</p><div class="section">
+conversation summary unless <code>value</code> still contains it.</p>
+<p>Skills loaded with <code>$load_skill()</code> stay loaded, so their prompts are
+added back after <code>value</code>, in the order they were loaded. A skill whose
+prompt <code>value</code> already contains is not added twice. With <code>value = NULL</code>, the system prompt holds only the loaded skills' prompts, or is
+<code>NULL</code> if there are none.</p><div class="section">
 <h4 id="usage-34">Usage<a class="anchor" aria-label="anchor" href="#usage-34"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">set_system_prompt</span><span class="op">(</span><span class="va">value</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
@@ -2229,7 +2233,7 @@ name clash is an error.</p></dd>
 
 <p></p><hr><a id="method-Agent-skills"></a><div class="section">
 <h3 id="agent-skills-"><code>Agent$skills()</code><a class="anchor" aria-label="anchor" href="#agent-skills-"></a></h3>
-<p>Get the loaded skills.</p><div class="section">
+<p>Get the loaded skills, in the order they were last loaded.</p><div class="section">
 <h4 id="usage-71">Usage<a class="anchor" aria-label="anchor" href="#usage-71"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">Agent</span><span class="op">$</span><span class="fu">skills</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
