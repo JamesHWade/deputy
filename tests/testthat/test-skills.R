@@ -709,6 +709,45 @@ test_that("set_system_prompt() does not add a skill prompt twice", {
   expect_identical(agent$get_system_prompt(), saved)
 })
 
+test_that("set_system_prompt() does not add a skill to a trimmed prompt", {
+  agent <- Agent$new(chat = create_mock_chat())
+  suppressMessages(agent$load_skill(
+    Skill("plain", prompt = "Use plain words.")
+  ))
+
+  agent$set_system_prompt(trimws(agent$get_system_prompt()))
+  expect_identical(
+    agent$get_system_prompt(),
+    "# Skill: plain\nUse plain words."
+  )
+
+  agent$set_system_prompt("Base.\n# Skill: plain\nUse plain words.")
+  expect_identical(
+    agent$get_system_prompt(),
+    "Base.\n# Skill: plain\nUse plain words."
+  )
+})
+
+test_that("set_system_prompt() takes the prompts ellmer takes", {
+  chat <- ellmer::chat_openai(
+    model = "gpt-4o-mini",
+    credentials = function() "unused"
+  )
+  agent <- Agent$new(chat = chat)
+  agent$set_system_prompt(c("Part one.", "Part two."))
+  expect_identical(agent$get_system_prompt(), "Part one.\n\nPart two.")
+
+  suppressMessages(agent$load_skill(
+    Skill("plain", prompt = "Use plain words.")
+  ))
+  agent$set_system_prompt(c("Part one.", "Part two."))
+  joined <- "Part one.\n\nPart two.\n\n# Skill: plain\nUse plain words."
+  expect_identical(agent$get_system_prompt(), joined)
+
+  expect_error(agent$set_system_prompt(1))
+  expect_identical(agent$get_system_prompt(), joined)
+})
+
 test_that("set_system_prompt(NULL) leaves only the loaded skills' prompts", {
   agent <- Agent$new(chat = create_mock_chat())
   agent$set_system_prompt(NULL)

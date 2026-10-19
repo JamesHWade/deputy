@@ -398,21 +398,25 @@ skill_prompt_block <- function(skill) {
 }
 
 # `prompt` followed by the block of each skill with a prompt that `prompt`
-# does not already contain.
+# does not already contain. A prompt in several parts is joined first, as
+# ellmer's `$set_system_prompt()` joins it.
 prompt_with_skill_prompts <- function(prompt, skills) {
   blocks <- vapply(
     Filter(function(skill) nzchar(skill$prompt %||% ""), skills),
     skill_prompt_block,
     character(1)
   )
-  if (length(blocks) == 0L) {
+  # A prompt that isn't text goes to ellmer as given, which rejects it.
+  if (length(blocks) == 0L || !(is.null(prompt) || is.character(prompt))) {
     return(prompt)
   }
-  base <- prompt %||% ""
-  missing <- blocks[!vapply(
+  base <- paste(prompt %||% "", collapse = "\n\n")
+  # Look for the block without the blank line before it, so a prompt that was
+  # trimmed or joined with single newlines doesn't get a second copy.
+  present <- vapply(
     blocks,
-    function(block) grepl(block, base, fixed = TRUE),
+    function(block) grepl(sub("^\n\n", "", block), base, fixed = TRUE),
     logical(1)
-  )]
-  paste0(base, paste(missing, collapse = ""))
+  )
+  paste0(base, paste(blocks[!present], collapse = ""))
 }
