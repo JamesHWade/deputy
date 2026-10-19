@@ -2510,7 +2510,7 @@ Agent <- R6::R6Class(
     #'   when the delegation started, so [subagent_chat_history()] can save a
     #'   conversation's subagents with it. While it is set, the agent's runs
     #'   are traced under it (`gen_ai.conversation.id`); otherwise under its
-    #'   session ID. It isn't sent to the model.
+    #'   session ID. A clone starts with it `NULL`. It isn't sent to the model.
     conversation_id = function(value) {
       if (missing(value)) {
         return(private$.conversation_id)
@@ -2854,6 +2854,9 @@ Agent <- R6::R6Class(
         # A clone, such as shinychat's title generator, shows no activity.
         cloned$.__enclos_env__$private$.activity <- NULL
         cloned$.__enclos_env__$private$.activity_leftover <- NULL
+        # Nor is it the host's conversation until the host names it: its runs
+        # would be the latest model spans a trace reader keeps for that id.
+        cloned$.__enclos_env__$private$.conversation_id <- NULL
         register_compaction_catalog_owner(
           private$.compaction_catalog_registry,
           cloned

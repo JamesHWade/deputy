@@ -5,12 +5,13 @@ record_runtime_trace <- function(
   mode = "tool",
   capture = FALSE,
   conversation_id = NULL,
-  compact = FALSE
+  compact = FALSE,
+  clone = NULL
 ) {
   skip_if_not_installed("otel")
   skip_if_not_installed("otelsdk")
   callr::r(
-    function(path, url, mode, capture, conversation_id, compact) {
+    function(path, url, mode, capture, conversation_id, compact, clone) {
       Sys.setenv(
         OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = if (capture) {
           "true"
@@ -83,6 +84,16 @@ record_runtime_trace <- function(
         if (compact) {
           agent$compact(keep_last = 1L)
         }
+        if (identical(clone, "title")) {
+          # What shinychat's title generator does with the live client.
+          titler <- agent$clone()
+          titler$set_turns(list())
+          titler$set_tools(list())
+          titler$set_system_prompt("You title chat conversations.")
+          titler$chat("user: private user prompt")
+        } else if (identical(clone, "keep")) {
+          agent$clone()$chat("a side question")
+        }
         list(
           run_id = result$run_id,
           session_id = result$session_id,
@@ -97,7 +108,8 @@ record_runtime_trace <- function(
       mode = mode,
       capture = capture,
       conversation_id = conversation_id,
-      compact = compact
+      compact = compact,
+      clone = clone
     )
   )
 }
@@ -194,6 +206,31 @@ test_that("compacting between turns stays out of the host's conversation", {
   ))
   expect_length(ids, 2L)
   expect_identical(sort(ids), sort(c("c_host_123", record$value$session_id)))
+})
+
+test_that("a clone's runs stay out of the host's conversation", {
+  # shinychat's title generator clones the live Agent; a title request filed
+  # under the host's id would be the latest model span a trajectory reader
+  # keeps for the conversation.
+  for (clone in c("title", "keep")) {
+    server <- local_runtime_server(list(
+      runtime_reply(),
+      runtime_reply(text = "A title")
+    ))
+    record <- record_runtime_trace(
+      server$url,
+      conversation_id = "c_host_123",
+      clone = clone
+    )
+    chats <- Filter(function(x) startsWith(x$name, "chat "), record$traces)
+    ids <- unname(vapply(
+      chats,
+      function(x) x$attributes[["gen_ai.conversation.id"]],
+      character(1)
+    ))
+    expect_length(ids, 2L)
+    expect_identical(sum(ids == "c_host_123"), 1L, label = clone)
+  }
 })
 
 test_that("a run keeps the conversation id it started with", {
