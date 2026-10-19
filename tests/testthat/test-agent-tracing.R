@@ -1,10 +1,15 @@
 # Instrumentation is initialized before importing ellmer in a fresh process;
 # no test reaches into upstream tracer caches or callback managers.
-record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
+record_runtime_trace <- function(
+  url,
+  mode = "tool",
+  capture = FALSE,
+  conversation_id = NULL
+) {
   skip_if_not_installed("otel")
   skip_if_not_installed("otelsdk")
   callr::r(
-    function(path, url, mode, capture) {
+    function(path, url, mode, capture, conversation_id) {
       Sys.setenv(
         OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = if (capture) {
           "true"
@@ -70,6 +75,9 @@ record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
             timeout = 0
           ))
         }
+        if (!is.null(conversation_id)) {
+          agent$conversation_id <- conversation_id
+        }
         result <- suppressWarnings(agent$run_sync("private user prompt"))
         list(
           run_id = result$run_id,
@@ -83,7 +91,8 @@ record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
       path = getNamespaceInfo(asNamespace("deputy"), "path"),
       url = url,
       mode = mode,
-      capture = capture
+      capture = capture,
+      conversation_id = conversation_id
     )
   )
 }
@@ -119,11 +128,44 @@ test_that("governance wraps upstream model, HTTP, and tool spans without duplica
     chats[[1]]$attributes[["gen_ai.conversation.id"]],
     record$value$session_id
   )
+  expect_identical(
+    run$attributes[["gen_ai.conversation.id"]],
+    record$value$session_id
+  )
+  expect_identical(
+    run$attributes[["deputy.session.id"]],
+    record$value$session_id
+  )
   expect_identical(record$value$usage$requests, 2L)
   serialized <- paste(utils::capture.output(dput(spans)), collapse = "\n")
   expect_false(grepl("private user prompt|private tool result", serialized))
   expect_true(
     "deputy.permission" %in% vapply(run$events, `[[`, character(1), "name")
+  )
+})
+
+test_that("a run is filed under the host's conversation when the host names one", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "effect"),
+    runtime_reply()
+  ))
+  record <- record_runtime_trace(server$url, conversation_id = "c_host_123")
+  spans <- record$traces
+  run <- spans[["deputy.run"]]
+  chats <- Filter(function(x) startsWith(x$name, "chat "), spans)
+  expect_length(chats, 2L)
+  expect_identical(run$attributes[["gen_ai.conversation.id"]], "c_host_123")
+  expect_true(all(vapply(
+    chats,
+    function(x) {
+      identical(x$attributes[["gen_ai.conversation.id"]], "c_host_123")
+    },
+    logical(1)
+  )))
+  # The session stays findable from the run.
+  expect_identical(
+    run$attributes[["deputy.session.id"]],
+    record$value$session_id
   )
 })
 

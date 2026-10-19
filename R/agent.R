@@ -2508,7 +2508,9 @@ Agent <- R6::R6Class(
     #'   conversation with `$set_turns(list())`, as shinychat does for a new
     #'   chat, sets it back to `NULL`. Each delegation keeps the value it had
     #'   when the delegation started, so [subagent_chat_history()] can save a
-    #'   conversation's subagents with it. It isn't sent to the model.
+    #'   conversation's subagents with it. While it is set, the agent's runs
+    #'   are traced under it (`gen_ai.conversation.id`); otherwise under its
+    #'   session ID. It isn't sent to the model.
     conversation_id = function(value) {
       if (missing(value)) {
         return(private$.conversation_id)

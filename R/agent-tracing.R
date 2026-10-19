@@ -1,4 +1,15 @@
 # Deputy records governance; ellmer records model, HTTP, and tool execution.
+
+# The conversation a run's spans are filed under (`gen_ai.conversation.id`):
+# the host's, when it named one (shinychat's chat_server() does before each
+# reply), so a trace reader groups the run with the conversation the user
+# sees. Without one, the Agent's session. The session outlives a host
+# conversation (one Agent answers every conversation in a browser session),
+# so filing a host's runs under it would merge them.
+trace_conversation_id <- function(private) {
+  private$.conversation_id %||% private$.session_id
+}
+
 start_run_trace <- function(agent, state) {
   if (!requireNamespace("otel", quietly = TRUE)) {
     return(NULL)
@@ -11,7 +22,8 @@ start_run_trace <- function(agent, state) {
       "deputy.agent.id" = agent$agent_id,
       "deputy.parent.run.id" = private$.parent_run_id,
       "deputy.delegation.id" = private$.delegation_id,
-      "gen_ai.conversation.id" = private$.session_id
+      "deputy.session.id" = private$.session_id,
+      "gen_ai.conversation.id" = trace_conversation_id(private)
     )
   )
   otel::start_span(
