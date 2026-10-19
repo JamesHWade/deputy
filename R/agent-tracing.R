@@ -5,9 +5,14 @@
 # reply), so a trace reader groups the run with the conversation the user
 # sees. Without one, the Agent's session. The session outlives a host
 # conversation (one Agent answers every conversation in a browser session),
-# so filing a host's runs under it would merge them.
+# so filing a host's runs under it would merge them. Read once when a run
+# starts and kept on the run state: the host may clear its id mid-run (New
+# chat), and a fallback that reinstalls the request callbacks must not move
+# the rest of the run to another id.
 trace_conversation_id <- function(private) {
-  private$.conversation_id %||% private$.session_id
+  private$current_run_state$trace_conversation_id %||%
+    private$.conversation_id %||%
+    private$.session_id
 }
 
 start_run_trace <- function(agent, state) {

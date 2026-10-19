@@ -8,7 +8,9 @@
   which every conversation answered by the same Agent shares, so a reader
   that keeps one trajectory per ID merged them. Without a host ID the session
   ID is used, as before; `deputy.run` now also carries it as
-  `deputy.session.id`. Compaction requests stay under the session ID.
+  `deputy.session.id`. A run keeps the ID it started with, even if the host
+  clears it mid-run and a fallback provider takes over. Compaction summary
+  requests, in a run or from `$compact()`, stay under the session ID.
 
 * `subagent_chat_activity()` and `subagent_chat_history()` work in apps that
   run the lead's replies themselves instead of through

@@ -4,12 +4,13 @@ record_runtime_trace <- function(
   url,
   mode = "tool",
   capture = FALSE,
-  conversation_id = NULL
+  conversation_id = NULL,
+  compact = FALSE
 ) {
   skip_if_not_installed("otel")
   skip_if_not_installed("otelsdk")
   callr::r(
-    function(path, url, mode, capture, conversation_id) {
+    function(path, url, mode, capture, conversation_id, compact) {
       Sys.setenv(
         OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = if (capture) {
           "true"
@@ -79,6 +80,9 @@ record_runtime_trace <- function(
           agent$conversation_id <- conversation_id
         }
         result <- suppressWarnings(agent$run_sync("private user prompt"))
+        if (compact) {
+          agent$compact(keep_last = 1L)
+        }
         list(
           run_id = result$run_id,
           session_id = result$session_id,
@@ -92,7 +96,8 @@ record_runtime_trace <- function(
       url = url,
       mode = mode,
       capture = capture,
-      conversation_id = conversation_id
+      conversation_id = conversation_id,
+      compact = compact
     )
   )
 }
@@ -167,6 +172,48 @@ test_that("a run is filed under the host's conversation when the host names one"
     run$attributes[["deputy.session.id"]],
     record$value$session_id
   )
+})
+
+test_that("compacting between turns stays out of the host's conversation", {
+  # A trajectory reader keeps the latest model span per conversation id; a
+  # summary request filed under the host's id would replace the conversation.
+  server <- local_runtime_server(list(
+    runtime_reply(),
+    runtime_reply(text = "summary of the earlier turns", stream = FALSE)
+  ))
+  record <- record_runtime_trace(
+    server$url,
+    conversation_id = "c_host_123",
+    compact = TRUE
+  )
+  chats <- Filter(function(x) startsWith(x$name, "chat "), record$traces)
+  ids <- unname(vapply(
+    chats,
+    function(x) x$attributes[["gen_ai.conversation.id"]],
+    character(1)
+  ))
+  expect_length(ids, 2L)
+  expect_identical(sort(ids), sort(c("c_host_123", record$value$session_id)))
+})
+
+test_that("a run keeps the conversation id it started with", {
+  chat <- ellmer::chat_openai_compatible(
+    base_url = "http://127.0.0.1:9/v1",
+    credentials = function() "fixture",
+    model = "gpt-4o-mini",
+    echo = "none"
+  )
+  agent <- Agent$new(chat, permissions = permissions_full())
+  private <- agent$.__enclos_env__$private
+  state <- new.env(parent = emptyenv())
+  state$trace_conversation_id <- "c_started"
+  private$current_run_state <- state
+  withr::defer(private$current_run_state <- NULL)
+  # The host cleared its id mid-run (New chat), then a fallback reinstalled
+  # the request callbacks.
+  agent$conversation_id <- NULL
+  install_request_callbacks(agent)
+  expect_identical(private$.chat$conversation_id, "c_started")
 })
 
 test_that("denials are governance events and content capture remains opt-in", {
