@@ -44,8 +44,10 @@ would exceed the checkpoint size limits is refused.
   to `NULL`. Each delegation keeps the value it had when the delegation
   started, so
   [`subagent_chat_history()`](https://jameshwade.github.io/deputy/reference/subagent_chat_history.md)
-  can save a conversation's subagents with it. It isn't sent to the
-  model.
+  can save a conversation's subagents with it. While it is set, the
+  agent's runs are traced under it (`gen_ai.conversation.id`); otherwise
+  under its session ID. A clone starts with it `NULL`. It isn't sent to
+  the model.
 
 - `run_context`:
 

@@ -23,7 +23,7 @@ working_dir, are read-only afterwards."><meta property="og:image" content="https
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9004</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -122,7 +122,9 @@ set it yourself before starting a run outside a reply. Emptying the
 conversation with <code>$set_turns(list())</code>, as shinychat does for a new
 chat, sets it back to <code>NULL</code>. Each delegation keeps the value it had
 when the delegation started, so <code><a href="subagent_chat_history.html">subagent_chat_history()</a></code> can save a
-conversation's subagents with it. It isn't sent to the model.</p></dd>
+conversation's subagents with it. While it is set, the agent's runs
+are traced under it (<code>gen_ai.conversation.id</code>); otherwise under its
+session ID. A clone starts with it <code>NULL</code>. It isn't sent to the model.</p></dd>
 
 
     <dt><code>run_context</code></dt>
