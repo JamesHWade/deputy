@@ -1,5 +1,18 @@
 # deputy (development version)
 
+* A run is traced under the host's conversation. When the host sets
+  `Agent$conversation_id` (shinychat's `chat_server()` does before each reply),
+  the `deputy.run` span and the run's model spans carry it as
+  `gen_ai.conversation.id`, so a trace reader files the run with the
+  conversation the user sees. Before, they carried the Agent's session ID,
+  which every conversation answered by the same Agent shares, so a reader
+  that keeps one trajectory per ID merged them. Without a host ID the session
+  ID is used, as before; `deputy.run` now also carries it as
+  `deputy.session.id`. A run keeps the ID it started with, even if the host
+  clears it mid-run and a fallback provider takes over. Compaction summary
+  requests, in a run or from `$compact()`, stay under the session ID, and a
+  clone (`$clone()`) starts without the host's ID.
+
 * `Agent$set_system_prompt()` keeps the prompts of skills loaded with
   `$load_skill()`. It used to replace them along with the rest of the prompt,
   while `$skills()` still listed the skills as loaded. A skill prompt that the

@@ -257,6 +257,8 @@ compaction_summary_attempt_async <- coro::async(function(
   tryCatch(
     {
       chat <- clone_compaction_chat(template)
+      # A summary request is not part of the host's conversation: filed under
+      # it, it would be the latest model span a trajectory reader keeps.
       chat$conversation_id <- private$.session_id
       chat$on_request_start(function(turns) {
         if (!compaction_can_continue(agent)) {

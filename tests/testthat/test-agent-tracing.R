@@ -1,10 +1,17 @@
 # Instrumentation is initialized before importing ellmer in a fresh process;
 # no test reaches into upstream tracer caches or callback managers.
-record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
+record_runtime_trace <- function(
+  url,
+  mode = "tool",
+  capture = FALSE,
+  conversation_id = NULL,
+  compact = FALSE,
+  clone = NULL
+) {
   skip_if_not_installed("otel")
   skip_if_not_installed("otelsdk")
   callr::r(
-    function(path, url, mode, capture) {
+    function(path, url, mode, capture, conversation_id, compact, clone) {
       Sys.setenv(
         OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = if (capture) {
           "true"
@@ -70,7 +77,23 @@ record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
             timeout = 0
           ))
         }
+        if (!is.null(conversation_id)) {
+          agent$conversation_id <- conversation_id
+        }
         result <- suppressWarnings(agent$run_sync("private user prompt"))
+        if (compact) {
+          agent$compact(keep_last = 1L)
+        }
+        if (identical(clone, "title")) {
+          # What shinychat's title generator does with the live client.
+          titler <- agent$clone()
+          titler$set_turns(list())
+          titler$set_tools(list())
+          titler$set_system_prompt("You title chat conversations.")
+          titler$chat("user: private user prompt")
+        } else if (identical(clone, "keep")) {
+          agent$clone()$chat("a side question")
+        }
         list(
           run_id = result$run_id,
           session_id = result$session_id,
@@ -83,7 +106,10 @@ record_runtime_trace <- function(url, mode = "tool", capture = FALSE) {
       path = getNamespaceInfo(asNamespace("deputy"), "path"),
       url = url,
       mode = mode,
-      capture = capture
+      capture = capture,
+      conversation_id = conversation_id,
+      compact = compact,
+      clone = clone
     )
   )
 }
@@ -119,12 +145,112 @@ test_that("governance wraps upstream model, HTTP, and tool spans without duplica
     chats[[1]]$attributes[["gen_ai.conversation.id"]],
     record$value$session_id
   )
+  expect_identical(
+    run$attributes[["gen_ai.conversation.id"]],
+    record$value$session_id
+  )
+  expect_identical(
+    run$attributes[["deputy.session.id"]],
+    record$value$session_id
+  )
   expect_identical(record$value$usage$requests, 2L)
   serialized <- paste(utils::capture.output(dput(spans)), collapse = "\n")
   expect_false(grepl("private user prompt|private tool result", serialized))
   expect_true(
     "deputy.permission" %in% vapply(run$events, `[[`, character(1), "name")
   )
+})
+
+test_that("a run is filed under the host's conversation when the host names one", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "effect"),
+    runtime_reply()
+  ))
+  record <- record_runtime_trace(server$url, conversation_id = "c_host_123")
+  spans <- record$traces
+  run <- spans[["deputy.run"]]
+  chats <- Filter(function(x) startsWith(x$name, "chat "), spans)
+  expect_length(chats, 2L)
+  expect_identical(run$attributes[["gen_ai.conversation.id"]], "c_host_123")
+  expect_true(all(vapply(
+    chats,
+    function(x) {
+      identical(x$attributes[["gen_ai.conversation.id"]], "c_host_123")
+    },
+    logical(1)
+  )))
+  # The session stays findable from the run.
+  expect_identical(
+    run$attributes[["deputy.session.id"]],
+    record$value$session_id
+  )
+})
+
+test_that("compacting between turns stays out of the host's conversation", {
+  # A trajectory reader keeps the latest model span per conversation id; a
+  # summary request filed under the host's id would replace the conversation.
+  server <- local_runtime_server(list(
+    runtime_reply(),
+    runtime_reply(text = "summary of the earlier turns", stream = FALSE)
+  ))
+  record <- record_runtime_trace(
+    server$url,
+    conversation_id = "c_host_123",
+    compact = TRUE
+  )
+  chats <- Filter(function(x) startsWith(x$name, "chat "), record$traces)
+  ids <- unname(vapply(
+    chats,
+    function(x) x$attributes[["gen_ai.conversation.id"]],
+    character(1)
+  ))
+  expect_length(ids, 2L)
+  expect_identical(sort(ids), sort(c("c_host_123", record$value$session_id)))
+})
+
+test_that("a clone's runs stay out of the host's conversation", {
+  # shinychat's title generator clones the live Agent; a title request filed
+  # under the host's id would be the latest model span a trajectory reader
+  # keeps for the conversation.
+  for (clone in c("title", "keep")) {
+    server <- local_runtime_server(list(
+      runtime_reply(),
+      runtime_reply(text = "A title")
+    ))
+    record <- record_runtime_trace(
+      server$url,
+      conversation_id = "c_host_123",
+      clone = clone
+    )
+    chats <- Filter(function(x) startsWith(x$name, "chat "), record$traces)
+    ids <- unname(vapply(
+      chats,
+      function(x) x$attributes[["gen_ai.conversation.id"]],
+      character(1)
+    ))
+    expect_length(ids, 2L)
+    expect_identical(sum(ids == "c_host_123"), 1L, label = clone)
+  }
+})
+
+test_that("a run keeps the conversation id it started with", {
+  chat <- ellmer::chat_openai_compatible(
+    base_url = "http://127.0.0.1:9/v1",
+    credentials = function() "fixture",
+    model = "gpt-4o-mini",
+    echo = "none"
+  )
+  agent <- Agent$new(chat, permissions = permissions_full())
+  private <- agent$.__enclos_env__$private
+  state <- new.env(parent = emptyenv())
+  state$trace_conversation_id <- "c_started"
+  private$current_run_state <- state
+  withr::defer(private$current_run_state <- NULL)
+  # The host cleared its id mid-run (New chat), then a fallback reinstalled
+  # the request callbacks.
+  agent$conversation_id <- NULL
+  install_request_callbacks(agent)
+  expect_identical(private$.chat$conversation_id, "c_started")
 })
 
 test_that("denials are governance events and content capture remains opt-in", {
