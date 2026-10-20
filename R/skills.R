@@ -409,10 +409,12 @@ prompt_with_skill_prompts <- function(prompt, skills) {
     return(prompt)
   }
   base <- prompt %||% ""
-  missing <- blocks[!vapply(
-    blocks,
-    function(block) grepl(block, base, fixed = TRUE),
-    logical(1)
-  )]
+  missing <- blocks[
+    !vapply(
+      blocks,
+      function(block) grepl(block, base, fixed = TRUE),
+      logical(1)
+    )
+  ]
   paste0(base, paste(missing, collapse = ""))
 }

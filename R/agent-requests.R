@@ -48,7 +48,7 @@ install_request_callbacks <- function(agent) {
       )
     }
   )
-  chat$conversation_id <- private$.session_id
+  chat$conversation_id <- trace_conversation_id(private)
   invisible(NULL)
 }
 

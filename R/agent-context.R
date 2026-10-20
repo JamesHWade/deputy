@@ -990,7 +990,14 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       fallback <- match.arg(fallback, c("error", "text"))
       compaction_prompt <- private$compaction_summary_prompt(turns)
       temp_chat <- tryCatch(
-        clone_compaction_chat(private$.chat),
+        {
+          chat <- clone_compaction_chat(private$.chat)
+          # The clone carries the host's conversation id. A summary request
+          # is not part of that conversation: filed under it, it would be the
+          # latest model span a trajectory reader keeps.
+          chat$conversation_id <- private$.session_id
+          chat
+        },
         error = function(e) e
       )
       response <- if (inherits(temp_chat, "error")) {
