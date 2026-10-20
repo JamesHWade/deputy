@@ -434,7 +434,9 @@ agent’s system prompt and registers the skill’s tools under the agent’s
 current permissions. Missing packages produce a warning, and a tool name
 that clashes with an existing tool is an error unless you pass
 <code>allow_conflicts = TRUE</code>. <code>agent$skills()</code> lists
-what’s loaded.</p>
+what’s loaded. A loaded skill stays loaded:
+<code>agent$set_system_prompt()</code> adds its prompt back after the
+new prompt, so to drop a skill, start a new agent.</p>
 <p>Skills can also live in a directory with a <code>SKILL.md</code>
 prompt and a <code>SKILL.yaml</code> that lists tools and requirements.
 Deputy ships two: <code>data_analysis</code>, with exploratory analysis

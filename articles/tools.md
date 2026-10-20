@@ -239,7 +239,9 @@ skill_check_requirements(concise)$ok
 prompt and registers the skill’s tools under the agent’s current
 permissions. Missing packages produce a warning, and a tool name that
 clashes with an existing tool is an error unless you pass
-`allow_conflicts = TRUE`. `agent$skills()` lists what’s loaded.
+`allow_conflicts = TRUE`. `agent$skills()` lists what’s loaded. A loaded
+skill stays loaded: `agent$set_system_prompt()` adds its prompt back
+after the new prompt, so to drop a skill, start a new agent.
 
 Skills can also live in a directory with a `SKILL.md` prompt and a
 `SKILL.yaml` that lists tools and requirements. Deputy ships two:
