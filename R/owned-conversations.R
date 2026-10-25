@@ -103,14 +103,17 @@ validate_conversation_candidate <- function(owner, agent) {
 
 # Send a task now, or once the tasks already sent have settled. Each waiting
 # task is admitted afresh when its turn comes, as if it were sent then; a task
-# a model's tool call sent is dropped if that run has ended meanwhile.
+# a model's tool call sent is dropped if that run has ended meanwhile. A woken
+# task that finds the conversation busy again waits at the front, so the
+# tasks keep their order.
 continue_conversation_queued <- function(
   owner,
   handle,
   task,
   usage_limits,
   correlation = NULL,
-  caller = owner
+  caller = owner,
+  front = FALSE
 ) {
   entry <- conversation_entry(owner, handle)
   cp <- entry$agent$.__enclos_env__$private
@@ -125,25 +128,42 @@ continue_conversation_queued <- function(
     ))
   }
   waiting <- promises::promise(function(resolve, reject) {
-    entry$waiters[[length(entry$waiters) + 1L]] <- resolve
+    entry$waiters <- if (front) {
+      c(list(resolve), entry$waiters)
+    } else {
+      c(entry$waiters, list(resolve))
+    }
   })
   promises::then(waiting, function(ignored) {
-    run_id <- correlation$parent_run_id
-    caller_private <- caller$.__enclos_env__$private
-    if (
-      !is.null(run_id) &&
-        !(isTRUE(caller_private$run_active) &&
-          identical(caller_private$current_run_id, run_id))
-    ) {
-      conversation_abort("The run that sent this task has ended.")
-    }
-    continue_conversation_queued(
-      owner,
-      handle,
-      task,
-      usage_limits,
-      correlation,
-      caller
+    # A task refused here starts no run, so no run's cleanup wakes the next
+    # one: wake it before failing. If the refusal came after a run's cleanup
+    # had already woken it, the extra wake is harmless: a task woken while
+    # the conversation is busy waits again at the front.
+    tryCatch(
+      {
+        run_id <- correlation$parent_run_id
+        caller_private <- caller$.__enclos_env__$private
+        if (
+          !is.null(run_id) &&
+            !(isTRUE(caller_private$run_active) &&
+              identical(caller_private$current_run_id, run_id))
+        ) {
+          conversation_abort("The run that sent this task has ended.")
+        }
+        continue_conversation_queued(
+          owner,
+          handle,
+          task,
+          usage_limits,
+          correlation,
+          caller,
+          front = TRUE
+        )
+      },
+      error = function(error) {
+        conversation_wake(entry)
+        stop(error)
+      }
     )
   })
 }

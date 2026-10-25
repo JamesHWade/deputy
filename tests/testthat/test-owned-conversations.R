@@ -887,6 +887,75 @@ test_that("queued tasks wait for the running one and go in order", {
   )
 })
 
+test_that("a queued task refused when its turn comes lets the next one go", {
+  owner <- owned_test_owner()
+  child <- owned_test_agent()
+  handle <- owner$retain_agent(
+    child,
+    UsageLimits(max_requests = 3),
+    max_runs = 1L
+  )
+  first <- owner$continue_agent_async(
+    handle,
+    "first",
+    UsageLimits(max_requests = 1)
+  )
+  second <- owner$continue_agent_async(
+    handle,
+    "second",
+    UsageLimits(max_requests = 1),
+    queue = TRUE
+  )
+  third <- owner$continue_agent_async(
+    handle,
+    "third",
+    UsageLimits(max_requests = 1),
+    queue = TRUE
+  )
+  expect_identical(resolve_async_value(first)$response, "answer")
+  # The second is refused before any run starts; the third still gets its
+  # turn, and is refused for the same reason rather than left waiting.
+  expect_error(resolve_async_value(second), "max_runs")
+  expect_error(resolve_async_value(third), "max_runs")
+})
+
+test_that("a task woken while the conversation is busy keeps its place", {
+  owner <- owned_test_owner()
+  child <- owned_test_agent()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 3))
+  pending <- list(
+    owner$continue_agent_async(
+      handle,
+      "first",
+      UsageLimits(max_requests = 1)
+    ),
+    owner$continue_agent_async(
+      handle,
+      "second",
+      UsageLimits(max_requests = 1),
+      queue = TRUE
+    ),
+    owner$continue_agent_async(
+      handle,
+      "third",
+      UsageLimits(max_requests = 1),
+      queue = TRUE
+    )
+  )
+  # Woken before the first task has settled, as a refused task wakes the
+  # next one even when a run's cleanup already has.
+  conversation_wake(conversation_entry(owner, handle))
+  lapply(pending, resolve_async_value)
+  asked <- Filter(
+    function(turn) inherits(turn, "ellmer::UserTurn"),
+    child$turns()
+  )
+  expect_identical(
+    vapply(asked, function(turn) turn@text, character(1)),
+    c("first", "second", "third")
+  )
+})
+
 test_that("a queued task is checked again when its turn comes", {
   owner <- owned_test_owner()
   child <- owned_test_agent()
