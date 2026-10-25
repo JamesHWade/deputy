@@ -1200,3 +1200,37 @@ test_that("invalid compaction evidence is rejected before hooks or context chang
   expect_identical(chat$get_system_prompt(), "Host policy")
   expect_null(agent$last_compaction())
 })
+
+test_that("tool_result_reference() finds a result saved outside the context", {
+  directory <- withr::local_tempdir(pattern = "deputy-reference-")
+  value <- paste(rep("large result", 100), collapse = " ")
+  tool <- ellmer::tool(
+    fun = function() value,
+    name = "large_result",
+    description = "Return a large test value.",
+    arguments = list(),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(tool),
+    context_policy = ContextPolicy(
+      max_tokens = NULL,
+      max_tool_result_bytes = 32,
+      offload_dir = directory
+    )
+  )
+  placeholder <- agent$get_tools()[["large_result"]]()
+  result <- ellmer::ContentToolResult(placeholder)
+
+  reference <- tool_result_reference(result)
+  expect_match(reference, "^deputy://tool-result/result_[a-f0-9]{64}\\?")
+  expect_identical(tool_result_reference(placeholder), reference)
+  expect_identical(agent$resolve_tool_result(reference), value)
+  expect_null(tool_result_reference(ellmer::ContentToolResult("small")))
+  expect_null(tool_result_reference(list(placeholder)))
+  expect_null(tool_result_reference(NA_character_))
+})

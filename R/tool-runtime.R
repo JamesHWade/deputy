@@ -452,6 +452,40 @@ offload_tool_result <- function(
   )
 }
 
+#' Find a tool result saved outside the model context
+#'
+#' When a [ContextPolicy] moves a large tool result out of the model context,
+#' the result recorded in the conversation holds a preview and a reference in
+#' place of the value. Use this function on the contents of
+#' `agent$get_turns()` to find those results, and
+#' `agent$resolve_tool_result()` to get a value back, for example to check an
+#' answer against the full results its tools returned.
+#'
+#' @param x An ellmer [ContentToolResult][ellmer::ContentToolResult], or the
+#'   text of one.
+#' @return The `deputy://tool-result/...` reference, a string, or `NULL` when
+#'   `x` is not a result saved outside the context.
+#' @seealso [ContextPolicy()]
+#' @export
+#' @examples
+#' tool_result_reference(ellmer::ContentToolResult("A short result"))
+tool_result_reference <- function(x) {
+  value <- if (inherits(x, "ellmer::ContentToolResult")) x@value else x
+  if (
+    !is.character(value) ||
+      length(value) != 1L ||
+      is.na(value) ||
+      !startsWith(value, "[Tool result offloaded by Deputy]\n")
+  ) {
+    return(NULL)
+  }
+  references <- compaction_tool_result_references(value)
+  if (length(references) != 1L) {
+    return(NULL)
+  }
+  references
+}
+
 tool_result_reference_text <- function(record) {
   paste(
     "[Tool result offloaded by Deputy]",

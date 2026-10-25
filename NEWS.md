@@ -12,6 +12,13 @@
   Saved sessions keep notes, and moving to another Chat keeps each on its
   turn.
 
+* `subagent_activity_info()` says which subagent call a tool card shown by
+  `subagent_chat_activity()` is, including `root_tool_call_id`, the lead's
+  tool call that delegated the work. `tool_result_reference()` finds a tool
+  result that a `ContextPolicy` saved outside the model context, for
+  `Agent$resolve_tool_result()`. With them, code that checks an answer
+  against its tools' results needn't depend on how either is marked.
+
 * `Agent$get_turns()` gains `activity` and `notes`, which leave out the
   subagent tool calls shown in the conversation and the notes added with
   `$add_note()`. Code that checks an answer against the tool results the
