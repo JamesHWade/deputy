@@ -1,5 +1,22 @@
 # deputy (development version)
 
+* `Agent$add_note()` adds a note to a turn of the conversation: content such
+  as a label saying whether an answer's citations were found in its sources.
+  Notes are part of the conversation `$get_turns()` returns, after their
+  turn's other contents, so shinychat's history saves and restores them, but
+  they are never sent to the model or counted in its context. Give the Agent a
+  `notes` function that recognizes your notes (`Agent$new(notes = )`, also on
+  `LeadAgent`): `$set_turns()` and `$add_turn()` use it to keep the notes in
+  the turns you give them, such as a restored conversation, out of the model's
+  context. A note can go on a turn that compaction removed from the context.
+  Saved sessions keep notes, and moving to another Chat keeps each on its
+  turn.
+
+* `Agent$get_turns()` gains `activity` and `notes`, which leave out the
+  subagent tool calls shown in the conversation and the notes added with
+  `$add_note()`. Code that checks an answer against the tool results the
+  model was given can read the conversation without them.
+
 * A run is traced under the host's conversation. When the host sets
   `Agent$conversation_id` (shinychat's `chat_server()` does before each reply),
   the `deputy.run` span and the run's model spans carry it as

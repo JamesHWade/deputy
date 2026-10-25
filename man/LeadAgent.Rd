@@ -37,6 +37,7 @@ its answer. See \code{vignette("multi-agent")}.
 \if{html}{\out{<details><summary>Inherited methods</summary>
 <ul>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href='../../deputy/html/Agent.html#method-Agent-add_hook'><code>Agent$add_hook()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_note"><a href='../../deputy/html/Agent.html#method-Agent-add_note'><code>Agent$add_note()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_turn"><a href='../../deputy/html/Agent.html#method-Agent-add_turn'><code>Agent$add_turn()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cancel_agent"><a href='../../deputy/html/Agent.html#method-Agent-cancel_agent'><code>Agent$cancel_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat"><a href='../../deputy/html/Agent.html#method-Agent-chat'><code>Agent$chat()</code></a></span></li>
@@ -142,7 +143,8 @@ its answer. See \code{vignette("multi-agent")}.
   delegation_disclosure = DelegationDisclosure(),
   delegation_observation = DelegationObservation(),
   approval_dir = NULL,
-  trusted_results = NULL
+  trusted_results = NULL,
+  notes = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -204,6 +206,8 @@ of the event buffer read by \verb{$observe_subagents()}.}
 every subagent and its tools. A designated tool may belong to the lead
 or a subagent, but must be the same tool everywhere. Subagents' trusted
 results are recorded in the lead's run and passed to its \code{on_result}.}
+      \item{\code{notes}}{Optional function that recognizes the notes you add to
+turns with \verb{$add_note()}; see \link{Agent}.}
     }
     \if{html}{\out{</div>}}
   }

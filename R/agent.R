@@ -108,6 +108,15 @@ Agent <- R6::R6Class(
     #' @param trusted_results Optional [TrustedResults] policy naming the one
     #'   tool allowed to produce each type of trusted result. Registering a tool
     #'   that could get around it is an error.
+    #' @param notes Optional function that takes one ellmer content object and
+    #'   returns `TRUE` when it is a note: content you add to a turn with
+    #'   `$add_note()`, such as a label under an answer. Notes are part of the
+    #'   conversation `$get_turns()` returns, so a saved chat history keeps
+    #'   them, but they are never sent to the model. `$set_turns()` and
+    #'   `$add_turn()` use this function to find the notes in the turns you
+    #'   give them, such as a restored conversation, so it must recognize every
+    #'   note you add. A note is usually an instance of your own subclass of
+    #'   [ellmer::ContentText].
     #' @return A new `Agent` object.
     initialize = function(
       chat,
@@ -129,7 +138,8 @@ Agent <- R6::R6Class(
       delegation_scope = list(),
       delegation_disclosure = DelegationDisclosure(),
       delegation_observation = DelegationObservation(),
-      trusted_results = NULL
+      trusted_results = NULL,
+      notes = NULL
     ) {
       if (!is.null(private$.chat)) {
         check_conversation_initialization(self)
@@ -204,6 +214,7 @@ Agent <- R6::R6Class(
       # Check every remaining argument and tool before the Chat changes, so a
       # bad one leaves an existing Agent on its previous conversation.
       trusted_results <- normalize_trusted_results(trusted_results)
+      check_note_filter(notes)
       usage_limits <- normalize_usage_limits(usage_limits)
       context_policy <- normalize_context_policy(context_policy)
       if (!is.null(approval_dir)) {
@@ -250,6 +261,7 @@ Agent <- R6::R6Class(
       }
       if (switching) {
         private$.activity_overlay <- list()
+        private$.note_overlay <- list()
         # Usage the new Chat's turns report is its own, as for a new Agent.
         private$.usage_stale_turns <- 0L
         unmark_chat_owner(previous_chat, self)
@@ -259,6 +271,9 @@ Agent <- R6::R6Class(
         {
           private$.permissions <- permissions
           private$.trusted_results <- trusted_results
+          # In a list: the snapshot that undoes a failed re-initialize skips
+          # functions.
+          private$.notes <- list(filter = notes)
           private$.usage_limits <- usage_limits
           private$.context_policy <- context_policy
           private$.working_dir <- working_dir
@@ -1230,23 +1245,84 @@ Agent <- R6::R6Class(
     #' @return The agent, invisibly.
     add_turn = function(user, assistant, log_tokens = TRUE) {
       check_conversation_lease(self, NULL)
-      # Subagent activity shown in the conversation never reaches the model,
-      # as in `$set_turns()`.
+      # Subagent activity and notes shown in the conversation never reach
+      # the model, as in `$set_turns()`.
       split <- activity_split(list(user, assistant))
+      notes <- note_split(split$turns, private$.notes$filter)
       offset <- length(private$.conversation_state$retained_turns()) +
         length(private$.chat$get_turns())
       private$.chat$add_turn(
-        split$turns[[1L]],
-        split$turns[[2L]],
+        notes$turns[[1L]],
+        notes$turns[[2L]],
         log_tokens = log_tokens
       )
-      private$.activity_overlay <- c(
-        private$.activity_overlay,
-        lapply(split$overlay, function(entry) {
+      shift <- function(overlay) {
+        lapply(overlay, function(entry) {
           entry$turn <- offset + entry$turn
           entry
         })
+      }
+      private$.activity_overlay <- c(
+        private$.activity_overlay,
+        shift(split$overlay)
       )
+      private$.note_overlay <- c(private$.note_overlay, shift(notes$overlay))
+      invisible(self)
+    },
+
+    #' @description Add a note to a turn of the conversation: content such as
+    #'   a label saying whether an answer's citations were found in its
+    #'   sources. The note is part of the conversation `$get_turns()` returns,
+    #'   after the turn's other contents, so a saved chat history keeps it,
+    #'   but it is never sent to the model. A turn that compaction removed
+    #'   from the model's context can still take a note.
+    #' @param turn Position of the turn in `$get_turns()`.
+    #' @param content An ellmer content object, or a list of them, that the
+    #'   agent's `notes` function recognizes. That is what keeps a note out of
+    #'   the model's context when the conversation is restored.
+    #' @return The agent, invisibly.
+    add_note = function(turn, content) {
+      check_conversation_lease(self, NULL)
+      filter <- private$.notes$filter
+      if (is.null(filter)) {
+        cli_abort(c(
+          "This agent has no {.arg notes} function.",
+          i = "Pass {.arg notes} to {.code $new()}: a function that recognizes your notes."
+        ))
+      }
+      contents <- if (inherits(content, "ellmer::Content")) {
+        list(content)
+      } else {
+        content
+      }
+      recognized <- is.list(contents) &&
+        !is.object(contents) &&
+        length(contents) > 0L &&
+        all(vapply(contents, is_note_content, logical(1), filter = filter))
+      if (!recognized) {
+        cli_abort(
+          "{.arg content} must be ellmer content that the agent's {.arg notes} function recognizes."
+        )
+      }
+      total <- length(private$transcript_turns())
+      if (
+        !is.numeric(turn) ||
+          length(turn) != 1L ||
+          is.na(turn) ||
+          turn != round(turn) ||
+          turn < 1 ||
+          turn > total
+      ) {
+        cli_abort(
+          "{.arg turn} must be the position of a turn in the conversation, between 1 and {total}."
+        )
+      }
+      for (item in contents) {
+        private$.note_overlay[[length(private$.note_overlay) + 1L]] <- list(
+          turn = as.integer(turn),
+          content = item
+        )
+      }
       invisible(self)
     },
 
@@ -1257,16 +1333,33 @@ Agent <- R6::R6Class(
     #'   until `$set_turns()` replaces the conversation. When
     #'   [subagent_chat_activity()] shows subagent tool calls in this
     #'   conversation, they are included here too, after the contents of the
-    #'   reply that delegated them; the model never sees them. A tool error is
+    #'   reply that delegated them; the model never sees them. Notes added
+    #'   with `$add_note()` come last in their turns. A tool error is
     #'   returned as a plain condition with the same message, so the
     #'   conversation can be saved and read back by shinychat's history.
     #' @param include_system_prompt Include the system prompt as a turn.
+    #' @param activity Include the subagent tool calls shown in the
+    #'   conversation. Code that checks an answer against the tool results the
+    #'   model was given can leave them out.
+    #' @param notes Include notes added with `$add_note()`.
     #' @return A list of ellmer turns.
-    get_turns = function(include_system_prompt = FALSE) {
-      turns <- activity_merge(
-        portable_tool_errors(private$transcript_turns()),
-        private$.activity_overlay
-      )
+    get_turns = function(
+      include_system_prompt = FALSE,
+      activity = TRUE,
+      notes = TRUE
+    ) {
+      for (name in c("activity", "notes")) {
+        if (!is_true_false(get(name))) {
+          cli_abort("{.arg {name}} must be TRUE or FALSE")
+        }
+      }
+      turns <- portable_tool_errors(private$transcript_turns())
+      if (activity) {
+        turns <- activity_merge(turns, private$.activity_overlay)
+      }
+      if (notes) {
+        turns <- activity_merge(turns, private$.note_overlay)
+      }
       if (isTRUE(include_system_prompt)) {
         context <- self$get_context_turns(include_system_prompt = TRUE)
         system <- Filter(
@@ -1297,15 +1390,20 @@ Agent <- R6::R6Class(
 
     #' @description Replace the conversation, as ellmer's `$set_turns()` does.
     #'   This also drops any compaction summary and the turns compaction
-    #'   removed. During a run, usage counted so far still counts.
+    #'   removed. During a run, usage counted so far still counts. Subagent
+    #'   tool calls and notes in `value` (the contents the agent's `notes`
+    #'   function recognizes) stay in the conversation but are not sent to the
+    #'   model.
     #' @param value A list of ellmer turns.
     #' @return The agent, invisibly.
     set_turns = function(value) {
       check_conversation_lease(self, NULL)
       usage <- if (isTRUE(private$run_active)) private$current_run_usage()
-      # Subagent activity shown in the conversation never reaches the model.
+      # Subagent activity and notes shown in the conversation never reach the
+      # model.
       split <- activity_split(value)
-      private$.conversation_state$replace(private$.chat, split$turns)
+      notes <- note_split(split$turns, private$.notes$filter)
+      private$.conversation_state$replace(private$.chat, notes$turns)
       # An emptied conversation is a new one: shinychat's "new chat" and
       # deleting the open conversation both end here, and neither tells the
       # host's callbacks. Keeping the old ID would file subagents started
@@ -1315,6 +1413,7 @@ Agent <- R6::R6Class(
       }
       preserve_run_usage(self, usage)
       private$.activity_overlay <- split$overlay
+      private$.note_overlay <- notes$overlay
       activity_reset(self)
       private$.usage_stale_turns <- 0L
       private$reset_frame_snapshots()
@@ -1585,9 +1684,13 @@ Agent <- R6::R6Class(
         NULL
       } else {
         activity_merge_turn(
-          found$turn,
+          activity_merge_turn(
+            found$turn,
+            found$position,
+            private$.activity_overlay
+          ),
           found$position,
-          private$.activity_overlay
+          private$.note_overlay
         )
       }
     },
@@ -2767,6 +2870,10 @@ Agent <- R6::R6Class(
       # Subagent tool calls shown in this conversation, by transcript turn;
       # never part of the model context (R/delegation-activity.R).
       .activity_overlay = list(),
+      # The host's notes, by transcript turn, and the function that recognizes
+      # them (R/turn-notes.R). Never part of the model context.
+      .note_overlay = list(),
+      .notes = NULL,
       .activity = NULL,
       # What the presenter had queued when it stopped, for the reply then
       # streaming.

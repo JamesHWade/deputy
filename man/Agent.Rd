@@ -136,6 +136,7 @@ hooks with \verb{$add_hook()}.}
     \item \href{#method-Agent-last_compaction}{\code{Agent$last_compaction()}}
     \item \href{#method-Agent-resolve_tool_result}{\code{Agent$resolve_tool_result()}}
     \item \href{#method-Agent-add_turn}{\code{Agent$add_turn()}}
+    \item \href{#method-Agent-add_note}{\code{Agent$add_note()}}
     \item \href{#method-Agent-get_turns}{\code{Agent$get_turns()}}
     \item \href{#method-Agent-get_context_turns}{\code{Agent$get_context_turns()}}
     \item \href{#method-Agent-set_turns}{\code{Agent$set_turns()}}
@@ -212,7 +213,8 @@ hooks with \verb{$add_hook()}.}
   delegation_scope = list(),
   delegation_disclosure = DelegationDisclosure(),
   delegation_observation = DelegationObservation(),
-  trusted_results = NULL
+  trusted_results = NULL,
+  notes = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -268,6 +270,15 @@ subagent events are kept for \verb{$observe_subagents()}.}
       \item{\code{trusted_results}}{Optional \link{TrustedResults} policy naming the one
 tool allowed to produce each type of trusted result. Registering a tool
 that could get around it is an error.}
+      \item{\code{notes}}{Optional function that takes one ellmer content object and
+returns \code{TRUE} when it is a note: content you add to a turn with
+\verb{$add_note()}, such as a label under an answer. Notes are part of the
+conversation \verb{$get_turns()} returns, so a saved chat history keeps
+them, but they are never sent to the model. \verb{$set_turns()} and
+\verb{$add_turn()} use this function to find the notes in the turns you
+give them, such as a restored conversation, so it must recognize every
+note you add. A note is usually an instance of your own subclass of
+\link[ellmer:ContentText]{ellmer::ContentText}.}
     }
     \if{html}{\out{</div>}}
   }
@@ -1199,6 +1210,36 @@ to the model.
 }
 
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-add_note"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-add_note}{}}}
+\subsection{\code{Agent$add_note()}}{
+  Add a note to a turn of the conversation: content such as
+a label saying whether an answer's citations were found in its
+sources. The note is part of the conversation \verb{$get_turns()} returns,
+after the turn's other contents, so a saved chat history keeps it,
+but it is never sent to the model. A turn that compaction removed
+from the model's context can still take a note.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$add_note(turn, content)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{turn}}{Position of the turn in \verb{$get_turns()}.}
+      \item{\code{content}}{An ellmer content object, or a list of them, that the
+agent's \code{notes} function recognizes. That is what keeps a note out of
+the model's context when the conversation is restored.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The agent, invisibly.
+  }
+}
+
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-Agent-get_turns"></a>}}
 \if{latex}{\out{\hypertarget{method-Agent-get_turns}{}}}
 \subsection{\code{Agent$get_turns()}}{
@@ -1209,18 +1250,23 @@ results that \verb{$microcompact()} cleared. Removed turns stay in memory
 until \verb{$set_turns()} replaces the conversation. When
 \code{\link[=subagent_chat_activity]{subagent_chat_activity()}} shows subagent tool calls in this
 conversation, they are included here too, after the contents of the
-reply that delegated them; the model never sees them. A tool error is
+reply that delegated them; the model never sees them. Notes added
+with \verb{$add_note()} come last in their turns. A tool error is
 returned as a plain condition with the same message, so the
 conversation can be saved and read back by shinychat's history.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$get_turns(include_system_prompt = FALSE)}
+    \preformatted{Agent$get_turns(include_system_prompt = FALSE, activity = TRUE, notes = TRUE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{include_system_prompt}}{Include the system prompt as a turn.}
+      \item{\code{activity}}{Include the subagent tool calls shown in the
+conversation. Code that checks an answer against the tool results the
+model was given can leave them out.}
+      \item{\code{notes}}{Include notes added with \verb{$add_note()}.}
     }
     \if{html}{\out{</div>}}
   }
@@ -1260,7 +1306,10 @@ compaction summary, as a turn.}
 \subsection{\code{Agent$set_turns()}}{
   Replace the conversation, as ellmer's \verb{$set_turns()} does.
 This also drops any compaction summary and the turns compaction
-removed. During a run, usage counted so far still counts.
+removed. During a run, usage counted so far still counts. Subagent
+tool calls and notes in \code{value} (the contents the agent's \code{notes}
+function recognizes) stay in the conversation but are not sent to the
+model.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
     \preformatted{Agent$set_turns(value)}

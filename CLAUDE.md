@@ -556,6 +556,20 @@ cards only while a presenter is enabled, reading records through disclosure
 on the consumer side; it never runs tools. Tool-call correlation no longer
 lets a finished call claim a later call that reuses its provider ID.
 
+`Agent$add_note(turn, content)` keeps host notes in a second overlay,
+`.note_overlay`, beside the activity overlay and with the same entry shape
+(`R/turn-notes.R`). Deputy can't recognize a host's notes by marker, so the
+Agent's `notes` function (`Agent$new(notes = )`) does: `set_turns()` and
+`add_turn()` split recognized contents out with `note_split()`, `add_note()`
+refuses content the function doesn't recognize, and a function that errors
+recognizes nothing. Notes merge after activity in `get_turns()` and
+`last_turn()`; `get_turns(activity = FALSE, notes = FALSE)` is the model's
+side of the selected conversation (a lead's view of a child uses it). Session
+payloads list notes in `notes`, so loading needs no function; `set_chat()`
+remaps them with `activity_remap()`, and re-initializing with another Chat
+drops them. Context forks copy the turns a host gives them, so hosts pass
+`get_turns(notes = FALSE)`.
+
 `subagent_chat_history(chat, lead, requester)` saves each conversation's
 settled subagent records with it through `chat$history$on_save()` and restores
 them read-only in `on_restore()` (ADR-0034, `R/subagent-history.R`).

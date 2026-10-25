@@ -37,6 +37,10 @@ read_optional_value <- function(reader, validator = NULL) {
 }
 
 # @noRd
+is_true_false <- function(x) {
+  is.logical(x) && length(x) == 1L && !is.na(x)
+}
+
 is_nonempty_string <- function(value) {
   is.character(value) &&
     length(value) == 1L &&

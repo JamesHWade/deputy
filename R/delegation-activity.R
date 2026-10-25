@@ -107,24 +107,7 @@ activity_record_marked <- function(content) {
 # Separate activity from turns a host supplies, such as a restored shinychat
 # conversation. The model context gets the turns without it.
 activity_split <- function(turns) {
-  overlay <- list()
-  for (index in seq_along(turns)) {
-    turn <- turns[[index]]
-    if (!inherits(turn, "ellmer::Turn")) {
-      next
-    }
-    contents <- turn@contents
-    marked <- vapply(contents, is_activity_content, logical(1))
-    if (!any(marked)) {
-      next
-    }
-    for (content in contents[marked]) {
-      overlay[[length(overlay) + 1L]] <- list(turn = index, content = content)
-    }
-    turn@contents <- contents[!marked]
-    turns[[index]] <- turn
-  }
-  list(turns = turns, overlay = overlay)
+  overlay_split(turns, is_activity_content)
 }
 
 activity_merge <- function(turns, overlay) {
@@ -196,59 +179,21 @@ activity_saved_entries <- function(agent) {
       )
     )
   }
-  activity_session_entries(overlay)
-}
-
-# Shown activity as a saved session keeps it: each card with the index of the
-# turn it was shown in, beside the turns the model reads.
-activity_session_entries <- function(overlay) {
-  if (!length(overlay)) {
-    return(NULL)
-  }
-  lapply(overlay, function(entry) {
-    list(turn = as.integer(entry$turn), content = entry$content)
-  })
+  overlay_session_entries(overlay)
 }
 
 # The shown activity of a saved session, checked against the turns it is
-# loaded with: each entry a marked card in one of the conversation's turns.
-# Cards are shown in assistant turns, but `$set_turns()` and `$add_turn()`
-# keep a card from any turn, so a load takes back what a save wrote.
+# loaded with. Cards are shown in assistant turns, but `$set_turns()` and
+# `$add_turn()` keep a card from any turn, so a load takes back what a save
+# wrote.
 activity_session_overlay <- function(session, path = NULL) {
-  entries <- if (is.list(session)) session$activity
-  if (is.null(entries)) {
-    return(list())
-  }
-  turns <- if (is.list(session$turns) && is.list(session$compacted_turns)) {
-    c(session$compacted_turns, session$turns)
-  } else {
-    list()
-  }
-  valid <- function(entry) {
-    turn <- if (is.list(entry) && !is.object(entry)) entry$turn
-    is.numeric(turn) &&
-      !is.object(turn) &&
-      length(turn) == 1L &&
-      !is.na(turn) &&
-      turn >= 1 &&
-      turn <= length(turns) &&
-      turn == round(turn) &&
-      inherits(turns[[turn]], "ellmer::Turn") &&
-      is_activity_content(entry$content)
-  }
-  if (
-    !is.list(entries) ||
-      is.object(entries) ||
-      !all(vapply(entries, valid, logical(1)))
-  ) {
-    abort_session_load(
-      "Invalid session file - its subagent activity is malformed",
-      path = path
-    )
-  }
-  lapply(entries, function(entry) {
-    list(turn = as.integer(entry$turn), content = entry$content)
-  })
+  overlay_session_overlay(
+    session,
+    field = "activity",
+    accepts = is_activity_content,
+    malformed = "Invalid session file - its subagent activity is malformed",
+    path = path
+  )
 }
 
 new_activity_presenter <- function(requester, interval) {
