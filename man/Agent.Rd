@@ -135,6 +135,7 @@ hooks with \verb{$add_hook()}.}
     \item \href{#method-Agent-last_run}{\code{Agent$last_run()}}
     \item \href{#method-Agent-last_compaction}{\code{Agent$last_compaction()}}
     \item \href{#method-Agent-resolve_tool_result}{\code{Agent$resolve_tool_result()}}
+    \item \href{#method-Agent-restore_tool_result}{\code{Agent$restore_tool_result()}}
     \item \href{#method-Agent-clear_tool_results}{\code{Agent$clear_tool_results()}}
     \item \href{#method-Agent-add_turn}{\code{Agent$add_turn()}}
     \item \href{#method-Agent-add_note}{\code{Agent$add_note()}}
@@ -1185,6 +1186,34 @@ containing one, such as the placeholder the model saw.}
   \subsection{Returns}{
     The stored R value. ellmer content objects saved during
 compaction come back as text.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-restore_tool_result"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-restore_tool_result}{}}}
+\subsection{\code{Agent$restore_tool_result()}}{
+  Put back what a tool returned, for a result recorded in
+the conversation with a preview and a reference in place of it (see
+\code{\link[=tool_result_reference]{tool_result_reference()}}): its value, its error message, or its list
+of content objects.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$restore_tool_result(content)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{content}}{An ellmer \link[ellmer:ContentToolResult]{ContentToolResult},
+such as one from \verb{$get_turns()}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    \code{content} with what the tool returned. \code{content} unchanged when
+it holds no reference, or the result can no longer be read, for
+example after \verb{$clear_tool_results()}.
   }
 }
 

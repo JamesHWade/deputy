@@ -40,9 +40,11 @@
 * `subagent_activity_info()` says which subagent call a tool card shown by
   `subagent_chat_activity()` is, including `root_tool_call_id`, the lead's
   tool call that delegated the work. `tool_result_reference()` finds a tool
-  result that a `ContextPolicy` saved outside the model context, for
-  `Agent$resolve_tool_result()`. With them, code that checks an answer
-  against its tools' results needn't depend on how either is marked.
+  result that a `ContextPolicy` saved outside the model context, whether it
+  held a value, an error or a list of content objects, and the new
+  `Agent$restore_tool_result()` puts back what the tool returned. With them,
+  code that checks an answer against its tools' results needn't depend on how
+  either is marked or stored.
 
 * `Agent$get_turns()` gains `activity` and `notes`, which leave out the
   subagent tool calls shown in the conversation and the notes added with

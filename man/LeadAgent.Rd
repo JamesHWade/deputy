@@ -89,6 +89,7 @@ its answer. See \code{vignette("multi-agent")}.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="release_agent"><a href='../../deputy/html/Agent.html#method-Agent-release_agent'><code>Agent$release_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="release_agent_graph"><a href='../../deputy/html/Agent.html#method-Agent-release_agent_graph'><code>Agent$release_agent_graph()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resolve_tool_result"><a href='../../deputy/html/Agent.html#method-Agent-resolve_tool_result'><code>Agent$resolve_tool_result()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="restore_tool_result"><a href='../../deputy/html/Agent.html#method-Agent-restore_tool_result'><code>Agent$restore_tool_result()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resume_approval"><a href='../../deputy/html/Agent.html#method-Agent-resume_approval'><code>Agent$resume_approval()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="retain_agent"><a href='../../deputy/html/Agent.html#method-Agent-retain_agent'><code>Agent$retain_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="retain_agent_graph"><a href='../../deputy/html/Agent.html#method-Agent-retain_agent_graph'><code>Agent$retain_agent_graph()</code></a></span></li>

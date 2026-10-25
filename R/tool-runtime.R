@@ -456,10 +456,11 @@ offload_tool_result <- function(
 #'
 #' When a [ContextPolicy] moves a large tool result out of the model context,
 #' the result recorded in the conversation holds a preview and a reference in
-#' place of the value. Use this function on the contents of
-#' `agent$get_turns()` to find those results, and
-#' `agent$resolve_tool_result()` to get a value back, for example to check an
-#' answer against the full results its tools returned.
+#' place of what the tool returned: in place of its value, of its error, or,
+#' for a result made of content objects, as the last of them. Use this
+#' function on the contents of `agent$get_turns()` to find those results, and
+#' `agent$restore_tool_result()` to put back what the tool returned, for
+#' example to check an answer against the full results its tools returned.
 #'
 #' @param x An ellmer [ContentToolResult][ellmer::ContentToolResult], or the
 #'   text of one.
@@ -470,7 +471,13 @@ offload_tool_result <- function(
 #' @examples
 #' tool_result_reference(ellmer::ContentToolResult("A short result"))
 tool_result_reference <- function(x) {
-  value <- if (inherits(x, "ellmer::ContentToolResult")) x@value else x
+  if (inherits(x, "ellmer::ContentToolResult")) {
+    return(tool_result_reference_slot(x)$reference)
+  }
+  tool_result_reference_in_text(x)
+}
+
+tool_result_reference_in_text <- function(value) {
   if (
     !is.character(value) ||
       length(value) != 1L ||
@@ -484,6 +491,82 @@ tool_result_reference <- function(x) {
     return(NULL)
   }
   references
+}
+
+# Where an offloaded result keeps its reference, as bound_rich_tool_result()
+# and the runtime offload write it: in place of the value, in place of the
+# error, or as the last of a list of contents.
+tool_result_reference_slot <- function(content) {
+  reference <- tool_result_reference_in_text(content@error)
+  if (!is.null(reference)) {
+    return(list(reference = reference, slot = "error"))
+  }
+  value <- content@value
+  reference <- tool_result_reference_in_text(value)
+  if (!is.null(reference)) {
+    return(list(reference = reference, slot = "value"))
+  }
+  if (is.list(value) && !is.object(value) && length(value)) {
+    last <- value[[length(value)]]
+    if (inherits(last, "ellmer::ContentText")) {
+      reference <- tool_result_reference_in_text(last@text)
+      if (!is.null(reference)) {
+        return(list(reference = reference, slot = "contents"))
+      }
+    }
+  }
+  list(reference = NULL, slot = NULL)
+}
+
+# `content` with what its tool returned put back, read with `resolve`, or
+# `content` unchanged when it holds no reference or the result can't be read.
+# Errors and lists of contents are saved inside an envelope of their own
+# (bound_rich_tool_result()).
+restore_tool_result_content <- function(
+  content,
+  resolve,
+  call = rlang::caller_env()
+) {
+  if (!inherits(content, "ellmer::ContentToolResult")) {
+    cli_abort(
+      "{.arg content} must be an ellmer {.cls ContentToolResult}.",
+      call = call
+    )
+  }
+  found <- tool_result_reference_slot(content)
+  if (is.null(found$reference)) {
+    return(content)
+  }
+  read <- tryCatch(
+    list(value = resolve(found$reference)),
+    error = function(error) NULL
+  )
+  if (is.null(read)) {
+    return(content)
+  }
+  stored <- read$value
+  if (identical(found$slot, "error")) {
+    if (
+      !is.list(stored) ||
+        !is.character(stored$error) ||
+        length(stored$error) != 1L
+    ) {
+      return(content)
+    }
+    content@error <- stored$error
+  } else if (identical(found$slot, "contents")) {
+    if (
+      !is.list(stored) ||
+        !identical(stored$kind, "deputy_native_content") ||
+        !is.list(stored$content)
+    ) {
+      return(content)
+    }
+    content@value <- stored$content
+  } else {
+    content@value <- stored
+  }
+  content
 }
 
 tool_result_reference_text <- function(record) {

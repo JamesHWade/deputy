@@ -17,10 +17,11 @@ The \verb{deputy://tool-result/...} reference, a string, or \code{NULL} when
 \description{
 When a \link{ContextPolicy} moves a large tool result out of the model context,
 the result recorded in the conversation holds a preview and a reference in
-place of the value. Use this function on the contents of
-\code{agent$get_turns()} to find those results, and
-\code{agent$resolve_tool_result()} to get a value back, for example to check an
-answer against the full results its tools returned.
+place of what the tool returned: in place of its value, of its error, or,
+for a result made of content objects, as the last of them. Use this
+function on the contents of \code{agent$get_turns()} to find those results, and
+\code{agent$restore_tool_result()} to put back what the tool returned, for
+example to check an answer against the full results its tools returned.
 }
 \examples{
 tool_result_reference(ellmer::ContentToolResult("A short result"))

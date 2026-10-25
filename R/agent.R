@@ -1252,6 +1252,19 @@ Agent <- R6::R6Class(
       )$value
     },
 
+    #' @description Put back what a tool returned, for a result recorded in
+    #' the conversation with a preview and a reference in place of it (see
+    #' [tool_result_reference()]): its value, its error message, or its list
+    #' of content objects.
+    #' @param content An ellmer [ContentToolResult][ellmer::ContentToolResult],
+    #'   such as one from `$get_turns()`.
+    #' @return `content` with what the tool returned. `content` unchanged when
+    #'   it holds no reference, or the result can no longer be read, for
+    #'   example after `$clear_tool_results()`.
+    restore_tool_result = function(content) {
+      restore_tool_result_content(content, self$resolve_tool_result)
+    },
+
     #' @description Delete the tool results this agent, and the agents it
     #' retains, saved outside the model context (see [ContextPolicy]), for
     #' example when the conversation ends. They are never deleted otherwise.

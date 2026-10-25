@@ -153,6 +153,14 @@
       Error in `compaction_automatic()`:
       ! `automatic` must be TRUE or FALSE
 
+# restore_tool_result() puts back an offloaded value, error or contents
+
+    Code
+      agent$restore_tool_result("text")
+    Condition
+      Error in `agent$restore_tool_result()`:
+      ! `content` must be an ellmer <ContentToolResult>.
+
 # set_system_prompt keeps the compaction summary unless told not to
 
     Code

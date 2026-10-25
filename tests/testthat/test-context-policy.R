@@ -1235,6 +1235,65 @@ test_that("tool_result_reference() finds a result saved outside the context", {
   expect_null(tool_result_reference(NA_character_))
 })
 
+test_that("restore_tool_result() puts back an offloaded value, error or contents", {
+  directory <- withr::local_tempdir(pattern = "deputy-restore-")
+  big <- paste(rep("large result", 100), collapse = " ")
+  test_tool <- function(name, fun) {
+    ellmer::tool(
+      fun = fun,
+      name = name,
+      description = "Return a large test result.",
+      arguments = list(),
+      annotations = ellmer::tool_annotations(
+        read_only_hint = TRUE,
+        open_world_hint = FALSE
+      )
+    )
+  }
+  contents <- list(ellmer::ContentText("Summary"), ellmer::ContentText(big))
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(
+      test_tool("text_result", function() big),
+      test_tool("error_result", function() {
+        ellmer::ContentToolResult(error = big)
+      }),
+      test_tool("contents_result", function() {
+        ellmer::ContentToolResult(value = contents)
+      })
+    ),
+    context_policy = ContextPolicy(
+      max_tokens = NULL,
+      max_tool_result_bytes = 32,
+      offload_dir = directory
+    )
+  )
+  recorded <- function(name) {
+    value <- agent$get_tools()[[name]]()
+    if (inherits(value, "ellmer::ContentToolResult")) {
+      value
+    } else {
+      ellmer::ContentToolResult(value)
+    }
+  }
+  text <- recorded("text_result")
+  error <- recorded("error_result")
+  rich <- recorded("contents_result")
+  for (result in list(text, error, rich)) {
+    expect_match(tool_result_reference(result), "^deputy://tool-result/")
+  }
+
+  expect_identical(agent$restore_tool_result(text)@value, big)
+  expect_identical(agent$restore_tool_result(error)@error, big)
+  expect_identical(agent$restore_tool_result(rich)@value, contents)
+  small <- ellmer::ContentToolResult("small")
+  expect_identical(agent$restore_tool_result(small), small)
+
+  agent$clear_tool_results()
+  expect_identical(agent$restore_tool_result(error), error)
+  expect_snapshot(agent$restore_tool_result("text"), error = TRUE)
+})
+
 test_that("set_system_prompt keeps the compaction summary unless told not to", {
   chat <- create_mock_chat()
   chat$set_system_prompt("Base prompt")
