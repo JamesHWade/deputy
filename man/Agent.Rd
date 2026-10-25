@@ -1348,22 +1348,28 @@ does. After compaction it includes the conversation summary.
 \if{latex}{\out{\hypertarget{method-Agent-set_system_prompt}{}}}
 \subsection{\code{Agent$set_system_prompt()}}{
   Replace the system prompt, as ellmer's
-\verb{$set_system_prompt()} does. After compaction, this also drops the
-conversation summary unless \code{value} still contains it.
+\verb{$set_system_prompt()} does.
 
 Skills loaded with \verb{$load_skill()} stay loaded, so their prompts are
 added back after \code{value}, in the order they were loaded. A skill whose
-prompt \code{value} already contains is not added twice. With \code{value = NULL}, the system prompt holds only the loaded skills' prompts, or is
-\code{NULL} if there are none.
+prompt \code{value} already contains is not added twice. After compaction,
+the summary of the turns it removed from the model's context stays at
+the end of the prompt, as compaction put it there, unless
+\code{keep_summary} is \code{FALSE}. With \code{value = NULL}, the system prompt holds
+only the loaded skills' prompts and the summary, or is \code{NULL} if there
+are none.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$set_system_prompt(value)}
+    \preformatted{Agent$set_system_prompt(value, keep_summary = TRUE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
       \item{\code{value}}{The new system prompt or \code{NULL}.}
+      \item{\code{keep_summary}}{Keep the compaction summary. With \code{FALSE}, the
+model loses what the removed turns said unless \code{value} contains the
+summary.}
     }
     \if{html}{\out{</div>}}
   }

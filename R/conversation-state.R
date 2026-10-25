@@ -82,6 +82,25 @@ conversation_state_prompt_block <- function(summary) {
   )
 }
 
+# A new system prompt with the installed summary at its end, where compaction
+# puts it. A prompt that already carries this summary is left as it is; one
+# carrying another summary has it replaced. A prompt that isn't text goes to
+# ellmer as given, which rejects it.
+conversation_state_prompt_with_summary <- function(prompt, summary) {
+  if (is.null(summary) || !(is.null(prompt) || is.character(prompt))) {
+    return(prompt)
+  }
+  base <- paste(prompt %||% "", collapse = "\n\n")
+  parts <- conversation_state_prompt_parts(base)
+  if (!is.null(parts) && identical(parts$summary, summary)) {
+    return(prompt)
+  }
+  if (!is.null(parts)) {
+    base <- paste0(parts$before, parts$after)
+  }
+  paste0(base, conversation_state_prompt_block(summary))
+}
+
 # Internal helpers for the conversation state representation.  They do not
 # retain a Chat or an Agent.
 cleared_result_key <- function(turn, content) {

@@ -1234,3 +1234,46 @@ test_that("tool_result_reference() finds a result saved outside the context", {
   expect_null(tool_result_reference(list(placeholder)))
   expect_null(tool_result_reference(NA_character_))
 })
+
+test_that("set_system_prompt keeps the compaction summary unless told not to", {
+  chat <- create_mock_chat()
+  chat$set_system_prompt("Base prompt")
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2")
+  ))
+  agent <- Agent$new(chat = chat)
+  agent$compact(keep_last = 1L, summary = "Retained summary")
+
+  agent$set_system_prompt("New prompt")
+  prompt <- agent$get_system_prompt()
+  expect_match(prompt, "^New prompt\n\n<!-- deputy-compaction-summary:v1 ")
+  expect_match(prompt, "Retained summary", fixed = TRUE)
+  expect_no_match(prompt, "Base prompt", fixed = TRUE)
+  expect_identical(
+    agent$.__enclos_env__$private$.conversation_state$summary(),
+    "Retained summary"
+  )
+
+  # A prompt that already carries the summary is not given a second copy.
+  agent$set_system_prompt(agent$get_system_prompt())
+  expect_identical(agent$get_system_prompt(), prompt)
+
+  agent$set_system_prompt(NULL)
+  expect_match(
+    agent$get_system_prompt(),
+    "^\n\n<!-- deputy-compaction-summary:v1 "
+  )
+
+  agent$set_system_prompt("Fresh prompt", keep_summary = FALSE)
+  expect_identical(agent$get_system_prompt(), "Fresh prompt")
+  expect_null(agent$.__enclos_env__$private$.conversation_state$summary())
+  expect_snapshot(agent$set_system_prompt("x", keep_summary = NA), error = TRUE)
+})
+
+test_that("set_system_prompt adds no summary before compaction", {
+  agent <- Agent$new(chat = create_mock_chat())
+  agent$set_system_prompt("New prompt")
+  expect_identical(agent$get_system_prompt(), "New prompt")
+})

@@ -12,6 +12,12 @@
   Saved sessions keep notes, and moving to another Chat keeps each on its
   turn.
 
+* `Agent$set_system_prompt()` keeps the compaction summary at the end of the
+  new prompt, as compaction put it there, so changing the prompt after a
+  compaction no longer makes the model forget what the removed turns said.
+  It used to drop the summary unless the new prompt contained it. Pass
+  `keep_summary = FALSE` to drop it.
+
 * `subagent_activity_info()` says which subagent call a tool card shown by
   `subagent_chat_activity()` is, including `root_tool_call_id`, the lead's
   tool call that delegated the work. `tool_result_reference()` finds a tool

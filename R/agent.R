@@ -1428,22 +1428,34 @@ Agent <- R6::R6Class(
     },
 
     #' @description Replace the system prompt, as ellmer's
-    #' `$set_system_prompt()` does. After compaction, this also drops the
-    #' conversation summary unless `value` still contains it.
+    #' `$set_system_prompt()` does.
     #'
     #' Skills loaded with `$load_skill()` stay loaded, so their prompts are
     #' added back after `value`, in the order they were loaded. A skill whose
-    #' prompt `value` already contains is not added twice. With `value =
-    #' NULL`, the system prompt holds only the loaded skills' prompts, or is
-    #' `NULL` if there are none.
+    #' prompt `value` already contains is not added twice. After compaction,
+    #' the summary of the turns it removed from the model's context stays at
+    #' the end of the prompt, as compaction put it there, unless
+    #' `keep_summary` is `FALSE`. With `value = NULL`, the system prompt holds
+    #' only the loaded skills' prompts and the summary, or is `NULL` if there
+    #' are none.
     #' @param value The new system prompt or `NULL`.
+    #' @param keep_summary Keep the compaction summary. With `FALSE`, the
+    #'   model loses what the removed turns said unless `value` contains the
+    #'   summary.
     #' @return The agent, invisibly.
-    set_system_prompt = function(value) {
+    set_system_prompt = function(value, keep_summary = TRUE) {
       check_conversation_lease(self, NULL)
-      private$.conversation_state$set_prompt(
-        private$.chat,
-        prompt_with_skill_prompts(value, self$skills())
-      )
+      if (!is_true_false(keep_summary)) {
+        cli_abort("{.arg keep_summary} must be TRUE or FALSE")
+      }
+      prompt <- prompt_with_skill_prompts(value, self$skills())
+      if (keep_summary) {
+        prompt <- conversation_state_prompt_with_summary(
+          prompt,
+          private$.conversation_state$summary()
+        )
+      }
+      private$.conversation_state$set_prompt(private$.chat, prompt)
       private$appended_hook_context_hashes <- character()
       invisible(self)
     },

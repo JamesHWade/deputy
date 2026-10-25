@@ -484,6 +484,8 @@ writes turns with `serializeJSON()` and drops any it can't read back, which
 Shiny's `deep.stack.trace` calls caused (`portable_tool_errors()`). Accepted compaction
 retains removed turns as a portable in-memory prefix, without executable tool
 references. `set_turns()` replaces both views and clears the installed summary.
+`set_system_prompt()` keeps it (`conversation_state_prompt_with_summary()`)
+unless `keep_summary = FALSE`.
 Snapshot schema 3 preserves the prefix and context separately. Hosts still own
 durable storage and branch identity; native shinychat history can use its normal
 Chat protocol without disabling compaction. See ADR-0017. Context/usage logic

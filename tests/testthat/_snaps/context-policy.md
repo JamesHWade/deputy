@@ -153,3 +153,11 @@
       Error in `compaction_automatic()`:
       ! `automatic` must be TRUE or FALSE
 
+# set_system_prompt keeps the compaction summary unless told not to
+
+    Code
+      agent$set_system_prompt("x", keep_summary = NA)
+    Condition
+      Error in `agent$set_system_prompt()`:
+      ! `keep_summary` must be TRUE or FALSE
+
