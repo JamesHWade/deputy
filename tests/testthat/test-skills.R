@@ -795,10 +795,17 @@ test_that("a skill survives compaction and a later set_system_prompt()", {
   agent$set_system_prompt(compacted)
   expect_identical(agent$get_system_prompt(), compacted)
 
+  # The skill comes back after the new prompt, and the summary stays last.
   agent$set_system_prompt("Rebuilt base.")
   rebuilt <- agent$get_system_prompt()
-  expect_identical(
+  expect_match(
     rebuilt,
+    "^Rebuilt base\\.\n\n# Skill: plain\nUse plain words\\.\n\n<!-- deputy-compaction-summary:v1 "
+  )
+  expect_match(rebuilt, "Earlier answers.", fixed = TRUE)
+  agent$set_system_prompt("Rebuilt base.", keep_summary = FALSE)
+  expect_identical(
+    agent$get_system_prompt(),
     "Rebuilt base.\n\n# Skill: plain\nUse plain words."
   )
   agent$compact(keep_last = 0, summary = "Later answers.") |>
