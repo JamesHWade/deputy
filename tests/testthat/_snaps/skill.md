@@ -166,3 +166,4 @@
       Error in `validate_definition_registry()`:
       ! Invalid AgentDefinition file
       x Invalid object in `skills` registry
+

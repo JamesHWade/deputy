@@ -73,3 +73,4 @@
     Condition
       Error in `validate_hook_timeout()`:
       ! `timeout` must be one finite non-negative number
+

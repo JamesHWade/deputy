@@ -52,3 +52,4 @@
       ! `params` can only hold the parameters of `ellmer::params()`
       x Not supported: "foo"
       i For other request settings, build the subagent's chat yourself with `DelegationPolicy(chat = )`.
+

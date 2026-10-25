@@ -50,3 +50,4 @@
       ! Permission mode cannot widen or replace the current policy
       x Mode readonly cannot change to full.
       i Create a new Agent with explicitly broader Permissions to make this change.
+
