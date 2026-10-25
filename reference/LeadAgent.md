@@ -45,6 +45,7 @@ its answer. See
 Inherited methods
 
 - [`Agent$add_hook()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-add_hook)
+- [`Agent$add_note()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-add_note)
 - [`Agent$add_turn()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-add_turn)
 - [`Agent$cancel_agent()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-cancel_agent)
 - [`Agent$chat()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-chat)
@@ -52,6 +53,7 @@ Inherited methods
 - [`Agent$chat_structured()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-chat_structured)
 - [`Agent$chat_structured_async()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-chat_structured_async)
 - [`Agent$checkpoint()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-checkpoint)
+- [`Agent$clear_tool_results()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-clear_tool_results)
 - [`Agent$compact()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-compact)
 - [`Agent$continue_agent()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-continue_agent)
 - [`Agent$continue_agent_async()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-continue_agent_async)
@@ -95,6 +97,7 @@ Inherited methods
 - [`Agent$release_agent()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-release_agent)
 - [`Agent$release_agent_graph()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-release_agent_graph)
 - [`Agent$resolve_tool_result()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-resolve_tool_result)
+- [`Agent$restore_tool_result()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-restore_tool_result)
 - [`Agent$resume_approval()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-resume_approval)
 - [`Agent$retain_agent()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-retain_agent)
 - [`Agent$retain_agent_graph()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-retain_agent_graph)
@@ -150,7 +153,8 @@ Create a new LeadAgent.
       delegation_disclosure = DelegationDisclosure(),
       delegation_observation = DelegationObservation(),
       approval_dir = NULL,
-      trusted_results = NULL
+      trusted_results = NULL,
+      notes = NULL
     )
 
 #### Arguments
@@ -298,6 +302,12 @@ Create a new LeadAgent.
   tool may belong to the lead or a subagent, but must be the same tool
   everywhere. Subagents' trusted results are recorded in the lead's run
   and passed to its `on_result`.
+
+- `notes`:
+
+  Optional function that recognizes the notes you add to turns with
+  `$add_note()`; see
+  [Agent](https://jameshwade.github.io/deputy/reference/Agent.md).
 
 #### Returns
 

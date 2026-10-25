@@ -13,7 +13,7 @@ its answer. See vignette("multi-agent").'><meta property="og:image" content="htt
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9006</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -106,6 +106,7 @@ its answer. See <code><a href="../articles/multi-agent.html">vignette("multi-age
 <li><p><a href="#method-LeadAgent-print"><code>LeadAgent$print()</code></a></p></li>
 <li><p><a href="#method-LeadAgent-clone"><code>LeadAgent$clone()</code></a></p></li>
 </ul></div><p><details><summary>Inherited methods</summary><ul><li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href="Agent.html#method-add_hook"><code>Agent$add_hook()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_note"><a href="Agent.html#method-add_note"><code>Agent$add_note()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_turn"><a href="Agent.html#method-add_turn"><code>Agent$add_turn()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cancel_agent"><a href="Agent.html#method-cancel_agent"><code>Agent$cancel_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat"><a href="Agent.html#method-chat"><code>Agent$chat()</code></a></span></li>
@@ -113,6 +114,7 @@ its answer. See <code><a href="../articles/multi-agent.html">vignette("multi-age
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_structured"><a href="Agent.html#method-chat_structured"><code>Agent$chat_structured()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_structured_async"><a href="Agent.html#method-chat_structured_async"><code>Agent$chat_structured_async()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="checkpoint"><a href="Agent.html#method-checkpoint"><code>Agent$checkpoint()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="clear_tool_results"><a href="Agent.html#method-clear_tool_results"><code>Agent$clear_tool_results()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href="Agent.html#method-compact"><code>Agent$compact()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="continue_agent"><a href="Agent.html#method-continue_agent"><code>Agent$continue_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="continue_agent_async"><a href="Agent.html#method-continue_agent_async"><code>Agent$continue_agent_async()</code></a></span></li>
@@ -156,6 +158,7 @@ its answer. See <code><a href="../articles/multi-agent.html">vignette("multi-age
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="release_agent"><a href="Agent.html#method-release_agent"><code>Agent$release_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="release_agent_graph"><a href="Agent.html#method-release_agent_graph"><code>Agent$release_agent_graph()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resolve_tool_result"><a href="Agent.html#method-resolve_tool_result"><code>Agent$resolve_tool_result()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="restore_tool_result"><a href="Agent.html#method-restore_tool_result"><code>Agent$restore_tool_result()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resume_approval"><a href="Agent.html#method-resume_approval"><code>Agent$resume_approval()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="retain_agent"><a href="Agent.html#method-retain_agent"><code>Agent$retain_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="retain_agent_graph"><a href="Agent.html#method-retain_agent_graph"><code>Agent$retain_agent_graph()</code></a></span></li>
@@ -206,7 +209,8 @@ its answer. See <code><a href="../articles/multi-agent.html">vignette("multi-age
 <span>  delegation_disclosure <span class="op">=</span> <span class="fu"><a href="../reference/DelegationDisclosure.html">DelegationDisclosure</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  delegation_observation <span class="op">=</span> <span class="fu"><a href="../reference/DelegationObservation.html">DelegationObservation</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  approval_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  trusted_results <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  trusted_results <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  notes <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h4>
@@ -312,6 +316,10 @@ of the event buffer read by <code>$observe_subagents()</code>.</p></dd>
 every subagent and its tools. A designated tool may belong to the lead
 or a subagent, but must be the same tool everywhere. Subagents' trusted
 results are recorded in the lead's run and passed to its <code>on_result</code>.</p></dd>
+
+      <dt><code>notes</code></dt>
+<dd><p>Optional function that recognizes the notes you add to
+turns with <code>$add_note()</code>; see <a href="Agent.html">Agent</a>.</p></dd>
 
 
 </dl><p></p></div>

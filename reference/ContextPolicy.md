@@ -50,14 +50,21 @@ ContextPolicy(
   Size, in bytes, above which a tool result is saved to disk and
   replaced in the model context by a preview and a reference. Compaction
   applies the same limit to tool results and tool call arguments in the
-  turns it summarises. `NULL` turns this off.
+  turns it summarises, and a subagent answer longer than 8 KiB is saved
+  the same way. `NULL` turns this off. With it and both image limits
+  `NULL`, nothing is written to disk: use that when tool results hold
+  data that must not be stored, and the model gets long subagent answers
+  cut at 8 KiB.
 
 - offload_dir:
 
   Directory for saved tool results; each session gets its own
   subdirectory. A relative path is resolved against the R working
   directory when the policy is created. `NULL` uses Deputy's user cache
-  directory.
+  directory. Saved results are plain files, readable by your user
+  account, and stay until
+  [Agent](https://jameshwade.github.io/deputy/reference/Agent.md)`$clear_tool_results()`
+  deletes them.
 
 - summary_fallback_chats:
 

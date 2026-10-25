@@ -42,6 +42,8 @@ Keep long conversations within the model’s context window.
   : Configure automatic context management
 - [`DeputyCompaction()`](https://jameshwade.github.io/deputy/reference/DeputyCompaction.md)
   : Create a compaction result
+- [`tool_result_reference()`](https://jameshwade.github.io/deputy/reference/tool_result_reference.md)
+  : Find a tool result saved outside the model context
 
 ## Built-in tools
 
@@ -249,6 +251,8 @@ Delegate parts of a task from a lead agent to specialists.
   : Show subagent conversations in a Shiny panel
 - [`subagent_chat_activity()`](https://jameshwade.github.io/deputy/reference/subagent_chat_activity.md)
   : Show subagent tool calls in the main chat
+- [`subagent_activity_info()`](https://jameshwade.github.io/deputy/reference/subagent_activity_info.md)
+  : Which subagent call a shown tool card is
 - [`subagent_chat_history()`](https://jameshwade.github.io/deputy/reference/subagent_chat_history.md)
   : Save subagent records with a shinychat conversation
 

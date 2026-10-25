@@ -149,7 +149,13 @@ would exceed the checkpoint size limits is refused.
 
 - [`Agent$resolve_tool_result()`](#method-Agent-resolve_tool_result)
 
+- [`Agent$restore_tool_result()`](#method-Agent-restore_tool_result)
+
+- [`Agent$clear_tool_results()`](#method-Agent-clear_tool_results)
+
 - [`Agent$add_turn()`](#method-Agent-add_turn)
+
+- [`Agent$add_note()`](#method-Agent-add_note)
 
 - [`Agent$get_turns()`](#method-Agent-get_turns)
 
@@ -273,7 +279,8 @@ Create a new agent.
       delegation_scope = list(),
       delegation_disclosure = DelegationDisclosure(),
       delegation_observation = DelegationObservation(),
-      trusted_results = NULL
+      trusted_results = NULL,
+      notes = NULL
     )
 
 #### Arguments
@@ -405,6 +412,18 @@ Create a new agent.
   [TrustedResults](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
   policy naming the one tool allowed to produce each type of trusted
   result. Registering a tool that could get around it is an error.
+
+- `notes`:
+
+  Optional function that takes one ellmer content object and returns
+  `TRUE` when it is a note: content you add to a turn with
+  `$add_note()`, such as a label under an answer. Notes are part of the
+  conversation `$get_turns()` returns, so a saved chat history keeps
+  them, but they are never sent to the model. `$set_turns()` and
+  `$add_turn()` use this function to find the notes in the turns you
+  give them, such as a restored conversation, so it must recognize every
+  note you add. A note is usually an instance of your own subclass of
+  [ellmer::ContentText](https://ellmer.tidyverse.org/reference/Content.html).
 
 #### Returns
 
@@ -571,13 +590,13 @@ need them. The agents' own tools and connections are left open.
 
 Send a retained agent its next task. It still has its earlier
 conversation. This errors, before any request is made, if the agent is
-busy, was changed or released, has used up `max_runs`, or the handle
-belongs to another agent. After a failed or cancelled task, call this
-again to carry on.
+busy (unless `queue` is `TRUE`), was changed or released, has used up
+`max_runs`, or the handle belongs to another agent. After a failed or
+cancelled task, call this again to carry on.
 
 #### Usage
 
-    Agent$continue_agent_async(handle, task, usage_limits)
+    Agent$continue_agent_async(handle, task, usage_limits, queue = FALSE)
 
 #### Arguments
 
@@ -596,6 +615,13 @@ again to carry on.
   for this task. It is also capped by what remains of the handle's total
   budget and by the retained agent's own limits.
 
+- `queue`:
+
+  If the agent is busy, wait for the tasks already sent to finish, then
+  send this one, instead of erroring. Waiting tasks are sent in order,
+  and each is checked as if it were sent then. `$cancel_agent()` stops
+  only the running task; `$release_agent()` fails the waiting ones.
+
 #### Returns
 
 A promise that resolves to an
@@ -611,11 +637,11 @@ Blocking version of `$continue_agent_async()`.
 
 #### Usage
 
-    Agent$continue_agent(handle, task, usage_limits)
+    Agent$continue_agent(handle, task, usage_limits, queue = FALSE)
 
 #### Arguments
 
-- `handle, task, usage_limits`:
+- `handle, task, usage_limits, queue`:
 
   See `$continue_agent_async()`.
 
@@ -1464,6 +1490,54 @@ back as text.
 
 ------------------------------------------------------------------------
 
+### `Agent$restore_tool_result()`
+
+Put back what a tool returned, for a result recorded in the conversation
+with a preview and a reference in place of it (see
+[`tool_result_reference()`](https://jameshwade.github.io/deputy/reference/tool_result_reference.md)):
+its value, its error message, or its list of content objects.
+
+#### Usage
+
+    Agent$restore_tool_result(content)
+
+#### Arguments
+
+- `content`:
+
+  An ellmer
+  [ContentToolResult](https://ellmer.tidyverse.org/reference/Content.html),
+  such as one from `$get_turns()`.
+
+#### Returns
+
+`content` with what the tool returned. `content` unchanged when it holds
+no reference, or the result can no longer be read, for example after
+`$clear_tool_results()`.
+
+------------------------------------------------------------------------
+
+### `Agent$clear_tool_results()`
+
+Delete the tool results this agent, and the agents it retains, saved
+outside the model context (see
+[ContextPolicy](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)),
+for example when the conversation ends. They are never deleted
+otherwise. References to them in the conversation stop resolving and the
+model sees only their previews. A session saved with `$save_session()`
+keeps its own copy. This errors while the agent, or one it retains, is
+running.
+
+#### Usage
+
+    Agent$clear_tool_results()
+
+#### Returns
+
+The agent, invisibly.
+
+------------------------------------------------------------------------
+
 ### `Agent$add_turn()`
 
 Add a user turn and an assistant turn, as ellmer's `$add_turn()` does.
@@ -1494,6 +1568,37 @@ The agent, invisibly.
 
 ------------------------------------------------------------------------
 
+### `Agent$add_note()`
+
+Add a note to a turn of the conversation: content such as a label saying
+whether an answer's citations were found in its sources. The note is
+part of the conversation `$get_turns()` returns, after the turn's other
+contents, so a saved chat history keeps it, but it is never sent to the
+model. A turn that compaction removed from the model's context can still
+take a note.
+
+#### Usage
+
+    Agent$add_note(turn, content)
+
+#### Arguments
+
+- `turn`:
+
+  Position of the turn in `$get_turns()`.
+
+- `content`:
+
+  An ellmer content object, or a list of them, that the agent's `notes`
+  function recognizes. That is what keeps a note out of the model's
+  context when the conversation is restored.
+
+#### Returns
+
+The agent, invisibly.
+
+------------------------------------------------------------------------
+
 ### `Agent$get_turns()`
 
 Get the whole conversation, as ellmer's `$get_turns()` does. Unlike
@@ -1504,19 +1609,30 @@ conversation. When
 [`subagent_chat_activity()`](https://jameshwade.github.io/deputy/reference/subagent_chat_activity.md)
 shows subagent tool calls in this conversation, they are included here
 too, after the contents of the reply that delegated them; the model
-never sees them. A tool error is returned as a plain condition with the
-same message, so the conversation can be saved and read back by
-shinychat's history.
+never sees them. Notes added with `$add_note()` come last in their
+turns. A tool error is returned as a plain condition with the same
+message, so the conversation can be saved and read back by shinychat's
+history.
 
 #### Usage
 
-    Agent$get_turns(include_system_prompt = FALSE)
+    Agent$get_turns(include_system_prompt = FALSE, activity = TRUE, notes = TRUE)
 
 #### Arguments
 
 - `include_system_prompt`:
 
   Include the system prompt as a turn.
+
+- `activity`:
+
+  Include the subagent tool calls shown in the conversation. Code that
+  checks an answer against the tool results the model was given can
+  leave them out.
+
+- `notes`:
+
+  Include notes added with `$add_note()`.
 
 #### Returns
 
@@ -1550,7 +1666,9 @@ A list of ellmer turns.
 
 Replace the conversation, as ellmer's `$set_turns()` does. This also
 drops any compaction summary and the turns compaction removed. During a
-run, usage counted so far still counts.
+run, usage counted so far still counts. Subagent tool calls and notes in
+`value` (the contents the agent's `notes` function recognizes) stay in
+the conversation but are not sent to the model.
 
 #### Usage
 
@@ -1586,24 +1704,29 @@ The system prompt or `NULL`.
 ### `Agent$set_system_prompt()`
 
 Replace the system prompt, as ellmer's `$set_system_prompt()` does.
-After compaction, this also drops the conversation summary unless
-`value` still contains it.
 
 Skills loaded with `$load_skill()` stay loaded, so their prompts are
 added back after `value`, in the order they were loaded. A skill whose
-prompt `value` already contains is not added twice. With `value = NULL`,
-the system prompt holds only the loaded skills' prompts, or is `NULL` if
-there are none.
+prompt `value` already contains is not added twice. After compaction,
+the summary of the turns it removed from the model's context stays at
+the end of the prompt, as compaction put it there, unless `keep_summary`
+is `FALSE`. With `value = NULL`, the system prompt holds only the loaded
+skills' prompts and the summary, or is `NULL` if there are none.
 
 #### Usage
 
-    Agent$set_system_prompt(value)
+    Agent$set_system_prompt(value, keep_summary = TRUE)
 
 #### Arguments
 
 - `value`:
 
   The new system prompt or `NULL`.
+
+- `keep_summary`:
+
+  Keep the compaction summary. With `FALSE`, the model loses what the
+  removed turns said unless `value` contains the summary.
 
 #### Returns
 

@@ -25,7 +25,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9006</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -218,14 +218,41 @@ result a chunk at a time if it needs more.</p>
 <p><code><a href="../reference/ContextPolicy.html">ContextPolicy()</a></code> sets the size limit
 (<code>max_tool_result_bytes</code>), limits on images returned by
 tools, and where results are stored (<code>offload_dir</code>). By
-default they go in Deputy’s user cache directory.</p>
+default they go in Deputy’s user cache directory. They are plain files
+that stay until you delete them with
+<code>agent$clear_tool_results()</code>, for example when the
+conversation ends; after that, the conversation keeps only their
+previews.</p>
+<p>If tool results hold data that must not be written to disk, turn this
+off:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ContextPolicy.html">ContextPolicy</a></span><span class="op">(</span></span>
+<span>  max_tool_result_bytes <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  max_tool_result_images <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  max_tool_result_image_bytes <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>Then nothing is saved, and every result stays in the model’s context
+in full.</p>
+<p>Code that reads the conversation afterwards, to check an answer
+against the results its tools returned, can find saved results with
+<code><a href="../reference/tool_result_reference.html">tool_result_reference()</a></code> and put back what the tool returned
+(its value, its error or its content objects) with
+<code>restore_tool_result()</code>:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw">for</span> <span class="op">(</span><span class="va">turn</span> <span class="kw">in</span> <span class="va">agent</span><span class="op">$</span><span class="fu">get_turns</span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="kw">for</span> <span class="op">(</span><span class="va">content</span> <span class="kw">in</span> <span class="va">turn</span><span class="op">@</span><span class="va">contents</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="fu"><a href="../reference/tool_result_reference.html">tool_result_reference</a></span><span class="op">(</span><span class="va">content</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>      <span class="va">content</span> <span class="op">&lt;-</span> <span class="va">agent</span><span class="op">$</span><span class="fu">restore_tool_result</span><span class="op">(</span><span class="va">content</span><span class="op">)</span></span>
+<span>    <span class="op">}</span></span>
+<span>  <span class="op">}</span></span>
+<span><span class="op">}</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="save-and-restore-a-conversation">Save and restore a conversation<a class="anchor" aria-label="anchor" href="#save-and-restore-a-conversation"></a>
 </h2>
 <p><code>save_session()</code> writes the conversation to an RDS file,
 and <code>load_session()</code> restores it into an agent:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">save_session</span><span class="op">(</span><span class="st">"review.rds"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">later</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>

@@ -131,7 +131,42 @@ value <- agent$resolve_tool_result("deputy://tool-result/...")
 [`ContextPolicy()`](https://jameshwade.github.io/deputy/reference/ContextPolicy.md)
 sets the size limit (`max_tool_result_bytes`), limits on images returned
 by tools, and where results are stored (`offload_dir`). By default they
-go in Deputy’s user cache directory.
+go in Deputy’s user cache directory. They are plain files that stay
+until you delete them with `agent$clear_tool_results()`, for example
+when the conversation ends; after that, the conversation keeps only
+their previews.
+
+If tool results hold data that must not be written to disk, turn this
+off:
+
+``` r
+
+policy <- ContextPolicy(
+  max_tool_result_bytes = NULL,
+  max_tool_result_images = NULL,
+  max_tool_result_image_bytes = NULL
+)
+```
+
+Then nothing is saved, and every result stays in the model’s context in
+full.
+
+Code that reads the conversation afterwards, to check an answer against
+the results its tools returned, can find saved results with
+[`tool_result_reference()`](https://jameshwade.github.io/deputy/reference/tool_result_reference.md)
+and put back what the tool returned (its value, its error or its content
+objects) with `restore_tool_result()`:
+
+``` r
+
+for (turn in agent$get_turns()) {
+  for (content in turn@contents) {
+    if (!is.null(tool_result_reference(content))) {
+      content <- agent$restore_tool_result(content)
+    }
+  }
+}
+```
 
 ## Save and restore a conversation
 

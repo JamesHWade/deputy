@@ -58,6 +58,12 @@ snapshot
 model. It may contain summaries or result markers in place of material
 in the selected conversation. *Avoid*: selected conversation, transcript
 
+**Note**: Content a host adds to a turn of the selected conversation
+after it was recorded, such as the result of checking an answer. Notes
+are shown and saved with the conversation but never enter model context;
+the Agent’s `notes` function recognizes them in turns the host supplies.
+*Avoid*: annotation, aside, label (for the concept)
+
 **Conversation state**: Retained turns, originals of tool results
 cleared from model context, and the installed summary used to
 reconstruct the selected conversation from the current Chat. Its

@@ -110,6 +110,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/skill_load.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/skills_list.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/stream_result.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/subagent_activity_info.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/subagent_chat_activity.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/subagent_chat_history.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/subagent_chat_ui.html</loc></url>
@@ -124,6 +125,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_read_csv.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_read_file.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_read_markdown.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/tool_result_reference.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_run_bash.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_run_r_code.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tool_web_fetch.html</loc></url>

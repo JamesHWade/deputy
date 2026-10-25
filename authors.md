@@ -11,12 +11,12 @@ Source:
 [`DESCRIPTION`](https://github.com/JamesHWade/deputy/blob/main/DESCRIPTION)
 
 Wade J (2026). *deputy: Run Tasks with Language Models and R Tools*. R
-package version 0.0.0.9005, <https://github.com/JamesHWade/deputy>.
+package version 0.0.0.9006, <https://github.com/JamesHWade/deputy>.
 
     @Manual{,
       title = {deputy: Run Tasks with Language Models and R Tools},
       author = {James Wade},
       year = {2026},
-      note = {R package version 0.0.0.9005},
+      note = {R package version 0.0.0.9006},
       url = {https://github.com/JamesHWade/deputy},
     }

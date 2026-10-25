@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9006</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -84,6 +84,7 @@
 <p><strong>Turn</strong>: A single exchange within a run — one model response and any tool calls it requested. <em>Avoid</em>: step, iteration, round</p>
 <p><strong>Selected conversation</strong>: The complete path of turns currently chosen by the host, including material removed from model context and subagent activity shown with those turns. <em>Avoid</em>: model context, conversation snapshot</p>
 <p><strong>Model context</strong>: The instructions and turns currently supplied to the model. It may contain summaries or result markers in place of material in the selected conversation. <em>Avoid</em>: selected conversation, transcript</p>
+<p><strong>Note</strong>: Content a host adds to a turn of the selected conversation after it was recorded, such as the result of checking an answer. Notes are shown and saved with the conversation but never enter model context; the Agent’s <code>notes</code> function recognizes them in turns the host supplies. <em>Avoid</em>: annotation, aside, label (for the concept)</p>
 <p><strong>Conversation state</strong>: Retained turns, originals of tool results cleared from model context, and the installed summary used to reconstruct the selected conversation from the current Chat. Its transitions keep those records consistent with changes to model context.</p>
 <p><strong>Conversation snapshot</strong>: The serialized contents of an Agent’s selected conversation and model context, written to and read from disk by <code>save_session()</code> and <code>load_session()</code>. Concerns what was said, not who is saying it. The host owns durable storage and branches. <em>Avoid</em>: session, session file, saved session, conversation state</p>
 <p><strong>Compaction</strong>: Replacing older turns in model context with a summary to reduce input size. The complete selected conversation remains available through <code>get_turns()</code>; <code>get_context_turns()</code> exposes only the current model context. <em>Avoid</em>: truncation, pruning, summarization</p>

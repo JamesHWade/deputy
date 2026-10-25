@@ -19,7 +19,7 @@ Agent$resolve_tool_result()."><meta property="og:image" content="https://jameshw
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9005</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9006</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -125,14 +125,19 @@ about this fraction of <code>max_tokens</code>. Must be between 0 and 1.</p></dd
 <dd><p>Size, in bytes, above which a tool result is
 saved to disk and replaced in the model context by a preview and a
 reference. Compaction applies the same limit to tool results and tool
-call arguments in the turns it summarises. <code>NULL</code> turns this off.</p></dd>
+call arguments in the turns it summarises, and a subagent answer longer
+than 8 KiB is saved the same way. <code>NULL</code> turns this off. With it and both
+image limits <code>NULL</code>, nothing is written to disk: use that when tool
+results hold data that must not be stored, and the model gets long
+subagent answers cut at 8 KiB.</p></dd>
 
 
 <dt id="arg-offload-dir">offload_dir<a class="anchor" aria-label="anchor" href="#arg-offload-dir"></a></dt>
 <dd><p>Directory for saved tool results; each session gets its
 own subdirectory. A relative path is resolved against the R working
 directory when the policy is created. <code>NULL</code> uses Deputy's user cache
-directory.</p></dd>
+directory. Saved results are plain files, readable by your user account,
+and stay until <a href="Agent.html">Agent</a><code>$clear_tool_results()</code> deletes them.</p></dd>
 
 
 <dt id="arg-summary-fallback-chats">summary_fallback_chats<a class="anchor" aria-label="anchor" href="#arg-summary-fallback-chats"></a></dt>
