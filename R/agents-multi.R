@@ -842,6 +842,10 @@ LeadAgent <- R6::R6Class(
         correlation$parent_run_id
       sub_agent$.__enclos_env__$private$.delegation_id <-
         correlation$delegation_id
+      # A subagent's runs belong to the conversation of the run that
+      # delegated them.
+      sub_agent$.__enclos_env__$private$.inherited_conversation_id <-
+        trace_conversation_id(private)
       # A checkpoint describes workspace state, not one agent's private
       # execution history. Delegated agents therefore write to the exact same
       # journal as the lead so a lead-level rewind includes child mutations.

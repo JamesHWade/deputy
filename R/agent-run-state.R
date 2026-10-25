@@ -100,6 +100,7 @@ initialize_agent_run <- function(
   state$model_failure <- NULL
   state$dispatch_turns <- private$.chat$get_turns()
   state$trace_conversation_id <- private$.conversation_id %||%
+    private$.inherited_conversation_id %||%
     private$.session_id
   state$trace_span <- start_run_trace(agent, state)
   # Retention rewires the Chat to its specialist. After release, whichever

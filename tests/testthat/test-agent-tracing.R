@@ -233,6 +233,57 @@ test_that("a clone's runs stay out of the host's conversation", {
   }
 })
 
+test_that("a subagent's run is filed under its lead's conversation", {
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "delegate_to_agent",
+      arguments = list(agent_name = "worker", task = "private task")
+    ),
+    runtime_reply("child finished"),
+    runtime_reply("parent finished")
+  ))
+  record <- record_runtime_trace(
+    server$url,
+    "delegate",
+    conversation_id = "c_host_123"
+  )
+  runs <- Filter(function(x) x$name == "deputy.run", record$traces)
+  expect_length(runs, 2L)
+  expect_identical(
+    vapply(
+      runs,
+      function(x) x$attributes[["gen_ai.conversation.id"]],
+      character(1),
+      USE.NAMES = FALSE
+    ),
+    c("c_host_123", "c_host_123")
+  )
+  chats <- Filter(function(x) startsWith(x$name, "chat "), record$traces)
+  expect_identical(
+    unique(vapply(
+      chats,
+      function(x) x$attributes[["gen_ai.conversation.id"]],
+      character(1)
+    )),
+    "c_host_123"
+  )
+})
+
+test_that("a retained agent's task is filed under its sender's conversation", {
+  server <- local_runtime_server(list(runtime_reply("specialist answer")))
+  owner <- Agent$new(create_mock_chat(), permissions = permissions_full())
+  specialist <- Agent$new(runtime_chat(server), agent_name = "specialist")
+  handle <- owner$retain_agent(specialist, UsageLimits(max_requests = 5))
+  owner$conversation_id <- "c_host_123"
+  owner$continue_agent(handle, "A task", UsageLimits(max_requests = 2))
+  expect_identical(
+    specialist$.__enclos_env__$private$.chat$conversation_id,
+    "c_host_123"
+  )
+  # Between tasks it belongs to no conversation of its own.
+  expect_null(specialist$.__enclos_env__$private$.inherited_conversation_id)
+})
+
 test_that("a run keeps the conversation id it started with", {
   chat <- ellmer::chat_openai_compatible(
     base_url = "http://127.0.0.1:9/v1",

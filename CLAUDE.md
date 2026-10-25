@@ -575,6 +575,9 @@ drops them. Context forks copy the turns a host gives them, so hosts pass
 `subagent_chat_history(chat, lead, requester)` saves each conversation's
 settled subagent records with it through `chat$history$on_save()` and restores
 them read-only in `on_restore()` (ADR-0034, `R/subagent-history.R`).
+A subagent or retained agent's run takes its trace conversation from the
+run that delegated it (`.inherited_conversation_id`, set per task and
+cleared by settlement and clones) unless the host set its own.
 `Agent$conversation_id`, set by shinychat before each reply, is stamped on
 delegation records as `host_conversation_id` (dropped from the compact
 model-facing outcome). Records are one JSON string in a typed codec that never

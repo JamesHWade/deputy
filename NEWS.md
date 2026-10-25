@@ -30,6 +30,13 @@
   `$add_note()`. Code that checks an answer against the tool results the
   model was given can read the conversation without them.
 
+* A subagent's runs, and the tasks a retained agent is sent with
+  `$continue_agent()`, are traced under the conversation of the run that
+  delegated them (`gen_ai.conversation.id`), so a trace reader files them with
+  the conversation the user sees. They used to carry the subagent's own
+  session ID. A `conversation_id` the host sets on the retained agent itself
+  still wins.
+
 * A run is traced under the host's conversation. When the host sets
   `Agent$conversation_id` (shinychat's `chat_server()` does before each reply),
   the `deputy.run` span and the run's model spans carry it as

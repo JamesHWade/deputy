@@ -304,6 +304,7 @@ continue_conversation <- function(
     }
     caller_private$release_delegation_usage(id)
     if (!is.null(old)) {
+      cp$.inherited_conversation_id <- old$inherited_conversation_id
       cp$.parent_agent_id <- old$parent_agent_id
       cp$.parent_run_id <- old$parent_run_id
       cp$.delegation_id <- old$delegation_id
@@ -343,6 +344,7 @@ continue_conversation <- function(
   caller_private$reserve_delegation_usage(id, limits)
   # Acquire before returning the promise, including before the first dispatch.
   old <- list(
+    inherited_conversation_id = cp$.inherited_conversation_id,
     parent_agent_id = cp$.parent_agent_id,
     parent_run_id = cp$.parent_run_id,
     delegation_id = cp$.delegation_id,
@@ -365,6 +367,9 @@ continue_conversation <- function(
   cp$delegation_artifacts <- list()
   cp$.parent_agent_id <- correlation$parent_agent_id
   cp$.parent_run_id <- correlation$parent_run_id
+  # The task belongs to the conversation of whoever sent it, unless the host
+  # named one for the retained agent itself.
+  cp$.inherited_conversation_id <- trace_conversation_id(caller_private)
   cp$.delegation_id <- id
   cp$.delegation_binding <- list(mode = "retained", approval = "unsupported")
   ancestors <- if (is.null(tree)) {

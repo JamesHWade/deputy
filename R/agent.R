@@ -2832,6 +2832,9 @@ Agent <- R6::R6Class(
       .agent_name = NULL,
       .session_id = NULL,
       .parent_agent_id = NULL,
+      # The conversation of the run that delegated this agent's current task,
+      # for its traces when the host named none for it.
+      .inherited_conversation_id = NULL,
       .parent_run_id = NULL,
       .delegation_id = NULL,
       .file_checkpoints = NULL,
@@ -2977,6 +2980,7 @@ Agent <- R6::R6Class(
         # Nor is it the host's conversation until the host names it: its runs
         # would be the latest model spans a trace reader keeps for that id.
         cloned$.__enclos_env__$private$.conversation_id <- NULL
+        cloned$.__enclos_env__$private$.inherited_conversation_id <- NULL
         register_compaction_catalog_owner(
           private$.compaction_catalog_registry,
           cloned
