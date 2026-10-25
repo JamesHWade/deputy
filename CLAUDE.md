@@ -76,6 +76,7 @@ deputy/
 │   ├── hook-validation.R   # HookMatcher configuration validation
 │   ├── callback-result.R   # S7 hook and permission decisions
 │   ├── trusted-results.R   # TrustedResults policy and no-bypass registry check
+│   ├── turn-notes.R        # Host notes beside the turns, and shared overlay helpers
 │   ├── tool-input-review.R # Typed per-field tables for input review
 │   ├── skill.R             # S7 Skill values and requirement inspection
 │   ├── skills.R            # Explicit Skill file and tool loading
