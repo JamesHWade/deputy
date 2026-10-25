@@ -2305,3 +2305,49 @@ test_that("subagent_chat_activity() without a chat shows cards in the app's own 
   # Ending the session stops it.
   expect_null(root$.__enclos_env__$private$.activity)
 })
+
+test_that("subagent_activity_info() describes a shown card", {
+  marker <- list(
+    format = "deputy_subagent_activity",
+    version = 1L,
+    activity_id = "deputy_activity_abc_1",
+    sequence = 1L,
+    label = "sales",
+    agent_name = "sales",
+    depth = 1L,
+    conversation_id = "session_1",
+    root_tool_call_id = "call_1"
+  )
+  shown <- ellmer::ContentToolRequest(
+    "deputy_activity_abc_1",
+    "call_measure",
+    list(),
+    extra = list(deputy_activity = marker)
+  )
+  result <- ellmer::ContentToolResult(
+    "60",
+    request = shown,
+    extra = list(deputy_activity = marker)
+  )
+  info <- subagent_activity_info(result)
+  expect_identical(info$activity_id, "deputy_activity_abc_1")
+  expect_identical(info$root_tool_call_id, "call_1")
+  expect_identical(info$agent_name, "sales")
+  expect_null(info$format)
+  expect_null(info$conversation_id)
+  expect_identical(subagent_activity_info(shown), info)
+
+  # The lead's own call, and a card whose request isn't its own, are not
+  # shown activity.
+  expect_null(subagent_activity_info(
+    ellmer::ContentToolRequest("call_1", "delegate", list())
+  ))
+  forged <- ellmer::ContentToolRequest(
+    "call_2",
+    "call_measure",
+    list(),
+    extra = list(deputy_activity = marker)
+  )
+  expect_null(subagent_activity_info(forged))
+  expect_null(subagent_activity_info(ellmer::ContentText("text")))
+})

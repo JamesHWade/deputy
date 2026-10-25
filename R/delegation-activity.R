@@ -60,6 +60,39 @@ is_activity_content <- function(content) {
   !is.null(activity_marker(content))
 }
 
+#' Which subagent call a shown tool card is
+#'
+#' [subagent_chat_activity()] shows each tool call a subagent makes as a pair of
+#' cards in the lead's conversation: a request and its result. Use this
+#' function on the contents of `lead$get_turns()` to tell those cards apart
+#' from the lead's own tool calls, for example to check an answer against what
+#' the subagent's tools returned. Use `lead$get_turns(activity = FALSE)` to
+#' leave the cards out instead.
+#'
+#' @param content An ellmer content object.
+#' @return `NULL` unless `content` is a card shown by
+#'   [subagent_chat_activity()]. For a card, a list with:
+#'   * `activity_id`: the card's ID, which its request and result share.
+#'   * `root_tool_call_id`: the ID of the lead's tool call that delegated the
+#'     work, so you can find the delegation the card belongs to.
+#'   * `label`, `agent_name`, `agent_id`: which subagent made the call.
+#'   * `depth`: 1 for the lead's own subagents, 2 for theirs, and so on.
+#'   * `sequence`, `delegation_id`, `parent_delegation_id`, `run_id`: the
+#'     call's position among the cards and the delegation it ran in.
+#'
+#'   Fields with no value are left out.
+#' @seealso [subagent_chat_activity()]
+#' @export
+#' @examples
+#' subagent_activity_info(ellmer::ContentText("Not a card"))
+subagent_activity_info <- function(content) {
+  marker <- activity_marker(content)
+  if (is.null(marker)) {
+    return(NULL)
+  }
+  marker[setdiff(names(marker), c("format", "version", "conversation_id"))]
+}
+
 # A portable turn record (from `ellmer::contents_record()`) without its
 # activity contents, found by the same marker as `activity_marker()`.
 activity_strip_record <- function(record) {
@@ -107,24 +140,7 @@ activity_record_marked <- function(content) {
 # Separate activity from turns a host supplies, such as a restored shinychat
 # conversation. The model context gets the turns without it.
 activity_split <- function(turns) {
-  overlay <- list()
-  for (index in seq_along(turns)) {
-    turn <- turns[[index]]
-    if (!inherits(turn, "ellmer::Turn")) {
-      next
-    }
-    contents <- turn@contents
-    marked <- vapply(contents, is_activity_content, logical(1))
-    if (!any(marked)) {
-      next
-    }
-    for (content in contents[marked]) {
-      overlay[[length(overlay) + 1L]] <- list(turn = index, content = content)
-    }
-    turn@contents <- contents[!marked]
-    turns[[index]] <- turn
-  }
-  list(turns = turns, overlay = overlay)
+  overlay_split(turns, is_activity_content)
 }
 
 activity_merge <- function(turns, overlay) {
@@ -196,59 +212,21 @@ activity_saved_entries <- function(agent) {
       )
     )
   }
-  activity_session_entries(overlay)
-}
-
-# Shown activity as a saved session keeps it: each card with the index of the
-# turn it was shown in, beside the turns the model reads.
-activity_session_entries <- function(overlay) {
-  if (!length(overlay)) {
-    return(NULL)
-  }
-  lapply(overlay, function(entry) {
-    list(turn = as.integer(entry$turn), content = entry$content)
-  })
+  overlay_session_entries(overlay)
 }
 
 # The shown activity of a saved session, checked against the turns it is
-# loaded with: each entry a marked card in one of the conversation's turns.
-# Cards are shown in assistant turns, but `$set_turns()` and `$add_turn()`
-# keep a card from any turn, so a load takes back what a save wrote.
+# loaded with. Cards are shown in assistant turns, but `$set_turns()` and
+# `$add_turn()` keep a card from any turn, so a load takes back what a save
+# wrote.
 activity_session_overlay <- function(session, path = NULL) {
-  entries <- if (is.list(session)) session$activity
-  if (is.null(entries)) {
-    return(list())
-  }
-  turns <- if (is.list(session$turns) && is.list(session$compacted_turns)) {
-    c(session$compacted_turns, session$turns)
-  } else {
-    list()
-  }
-  valid <- function(entry) {
-    turn <- if (is.list(entry) && !is.object(entry)) entry$turn
-    is.numeric(turn) &&
-      !is.object(turn) &&
-      length(turn) == 1L &&
-      !is.na(turn) &&
-      turn >= 1 &&
-      turn <= length(turns) &&
-      turn == round(turn) &&
-      inherits(turns[[turn]], "ellmer::Turn") &&
-      is_activity_content(entry$content)
-  }
-  if (
-    !is.list(entries) ||
-      is.object(entries) ||
-      !all(vapply(entries, valid, logical(1)))
-  ) {
-    abort_session_load(
-      "Invalid session file - its subagent activity is malformed",
-      path = path
-    )
-  }
-  lapply(entries, function(entry) {
-    list(turn = as.integer(entry$turn), content = entry$content)
-  })
+  overlay_session_overlay(
+    session,
+    field = "activity",
+    accepts = is_activity_content,
+    malformed = "Invalid session file - its subagent activity is malformed",
+    path = path
+  )
 }
 
 new_activity_presenter <- function(requester, interval) {

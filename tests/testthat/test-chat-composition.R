@@ -304,29 +304,31 @@ test_that("composition rejects failed specialists with a bounded outcome", {
   setup$owner$release_agent(setup$handle)
 })
 
-test_that("concurrent model calls cannot mutate one retained specialist twice", {
-  reply <- runtime_reply(tool = "ask", arguments = list(task = "work"))
-  lines <- strsplit(reply$body, "\n", fixed = TRUE)[[1L]]
-  chunk <- jsonlite::fromJSON(
-    substring(lines[[1L]], 7L),
-    simplifyVector = FALSE
+test_that("concurrent model calls to one retained specialist run one at a time", {
+  reply <- runtime_reply(
+    tool = "ask",
+    arguments = list(task = "work"),
+    calls = 2L
   )
-  call <- chunk$choices[[1L]]$delta$tool_calls[[1L]]
-  call$id <- "second_call"
-  call$index <- 1L
-  chunk$choices[[1L]]$delta$tool_calls[[2L]] <- call
-  lines[[1L]] <- paste0(
-    "data: ",
-    jsonlite::toJSON(chunk, auto_unbox = TRUE, null = "null")
-  )
-  reply$body <- paste(lines, collapse = "\n")
-  server <- local_runtime_server(list(runtime_reply("one answer")))
+  server <- local_runtime_server(list(
+    runtime_reply("first answer"),
+    runtime_reply("second answer")
+  ))
   setup <- composition_parent(Agent$new(runtime_chat(server)), response = reply)
-  suppressWarnings(setup$owner$run_sync("two concurrent calls"))
-  expect_equal(nrow(setup$owner$list_subagents()), 1L)
-  expect_length(server$requests(), 1L)
+  result <- suppressWarnings(setup$owner$run_sync("two concurrent calls"))
+  expect_identical(result$stop_reason, "complete")
+  runs <- setup$owner$list_subagents()
+  expect_equal(nrow(runs), 2L)
+  expect_identical(runs$status, c("completed", "completed"))
+  # The second task waited for the first and continued its conversation.
+  views <- setup$owner$inspect_subagents("host")
+  expect_identical(
+    views[[2L]]$outcome$runtime$previous_delegation_id,
+    views[[1L]]$outcome$runtime$delegation_id
+  )
+  expect_length(server$requests(), 2L)
   parent <- setup$server$requests()[[2L]]$body
-  expect_match(jsonlite::toJSON(parent), "conversation is busy")
+  expect_no_match(jsonlite::toJSON(parent), "conversation is busy")
 })
 
 test_that("the public composition recipe authorizes its curated read tools", {

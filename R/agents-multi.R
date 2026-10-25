@@ -80,6 +80,8 @@ LeadAgent <- R6::R6Class(
     #'   [DelegationManifest]. Defaults to 64 KiB. A delegation over this limit,
     #'   or whose estimated tokens exceed the [ContextPolicy] `max_tokens`,
     #'   fails before any model request.
+    #' @param notes Optional function that recognizes the notes you add to
+    #'   turns with `$add_note()`; see [Agent].
     #' @return A new `LeadAgent` object
     initialize = function(
       chat,
@@ -105,7 +107,8 @@ LeadAgent <- R6::R6Class(
       delegation_disclosure = DelegationDisclosure(),
       delegation_observation = DelegationObservation(),
       approval_dir = NULL,
-      trusted_results = NULL
+      trusted_results = NULL,
+      notes = NULL
     ) {
       if (!is.null(private$.chat)) {
         check_conversation_initialization(self)
@@ -199,7 +202,8 @@ LeadAgent <- R6::R6Class(
         agent_name = agent_name,
         fallback_chats = fallback_chats,
         approval_dir = approval_dir,
-        trusted_results = trusted_results
+        trusted_results = trusted_results,
+        notes = notes
       )
       completed <- TRUE
       invisible(self)
@@ -838,6 +842,10 @@ LeadAgent <- R6::R6Class(
         correlation$parent_run_id
       sub_agent$.__enclos_env__$private$.delegation_id <-
         correlation$delegation_id
+      # A subagent's runs belong to the conversation of the run that
+      # delegated them.
+      sub_agent$.__enclos_env__$private$.inherited_conversation_id <-
+        trace_conversation_id(private)
       # A checkpoint describes workspace state, not one agent's private
       # execution history. Delegated agents therefore write to the exact same
       # journal as the lead so a lead-level rewind includes child mutations.

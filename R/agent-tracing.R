@@ -12,6 +12,7 @@
 trace_conversation_id <- function(private) {
   private$current_run_state$trace_conversation_id %||%
     private$.conversation_id %||%
+    private$.inherited_conversation_id %||%
     private$.session_id
 }
 

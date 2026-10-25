@@ -1200,3 +1200,195 @@ test_that("invalid compaction evidence is rejected before hooks or context chang
   expect_identical(chat$get_system_prompt(), "Host policy")
   expect_null(agent$last_compaction())
 })
+
+test_that("tool_result_reference() finds a result saved outside the context", {
+  directory <- withr::local_tempdir(pattern = "deputy-reference-")
+  value <- paste(rep("large result", 100), collapse = " ")
+  tool <- ellmer::tool(
+    fun = function() value,
+    name = "large_result",
+    description = "Return a large test value.",
+    arguments = list(),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(tool),
+    context_policy = ContextPolicy(
+      max_tokens = NULL,
+      max_tool_result_bytes = 32,
+      offload_dir = directory
+    )
+  )
+  placeholder <- agent$get_tools()[["large_result"]]()
+  result <- ellmer::ContentToolResult(placeholder)
+
+  reference <- tool_result_reference(result)
+  expect_match(reference, "^deputy://tool-result/result_[a-f0-9]{64}\\?")
+  expect_identical(tool_result_reference(placeholder), reference)
+  expect_identical(agent$resolve_tool_result(reference), value)
+  expect_null(tool_result_reference(ellmer::ContentToolResult("small")))
+  expect_null(tool_result_reference(list(placeholder)))
+  expect_null(tool_result_reference(NA_character_))
+})
+
+test_that("restore_tool_result() puts back an offloaded value, error or contents", {
+  directory <- withr::local_tempdir(pattern = "deputy-restore-")
+  big <- paste(rep("large result", 100), collapse = " ")
+  test_tool <- function(name, fun) {
+    ellmer::tool(
+      fun = fun,
+      name = name,
+      description = "Return a large test result.",
+      arguments = list(),
+      annotations = ellmer::tool_annotations(
+        read_only_hint = TRUE,
+        open_world_hint = FALSE
+      )
+    )
+  }
+  contents <- list(ellmer::ContentText("Summary"), ellmer::ContentText(big))
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    tools = list(
+      test_tool("text_result", function() big),
+      test_tool("error_result", function() {
+        ellmer::ContentToolResult(error = big)
+      }),
+      test_tool("contents_result", function() {
+        ellmer::ContentToolResult(value = contents)
+      })
+    ),
+    context_policy = ContextPolicy(
+      max_tokens = NULL,
+      max_tool_result_bytes = 32,
+      offload_dir = directory
+    )
+  )
+  recorded <- function(name) {
+    value <- agent$get_tools()[[name]]()
+    if (inherits(value, "ellmer::ContentToolResult")) {
+      value
+    } else {
+      ellmer::ContentToolResult(value)
+    }
+  }
+  text <- recorded("text_result")
+  error <- recorded("error_result")
+  rich <- recorded("contents_result")
+  for (result in list(text, error, rich)) {
+    expect_match(tool_result_reference(result), "^deputy://tool-result/")
+  }
+
+  expect_identical(agent$restore_tool_result(text)@value, big)
+  expect_identical(agent$restore_tool_result(error)@error, big)
+  expect_identical(agent$restore_tool_result(rich)@value, contents)
+  small <- ellmer::ContentToolResult("small")
+  expect_identical(agent$restore_tool_result(small), small)
+
+  agent$clear_tool_results()
+  expect_identical(agent$restore_tool_result(error), error)
+  expect_snapshot(agent$restore_tool_result("text"), error = TRUE)
+})
+
+test_that("set_system_prompt keeps the compaction summary unless told not to", {
+  chat <- create_mock_chat()
+  chat$set_system_prompt("Base prompt")
+  chat$set_turns(list(
+    create_mock_user_turn("Q1"),
+    create_mock_assistant_turn("A1"),
+    create_mock_user_turn("Q2")
+  ))
+  agent <- Agent$new(chat = chat)
+  agent$compact(keep_last = 1L, summary = "Retained summary")
+
+  agent$set_system_prompt("New prompt")
+  prompt <- agent$get_system_prompt()
+  expect_match(prompt, "^New prompt\n\n<!-- deputy-compaction-summary:v1 ")
+  expect_match(prompt, "Retained summary", fixed = TRUE)
+  expect_no_match(prompt, "Base prompt", fixed = TRUE)
+  expect_identical(
+    agent$.__enclos_env__$private$.conversation_state$summary(),
+    "Retained summary"
+  )
+
+  # A prompt that already carries the summary is not given a second copy.
+  agent$set_system_prompt(agent$get_system_prompt())
+  expect_identical(agent$get_system_prompt(), prompt)
+
+  agent$set_system_prompt(NULL)
+  expect_match(
+    agent$get_system_prompt(),
+    "^\n\n<!-- deputy-compaction-summary:v1 "
+  )
+
+  agent$set_system_prompt("Fresh prompt", keep_summary = FALSE)
+  expect_identical(agent$get_system_prompt(), "Fresh prompt")
+  expect_null(agent$.__enclos_env__$private$.conversation_state$summary())
+  expect_snapshot(agent$set_system_prompt("x", keep_summary = NA), error = TRUE)
+})
+
+test_that("set_system_prompt adds no summary before compaction", {
+  agent <- Agent$new(chat = create_mock_chat())
+  agent$set_system_prompt("New prompt")
+  expect_identical(agent$get_system_prompt(), "New prompt")
+})
+
+test_that("clear_tool_results() deletes saved results, a retained agent's too", {
+  directory <- withr::local_tempdir(pattern = "deputy-clear-")
+  value <- paste(rep("large result", 100), collapse = " ")
+  tool <- ellmer::tool(
+    fun = function() value,
+    name = "large_result",
+    description = "Return a large test value.",
+    arguments = list(),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  policy <- ContextPolicy(
+    max_tokens = NULL,
+    max_tool_result_bytes = 32,
+    offload_dir = directory
+  )
+  owner <- owned_test_owner(tools = list(tool), context_policy = policy)
+  child <- owned_test_agent(tools = list(tool), context_policy = policy)
+  reference <- owner$get_tools()[["large_result"]]()
+  child$get_tools()[["large_result"]]()
+  owner$retain_agent(child, UsageLimits(max_requests = 1))
+  expect_length(list.files(directory), 2L)
+
+  owner$clear_tool_results()
+  expect_length(list.files(directory), 0L)
+  expect_error(owner$resolve_tool_result(reference))
+
+  owner$.__enclos_env__$private$run_active <- TRUE
+  withr::defer(owner$.__enclos_env__$private$run_active <- FALSE)
+  expect_snapshot(owner$clear_tool_results(), error = TRUE)
+})
+
+test_that("a policy that saves no tool results doesn't save long subagent answers", {
+  directory <- withr::local_tempdir(pattern = "deputy-no-offload-")
+  policy <- ContextPolicy(
+    max_tokens = NULL,
+    max_tool_result_bytes = NULL,
+    max_tool_result_images = NULL,
+    max_tool_result_image_bytes = NULL,
+    offload_dir = directory
+  )
+  owner <- owned_test_owner(context_policy = policy)
+  child <- owned_test_agent(text = strrep("long answer ", 1000))
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
+  result <- owner$continue_agent(handle, "task", UsageLimits(max_requests = 1))
+
+  expect_identical(result$stop_reason, "complete")
+  expect_length(list.files(directory, recursive = TRUE), 0L)
+  view <- owner$inspect_subagents("owner")[[1L]]
+  expect_identical(view$outcome$runtime$answer_truncated, TRUE)
+  expect_null(view$outcome$runtime$error)
+  expect_length(view$outcome$references, 0L)
+})

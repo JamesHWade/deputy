@@ -76,6 +76,7 @@ deputy/
 │   ├── hook-validation.R   # HookMatcher configuration validation
 │   ├── callback-result.R   # S7 hook and permission decisions
 │   ├── trusted-results.R   # TrustedResults policy and no-bypass registry check
+│   ├── turn-notes.R        # Host notes beside the turns, and shared overlay helpers
 │   ├── tool-input-review.R # Typed per-field tables for input review
 │   ├── skill.R             # S7 Skill values and requirement inspection
 │   ├── skills.R            # Explicit Skill file and tool loading
@@ -484,6 +485,8 @@ writes turns with `serializeJSON()` and drops any it can't read back, which
 Shiny's `deep.stack.trace` calls caused (`portable_tool_errors()`). Accepted compaction
 retains removed turns as a portable in-memory prefix, without executable tool
 references. `set_turns()` replaces both views and clears the installed summary.
+`set_system_prompt()` keeps it (`conversation_state_prompt_with_summary()`)
+unless `keep_summary = FALSE`.
 Snapshot schema 3 preserves the prefix and context separately. Hosts still own
 durable storage and branch identity; native shinychat history can use its normal
 Chat protocol without disabling compaction. See ADR-0017. Context/usage logic
@@ -556,9 +559,26 @@ cards only while a presenter is enabled, reading records through disclosure
 on the consumer side; it never runs tools. Tool-call correlation no longer
 lets a finished call claim a later call that reuses its provider ID.
 
+`Agent$add_note(turn, content)` keeps host notes in a second overlay,
+`.note_overlay`, beside the activity overlay and with the same entry shape
+(`R/turn-notes.R`). Deputy can't recognize a host's notes by marker, so the
+Agent's `notes` function (`Agent$new(notes = )`) does: `set_turns()` and
+`add_turn()` split recognized contents out with `note_split()`, `add_note()`
+refuses content the function doesn't recognize, and a function that errors
+recognizes nothing. Notes merge after activity in `get_turns()` and
+`last_turn()`; `get_turns(activity = FALSE, notes = FALSE)` is the model's
+side of the selected conversation (a lead's view of a child uses it). Session
+payloads list notes in `notes`, so loading needs no function; `set_chat()`
+remaps them with `activity_remap()`, and re-initializing with another Chat
+drops them. Context forks copy the turns a host gives them, so hosts pass
+`get_turns(notes = FALSE)`.
+
 `subagent_chat_history(chat, lead, requester)` saves each conversation's
 settled subagent records with it through `chat$history$on_save()` and restores
 them read-only in `on_restore()` (ADR-0034, `R/subagent-history.R`).
+A subagent or retained agent's run takes its trace conversation from the
+run that delegated it (`.inherited_conversation_id`, set per task and
+cleared by settlement and clones) unless the host set its own.
 `Agent$conversation_id`, set by shinychat before each reply, is stamped on
 delegation records as `host_conversation_id` (dropped from the compact
 model-facing outcome). Records are one JSON string in a typed codec that never
@@ -673,7 +693,11 @@ and conversation storage; graph approvals remain unsupported. See ADR-0027.
 `Agent$retain_agent()` transfers execution ownership of a standalone specialist.
 `continue_agent()` / `continue_agent_async()` keep its history with explicit
 cumulative budgets and one active lease; `cancel_agent()` and `release_agent()`
-are trusted host controls. The shared child inspection and observation methods
+are trusted host controls. `queue = TRUE` (and every `delegation_tool()`
+call) goes through `continue_conversation_queued()`: a busy entry keeps
+`waiters`, settlement wakes the oldest with `later`, release fails them all,
+and a woken task is admitted afresh. Graph routes don't queue, since
+members can route to each other. are trusted host controls. The shared child inspection and observation methods
 now live on Agent and are inherited by LeadAgent. `R/owned-conversations.R` owns
 handle admission and cleanup; it uses the existing delegation lifecycle and run
 kernel. See ADR-0024 for lifetime, resource, approval and recursion boundaries.

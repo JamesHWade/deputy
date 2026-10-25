@@ -114,6 +114,7 @@ reference:
   contents:
   - ContextPolicy
   - DeputyCompaction
+  - tool_result_reference
 
 - title: Built-in tools
   desc: Tools for files, data, the web and code, and presets that bundle them.
@@ -228,6 +229,7 @@ reference:
   - DelegationSubscription
   - subagent_chat_ui
   - subagent_chat_activity
+  - subagent_activity_info
   - subagent_chat_history
 
 - title: Retained specialists

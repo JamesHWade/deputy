@@ -484,6 +484,11 @@ replace_agent_chat <- function(agent, chat) {
     kept,
     offset = length(private$.conversation_state$retained_turns())
   )
+  private$.note_overlay <- activity_remap(
+    private$.note_overlay,
+    kept,
+    offset = length(private$.conversation_state$retained_turns())
+  )
   unmark_chat_owner(old, agent)
   mark_chat_owner(chat, agent)
   # Fallbacks start again from the new primary Chat.

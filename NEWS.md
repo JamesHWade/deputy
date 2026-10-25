@@ -1,5 +1,63 @@
 # deputy (development version)
 
+* `Agent$add_note()` adds a note to a turn of the conversation: content such
+  as a label saying whether an answer's citations were found in its sources.
+  Notes are part of the conversation `$get_turns()` returns, after their
+  turn's other contents, so shinychat's history saves and restores them, but
+  they are never sent to the model or counted in its context. Give the Agent a
+  `notes` function that recognizes your notes (`Agent$new(notes = )`, also on
+  `LeadAgent`): `$set_turns()` and `$add_turn()` use it to keep the notes in
+  the turns you give them, such as a restored conversation, out of the model's
+  context. A note can go on a turn that compaction removed from the context.
+  Saved sessions keep notes, and moving to another Chat keeps each on its
+  turn.
+
+* `Agent$clear_tool_results()` deletes the tool results an agent, and the
+  agents it retains, saved outside the model context, for example when a
+  conversation ends. Nothing deleted them before, and `ContextPolicy()`'s
+  default `offload_dir` is the user cache, so they stayed on disk.
+
+* A `ContextPolicy()` with `max_tool_result_bytes = NULL` and both image
+  limits `NULL` writes nothing to disk. A subagent answer longer than 8 KiB
+  used to be saved there regardless; it now reaches the lead cut at 8 KiB,
+  without a reference to the rest.
+
+* `Agent$continue_agent()` and `$continue_agent_async()` gain `queue`: a task
+  sent to a retained agent that is busy waits for the tasks already sent
+  instead of failing with "The conversation is busy". Waiting tasks are sent
+  in order, each checked as if it were sent then. `delegation_tool()` queues,
+  so a model that asks one specialist for two things in one response gets
+  both answers, one after the other; it used to get an error for the second.
+  Routes between the agents of a `retain_agent_graph()` still refuse a busy
+  agent.
+
+* `Agent$set_system_prompt()` keeps the compaction summary at the end of the
+  new prompt, as compaction put it there, so changing the prompt after a
+  compaction no longer makes the model forget what the removed turns said.
+  It used to drop the summary unless the new prompt contained it. Pass
+  `keep_summary = FALSE` to drop it.
+
+* `subagent_activity_info()` says which subagent call a tool card shown by
+  `subagent_chat_activity()` is, including `root_tool_call_id`, the lead's
+  tool call that delegated the work. `tool_result_reference()` finds a tool
+  result that a `ContextPolicy` saved outside the model context, whether it
+  held a value, an error or a list of content objects, and the new
+  `Agent$restore_tool_result()` puts back what the tool returned. With them,
+  code that checks an answer against its tools' results needn't depend on how
+  either is marked or stored.
+
+* `Agent$get_turns()` gains `activity` and `notes`, which leave out the
+  subagent tool calls shown in the conversation and the notes added with
+  `$add_note()`. Code that checks an answer against the tool results the
+  model was given can read the conversation without them.
+
+* A subagent's runs, and the tasks a retained agent is sent with
+  `$continue_agent()`, are traced under the conversation of the run that
+  delegated them (`gen_ai.conversation.id`), so a trace reader files them with
+  the conversation the user sees. They used to carry the subagent's own
+  session ID. A `conversation_id` the host sets on the retained agent itself
+  still wins.
+
 * A run is traced under the host's conversation. When the host sets
   `Agent$conversation_id` (shinychat's `chat_server()` does before each reply),
   the `deputy.run` span and the run's model spans carry it as

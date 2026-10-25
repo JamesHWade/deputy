@@ -90,10 +90,10 @@ lead_bind_delegation <- function(lead, id, child, manifest = NULL) {
 }
 
 # A child's conversation as its model has it. Subagent activity its own chat
-# shows (from its own subagents, for its own viewer) isn't part of it, so the
-# lead's views of the child never carry it.
+# shows (from its own subagents, for its own viewer) and notes its host added
+# aren't part of it, so the lead's views of the child never carry them.
 lead_child_turns <- function(child) {
-  activity_strip(child$turns())
+  child$get_turns(activity = FALSE, notes = FALSE)
 }
 
 lead_delegation_records <- function(lead, messages = FALSE, usage = FALSE) {

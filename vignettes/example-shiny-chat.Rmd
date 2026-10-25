@@ -84,6 +84,32 @@ shinychat's conversation history, where available, stores the whole
 conversation (`agent$get_turns()`), so restoring a conversation brings back
 every message while the model continues from the summary.
 
+## Add notes to answers
+
+An app can add a note to a turn after it has been answered: a label saying
+whether the answer's sources were found, say. The note shows in the chat and
+is saved with the conversation, but the model never sees it, so it can't
+mistake your label for something it wrote. Make notes from your own subclass
+of `ellmer::ContentText`, and tell the agent how to recognize them:
+
+```{r}
+SourceCheck <- S7::new_class("SourceCheck", parent = ellmer::ContentText)
+
+agent <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  notes = function(content) S7::S7_inherits(content, SourceCheck)
+)
+
+# After a reply, label the latest turn.
+turns <- agent$get_turns()
+agent$add_note(length(turns), SourceCheck("All 3 sources found."))
+```
+
+The agent uses the `notes` function again when shinychat restores a saved
+conversation, to keep its notes out of the model's context. Code that checks
+answers can read the conversation without notes, or without subagent tool
+calls, with `agent$get_turns(notes = FALSE, activity = FALSE)`.
+
 ## Hooks in an app
 
 Hooks are added to the agent as usual, inside `server()`:

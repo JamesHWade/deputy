@@ -32,6 +32,7 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       # Subagent tool calls shown in the conversation, beside the turns the
       # model reads; a conversation that showed none has no field.
       session$activity <- activity_saved_entries(self)
+      session$notes <- overlay_session_entries(private$.note_overlay)
       session
     },
 
@@ -142,6 +143,7 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       )
       # Checked against the turns being restored, before anything changes.
       restored_activity <- activity_session_overlay(session, source)
+      restored_notes <- note_session_overlay(session, source)
       # Validate recoverable filesystem state before mutating any conversation
       # state so a rejected cross-root or oversized journal leaves the receiver
       # unchanged.
@@ -219,6 +221,7 @@ deputy_agent_session_methods <- function(self = NULL, private = NULL) {
       # Activity shown for the previous conversation doesn't belong to this
       # one.
       private$.activity_overlay <- restored_activity
+      private$.note_overlay <- restored_notes
       activity_reset(self)
     }
   )

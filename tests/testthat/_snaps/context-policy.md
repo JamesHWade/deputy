@@ -153,3 +153,27 @@
       Error in `compaction_automatic()`:
       ! `automatic` must be TRUE or FALSE
 
+# restore_tool_result() puts back an offloaded value, error or contents
+
+    Code
+      agent$restore_tool_result("text")
+    Condition
+      Error in `agent$restore_tool_result()`:
+      ! `content` must be an ellmer <ContentToolResult>.
+
+# set_system_prompt keeps the compaction summary unless told not to
+
+    Code
+      agent$set_system_prompt("x", keep_summary = NA)
+    Condition
+      Error in `agent$set_system_prompt()`:
+      ! `keep_summary` must be TRUE or FALSE
+
+# clear_tool_results() deletes saved results, a retained agent's too
+
+    Code
+      owner$clear_tool_results()
+    Condition
+      Error in `owner$clear_tool_results()`:
+      ! Wait for the agent's runs to finish before clearing its tool results.
+

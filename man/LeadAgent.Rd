@@ -37,6 +37,7 @@ its answer. See \code{vignette("multi-agent")}.
 \if{html}{\out{<details><summary>Inherited methods</summary>
 <ul>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href='../../deputy/html/Agent.html#method-Agent-add_hook'><code>Agent$add_hook()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_note"><a href='../../deputy/html/Agent.html#method-Agent-add_note'><code>Agent$add_note()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_turn"><a href='../../deputy/html/Agent.html#method-Agent-add_turn'><code>Agent$add_turn()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cancel_agent"><a href='../../deputy/html/Agent.html#method-Agent-cancel_agent'><code>Agent$cancel_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat"><a href='../../deputy/html/Agent.html#method-Agent-chat'><code>Agent$chat()</code></a></span></li>
@@ -44,6 +45,7 @@ its answer. See \code{vignette("multi-agent")}.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_structured"><a href='../../deputy/html/Agent.html#method-Agent-chat_structured'><code>Agent$chat_structured()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_structured_async"><a href='../../deputy/html/Agent.html#method-Agent-chat_structured_async'><code>Agent$chat_structured_async()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="checkpoint"><a href='../../deputy/html/Agent.html#method-Agent-checkpoint'><code>Agent$checkpoint()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="clear_tool_results"><a href='../../deputy/html/Agent.html#method-Agent-clear_tool_results'><code>Agent$clear_tool_results()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href='../../deputy/html/Agent.html#method-Agent-compact'><code>Agent$compact()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="continue_agent"><a href='../../deputy/html/Agent.html#method-Agent-continue_agent'><code>Agent$continue_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="continue_agent_async"><a href='../../deputy/html/Agent.html#method-Agent-continue_agent_async'><code>Agent$continue_agent_async()</code></a></span></li>
@@ -87,6 +89,7 @@ its answer. See \code{vignette("multi-agent")}.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="release_agent"><a href='../../deputy/html/Agent.html#method-Agent-release_agent'><code>Agent$release_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="release_agent_graph"><a href='../../deputy/html/Agent.html#method-Agent-release_agent_graph'><code>Agent$release_agent_graph()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resolve_tool_result"><a href='../../deputy/html/Agent.html#method-Agent-resolve_tool_result'><code>Agent$resolve_tool_result()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="restore_tool_result"><a href='../../deputy/html/Agent.html#method-Agent-restore_tool_result'><code>Agent$restore_tool_result()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="resume_approval"><a href='../../deputy/html/Agent.html#method-Agent-resume_approval'><code>Agent$resume_approval()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="retain_agent"><a href='../../deputy/html/Agent.html#method-Agent-retain_agent'><code>Agent$retain_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="retain_agent_graph"><a href='../../deputy/html/Agent.html#method-Agent-retain_agent_graph'><code>Agent$retain_agent_graph()</code></a></span></li>
@@ -142,7 +145,8 @@ its answer. See \code{vignette("multi-agent")}.
   delegation_disclosure = DelegationDisclosure(),
   delegation_observation = DelegationObservation(),
   approval_dir = NULL,
-  trusted_results = NULL
+  trusted_results = NULL,
+  notes = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -204,6 +208,8 @@ of the event buffer read by \verb{$observe_subagents()}.}
 every subagent and its tools. A designated tool may belong to the lead
 or a subagent, but must be the same tool everywhere. Subagents' trusted
 results are recorded in the lead's run and passed to its \code{on_result}.}
+      \item{\code{notes}}{Optional function that recognizes the notes you add to
+turns with \verb{$add_note()}; see \link{Agent}.}
     }
     \if{html}{\out{</div>}}
   }
