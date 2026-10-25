@@ -101,6 +101,70 @@ validate_conversation_candidate <- function(owner, agent) {
   invisible(NULL)
 }
 
+# Send a task now, or once the tasks already sent have settled. Each waiting
+# task is admitted afresh when its turn comes, as if it were sent then; a task
+# a model's tool call sent is dropped if that run has ended meanwhile.
+continue_conversation_queued <- function(
+  owner,
+  handle,
+  task,
+  usage_limits,
+  correlation = NULL,
+  caller = owner
+) {
+  entry <- conversation_entry(owner, handle)
+  cp <- entry$agent$.__enclos_env__$private
+  if (!entry$busy && !isTRUE(cp$run_active)) {
+    return(continue_conversation(
+      owner,
+      handle,
+      task,
+      usage_limits,
+      correlation,
+      caller
+    ))
+  }
+  waiting <- promises::promise(function(resolve, reject) {
+    entry$waiters[[length(entry$waiters) + 1L]] <- resolve
+  })
+  promises::then(waiting, function(ignored) {
+    run_id <- correlation$parent_run_id
+    caller_private <- caller$.__enclos_env__$private
+    if (
+      !is.null(run_id) &&
+        !(isTRUE(caller_private$run_active) &&
+          identical(caller_private$current_run_id, run_id))
+    ) {
+      conversation_abort("The run that sent this task has ended.")
+    }
+    continue_conversation_queued(
+      owner,
+      handle,
+      task,
+      usage_limits,
+      correlation,
+      caller
+    )
+  })
+}
+
+# Let the oldest waiting task try again, or every one when the conversation
+# is released (each then fails on the released handle).
+conversation_wake <- function(entry, all = FALSE) {
+  waiters <- entry$waiters
+  if (!length(waiters)) {
+    return(invisible(NULL))
+  }
+  woken <- if (all) waiters else waiters[1L]
+  entry$waiters <- if (all) list() else waiters[-1L]
+  later::later(function() {
+    for (resolve in woken) {
+      resolve(TRUE)
+    }
+  })
+  invisible(NULL)
+}
+
 retain_conversation <- function(
   owner,
   agent,
@@ -156,6 +220,9 @@ retain_conversation <- function(
   entry$max_runs <- max_runs
   entry$ids <- character()
   entry$busy <- FALSE
+  # Tasks waiting for the conversation, oldest first (see
+  # continue_conversation_queued()).
+  entry$waiters <- list()
   entry$configuration <- conversation_configuration(agent)
   entry$fork <- fork
   entry$authorize <- authorize
@@ -318,6 +385,7 @@ continue_conversation <- function(
     }
     entry$busy <- FALSE
     entry$configuration <- conversation_configuration(child)
+    conversation_wake(entry)
   }
   on.exit(
     {
@@ -494,6 +562,7 @@ release_conversation <- function(owner, handle) {
   cp$.hooks$.__enclos_env__$private$configuration_locked <- FALSE
   trusted_release_conversation(entry)
   op$owned_conversations[[handle]] <- NULL
+  conversation_wake(entry, all = TRUE)
   conversation_remove_routes(owner, handle)
   # Release snapshots too; hosts can explicitly export them beforehand.
   op$subagent_runs[entry$ids] <- NULL

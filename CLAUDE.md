@@ -692,7 +692,11 @@ and conversation storage; graph approvals remain unsupported. See ADR-0027.
 `Agent$retain_agent()` transfers execution ownership of a standalone specialist.
 `continue_agent()` / `continue_agent_async()` keep its history with explicit
 cumulative budgets and one active lease; `cancel_agent()` and `release_agent()`
-are trusted host controls. The shared child inspection and observation methods
+are trusted host controls. `queue = TRUE` (and every `delegation_tool()`
+call) goes through `continue_conversation_queued()`: a busy entry keeps
+`waiters`, settlement wakes the oldest with `later`, release fails them all,
+and a woken task is admitted afresh. Graph routes don't queue, since
+members can route to each other. are trusted host controls. The shared child inspection and observation methods
 now live on Agent and are inherited by LeadAgent. `R/owned-conversations.R` owns
 handle admission and cleanup; it uses the existing delegation lifecycle and run
 kernel. See ADR-0024 for lifetime, resource, approval and recursion boundaries.

@@ -462,21 +462,28 @@ runtime_reply <- function(
   tool = NULL,
   stream = TRUE,
   finish = "stop",
-  arguments = list()
+  arguments = list(),
+  calls = 1L
 ) {
   usage <- list(prompt_tokens = 10, completion_tokens = 5, total_tokens = 15)
   message <- list(role = "assistant", content = text)
   if (!is.null(tool)) {
     message$content <- NULL
-    message$tool_calls <- list(list(
-      index = 0L,
-      id = "call_fixture",
-      type = "function",
-      `function` = list(
-        name = tool,
-        arguments = as.character(jsonlite::toJSON(arguments, auto_unbox = TRUE))
+    # `calls` asks for the same tool that many times in one response.
+    message$tool_calls <- lapply(seq_len(calls), function(i) {
+      list(
+        index = i - 1L,
+        id = if (calls == 1L) "call_fixture" else paste0("call_fixture_", i),
+        type = "function",
+        `function` = list(
+          name = tool,
+          arguments = as.character(jsonlite::toJSON(
+            arguments,
+            auto_unbox = TRUE
+          ))
+        )
       )
-    ))
+    })
     finish <- "tool_calls"
   }
   if (stream) {

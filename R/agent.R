@@ -454,30 +454,47 @@ Agent <- R6::R6Class(
     #' @description
     #' Send a retained agent its next task. It still has its earlier
     #' conversation. This errors, before any request is made, if the agent is
-    #' busy, was changed or released, has used up `max_runs`, or the handle
-    #' belongs to another agent. After a failed or cancelled task, call this
-    #' again to carry on.
+    #' busy (unless `queue` is `TRUE`), was changed or released, has used up
+    #' `max_runs`, or the handle belongs to another agent. After a failed or
+    #' cancelled task, call this again to carry on.
     #' @param handle A handle from this agent's `$retain_agent()` or
     #'   `$retain_agent_graph()`.
     #' @param task The next task, as one string of at most 64 KiB.
     #' @param usage_limits [UsageLimits] for this task. It is also capped by
     #'   what remains of the handle's total budget and by the retained agent's
     #'   own limits.
+    #' @param queue If the agent is busy, wait for the tasks already sent to
+    #'   finish, then send this one, instead of erroring. Waiting tasks are
+    #'   sent in order, and each is checked as if it were sent then.
+    #'   `$cancel_agent()` stops only the running task; `$release_agent()`
+    #'   fails the waiting ones.
     #' @return A promise that resolves to an [AgentResult]. If the task is
     #'   cancelled before it starts, the result has zero usage and no run ID.
-    continue_agent_async = function(handle, task, usage_limits) {
+    continue_agent_async = function(
+      handle,
+      task,
+      usage_limits,
+      queue = FALSE
+    ) {
+      if (!is_true_false(queue)) {
+        cli_abort("{.arg queue} must be TRUE or FALSE")
+      }
+      if (queue) {
+        return(continue_conversation_queued(self, handle, task, usage_limits))
+      }
       continue_conversation(self, handle, task, usage_limits)
     },
 
     #' @description
     #' Blocking version of `$continue_agent_async()`.
-    #' @param handle,task,usage_limits See `$continue_agent_async()`.
+    #' @param handle,task,usage_limits,queue See `$continue_agent_async()`.
     #' @return An [AgentResult].
-    continue_agent = function(handle, task, usage_limits) {
+    continue_agent = function(handle, task, usage_limits, queue = FALSE) {
       private$resolve_promise(self$continue_agent_async(
         handle,
         task,
-        usage_limits
+        usage_limits,
+        queue = queue
       ))
     },
 

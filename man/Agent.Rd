@@ -424,12 +424,12 @@ if you need them. The agents' own tools and connections are left open.
 \subsection{\code{Agent$continue_agent_async()}}{
   Send a retained agent its next task. It still has its earlier
 conversation. This errors, before any request is made, if the agent is
-busy, was changed or released, has used up \code{max_runs}, or the handle
-belongs to another agent. After a failed or cancelled task, call this
-again to carry on.
+busy (unless \code{queue} is \code{TRUE}), was changed or released, has used up
+\code{max_runs}, or the handle belongs to another agent. After a failed or
+cancelled task, call this again to carry on.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$continue_agent_async(handle, task, usage_limits)}
+    \preformatted{Agent$continue_agent_async(handle, task, usage_limits, queue = FALSE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
@@ -441,6 +441,11 @@ again to carry on.
       \item{\code{usage_limits}}{\link{UsageLimits} for this task. It is also capped by
 what remains of the handle's total budget and by the retained agent's
 own limits.}
+      \item{\code{queue}}{If the agent is busy, wait for the tasks already sent to
+finish, then send this one, instead of erroring. Waiting tasks are
+sent in order, and each is checked as if it were sent then.
+\verb{$cancel_agent()} stops only the running task; \verb{$release_agent()}
+fails the waiting ones.}
     }
     \if{html}{\out{</div>}}
   }
@@ -457,13 +462,13 @@ cancelled before it starts, the result has zero usage and no run ID.
   Blocking version of \verb{$continue_agent_async()}.
   \subsection{Usage}{
     \if{html}{\out{<div class="r">}}
-    \preformatted{Agent$continue_agent(handle, task, usage_limits)}
+    \preformatted{Agent$continue_agent(handle, task, usage_limits, queue = FALSE)}
     \if{html}{\out{</div>}}
   }
   \subsection{Arguments}{
     \if{html}{\out{<div class="arguments">}}
     \describe{
-      \item{\code{handle, task, usage_limits}}{See \verb{$continue_agent_async()}.}
+      \item{\code{handle, task, usage_limits, queue}}{See \verb{$continue_agent_async()}.}
     }
     \if{html}{\out{</div>}}
   }

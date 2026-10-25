@@ -134,3 +134,11 @@
       Error in `conversation_abort()`:
       ! This conversation must be run through its current owner.
 
+# queued tasks wait for the running one and go in order
+
+    Code
+      owner$continue_agent_async(handle, "x", UsageLimits(), queue = NA)
+    Condition
+      Error in `owner$continue_agent_async()`:
+      ! `queue` must be TRUE or FALSE
+

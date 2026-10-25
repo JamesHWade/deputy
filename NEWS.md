@@ -12,6 +12,15 @@
   Saved sessions keep notes, and moving to another Chat keeps each on its
   turn.
 
+* `Agent$continue_agent()` and `$continue_agent_async()` gain `queue`: a task
+  sent to a retained agent that is busy waits for the tasks already sent
+  instead of failing with "The conversation is busy". Waiting tasks are sent
+  in order, each checked as if it were sent then. `delegation_tool()` queues,
+  so a model that asks one specialist for two things in one response gets
+  both answers, one after the other; it used to get an error for the second.
+  Routes between the agents of a `retain_agent_graph()` still refuse a busy
+  agent.
+
 * `Agent$set_system_prompt()` keeps the compaction summary at the end of the
   new prompt, as compaction put it there, so changing the prompt after a
   compaction no longer makes the model forget what the removed turns said.

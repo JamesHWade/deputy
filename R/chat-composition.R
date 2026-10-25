@@ -127,8 +127,16 @@ make_delegation_tool <- function(
   invoke <- function(task, correlation) {
     owner <- if (is.null(tree)) caller else delegation_tree_root(tree)
     private <- owner$.__enclos_env__$private
+    # A model may send one specialist several tasks in one response, which
+    # ellmer runs concurrently: they wait their turn. Graph routes don't wait,
+    # since members can route to each other.
+    send <- if (is.null(tree)) {
+      continue_conversation_queued
+    } else {
+      continue_conversation
+    }
     promises::then(
-      continue_conversation(
+      send(
         owner,
         handle,
         task,

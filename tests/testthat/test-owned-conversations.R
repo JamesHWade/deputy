@@ -844,3 +844,67 @@ test_that("a retained budget is worked out from the known cost only when its lim
     "Cumulative usage is unavailable"
   )
 })
+
+test_that("queued tasks wait for the running one and go in order", {
+  owner <- owned_test_owner()
+  child <- owned_test_agent()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 3))
+  pending <- list(
+    owner$continue_agent_async(
+      handle,
+      "first",
+      UsageLimits(max_requests = 1)
+    ),
+    owner$continue_agent_async(
+      handle,
+      "second",
+      UsageLimits(max_requests = 1),
+      queue = TRUE
+    ),
+    owner$continue_agent_async(
+      handle,
+      "third",
+      UsageLimits(max_requests = 1),
+      queue = TRUE
+    )
+  )
+  results <- lapply(pending, resolve_async_value)
+  expect_identical(
+    vapply(results, function(result) result$response, character(1)),
+    rep("answer", 3L)
+  )
+  asked <- Filter(
+    function(turn) inherits(turn, "ellmer::UserTurn"),
+    child$turns()
+  )
+  expect_identical(
+    vapply(asked, function(turn) turn@text, character(1)),
+    c("first", "second", "third")
+  )
+  expect_snapshot(
+    error = TRUE,
+    owner$continue_agent_async(handle, "x", UsageLimits(), queue = NA)
+  )
+})
+
+test_that("a queued task is checked again when its turn comes", {
+  owner <- owned_test_owner()
+  child <- owned_test_agent()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
+  first <- owner$continue_agent_async(
+    handle,
+    "first",
+    UsageLimits(max_requests = 1)
+  )
+  second <- owner$continue_agent_async(
+    handle,
+    "second",
+    UsageLimits(max_requests = 1),
+    queue = TRUE
+  )
+  expect_identical(resolve_async_value(first)$response, "answer")
+  # The handle's budget is spent by the time the second task's turn comes.
+  exhausted <- resolve_async_value(second)
+  expect_identical(exhausted$stop_reason, "request_limit")
+  expect_identical(exhausted$usage$requests, 0L)
+})
