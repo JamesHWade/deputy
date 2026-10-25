@@ -161,3 +161,11 @@
       Error in `agent$set_system_prompt()`:
       ! `keep_summary` must be TRUE or FALSE
 
+# clear_tool_results() deletes saved results, a retained agent's too
+
+    Code
+      owner$clear_tool_results()
+    Condition
+      Error in `owner$clear_tool_results()`:
+      ! Wait for the agent's runs to finish before clearing its tool results.
+

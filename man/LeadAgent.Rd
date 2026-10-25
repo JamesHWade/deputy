@@ -45,6 +45,7 @@ its answer. See \code{vignette("multi-agent")}.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_structured"><a href='../../deputy/html/Agent.html#method-Agent-chat_structured'><code>Agent$chat_structured()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_structured_async"><a href='../../deputy/html/Agent.html#method-Agent-chat_structured_async'><code>Agent$chat_structured_async()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="checkpoint"><a href='../../deputy/html/Agent.html#method-Agent-checkpoint'><code>Agent$checkpoint()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="clear_tool_results"><a href='../../deputy/html/Agent.html#method-Agent-clear_tool_results'><code>Agent$clear_tool_results()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="compact"><a href='../../deputy/html/Agent.html#method-Agent-compact'><code>Agent$compact()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="continue_agent"><a href='../../deputy/html/Agent.html#method-Agent-continue_agent'><code>Agent$continue_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="continue_agent_async"><a href='../../deputy/html/Agent.html#method-Agent-continue_agent_async'><code>Agent$continue_agent_async()</code></a></span></li>

@@ -30,12 +30,17 @@ about this fraction of \code{max_tokens}. Must be between 0 and 1.}
 \item{max_tool_result_bytes}{Size, in bytes, above which a tool result is
 saved to disk and replaced in the model context by a preview and a
 reference. Compaction applies the same limit to tool results and tool
-call arguments in the turns it summarises. \code{NULL} turns this off.}
+call arguments in the turns it summarises, and a subagent answer longer
+than 8 KiB is saved the same way. \code{NULL} turns this off. With it and both
+image limits \code{NULL}, nothing is written to disk: use that when tool
+results hold data that must not be stored, and the model gets long
+subagent answers cut at 8 KiB.}
 
 \item{offload_dir}{Directory for saved tool results; each session gets its
 own subdirectory. A relative path is resolved against the R working
 directory when the policy is created. \code{NULL} uses Deputy's user cache
-directory.}
+directory. Saved results are plain files, readable by your user account,
+and stay until \link{Agent}\verb{$clear_tool_results()} deletes them.}
 
 \item{summary_fallback_chats}{A list of ellmer Chats to try, in order, if
 the agent's own Chat fails to write the summary during automatic

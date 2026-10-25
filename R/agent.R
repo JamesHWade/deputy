@@ -1252,6 +1252,39 @@ Agent <- R6::R6Class(
       )$value
     },
 
+    #' @description Delete the tool results this agent, and the agents it
+    #' retains, saved outside the model context (see [ContextPolicy]), for
+    #' example when the conversation ends. They are never deleted otherwise.
+    #' References to them in the conversation stop resolving and the model
+    #' sees only their previews. A session saved with `$save_session()` keeps
+    #' its own copy. This errors while the agent, or one it retains, is
+    #' running.
+    #' @return The agent, invisibly.
+    clear_tool_results = function() {
+      check_conversation_lease(self, NULL)
+      retained <- lapply(private$owned_conversations, function(entry) {
+        entry
+      })
+      busy <- isTRUE(private$run_active) ||
+        any(vapply(retained, function(entry) isTRUE(entry$busy), logical(1)))
+      if (busy) {
+        cli_abort(
+          "Wait for the agent's runs to finish before clearing its tool results."
+        )
+      }
+      agents <- c(
+        list(self),
+        lapply(retained, function(entry) entry$agent)
+      )
+      for (agent in agents) {
+        unlink(
+          tool_result_offload_dir(agent$context_policy, agent$session_id()),
+          recursive = TRUE
+        )
+      }
+      invisible(self)
+    },
+
     #' @description Add a user turn and an assistant turn, as ellmer's
     #' `$add_turn()` does. Subagent tool calls shown in them, as
     #' `$get_turns()` returns them, stay in the conversation but are not sent

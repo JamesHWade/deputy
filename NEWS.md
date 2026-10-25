@@ -12,6 +12,16 @@
   Saved sessions keep notes, and moving to another Chat keeps each on its
   turn.
 
+* `Agent$clear_tool_results()` deletes the tool results an agent, and the
+  agents it retains, saved outside the model context, for example when a
+  conversation ends. Nothing deleted them before, and `ContextPolicy()`'s
+  default `offload_dir` is the user cache, so they stayed on disk.
+
+* A `ContextPolicy()` with `max_tool_result_bytes = NULL` and both image
+  limits `NULL` writes nothing to disk. A subagent answer longer than 8 KiB
+  used to be saved there regardless; it now reaches the lead cut at 8 KiB,
+  without a reference to the rest.
+
 * `Agent$continue_agent()` and `$continue_agent_async()` gain `queue`: a task
   sent to a retained agent that is busy waits for the tasks already sent
   instead of failing with "The conversation is busy". Waiting tasks are sent

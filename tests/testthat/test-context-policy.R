@@ -1277,3 +1277,59 @@ test_that("set_system_prompt adds no summary before compaction", {
   agent$set_system_prompt("New prompt")
   expect_identical(agent$get_system_prompt(), "New prompt")
 })
+
+test_that("clear_tool_results() deletes saved results, a retained agent's too", {
+  directory <- withr::local_tempdir(pattern = "deputy-clear-")
+  value <- paste(rep("large result", 100), collapse = " ")
+  tool <- ellmer::tool(
+    fun = function() value,
+    name = "large_result",
+    description = "Return a large test value.",
+    arguments = list(),
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      open_world_hint = FALSE
+    )
+  )
+  policy <- ContextPolicy(
+    max_tokens = NULL,
+    max_tool_result_bytes = 32,
+    offload_dir = directory
+  )
+  owner <- owned_test_owner(tools = list(tool), context_policy = policy)
+  child <- owned_test_agent(tools = list(tool), context_policy = policy)
+  reference <- owner$get_tools()[["large_result"]]()
+  child$get_tools()[["large_result"]]()
+  owner$retain_agent(child, UsageLimits(max_requests = 1))
+  expect_length(list.files(directory), 2L)
+
+  owner$clear_tool_results()
+  expect_length(list.files(directory), 0L)
+  expect_error(owner$resolve_tool_result(reference))
+
+  owner$.__enclos_env__$private$run_active <- TRUE
+  withr::defer(owner$.__enclos_env__$private$run_active <- FALSE)
+  expect_snapshot(owner$clear_tool_results(), error = TRUE)
+})
+
+test_that("a policy that saves no tool results doesn't save long subagent answers", {
+  directory <- withr::local_tempdir(pattern = "deputy-no-offload-")
+  policy <- ContextPolicy(
+    max_tokens = NULL,
+    max_tool_result_bytes = NULL,
+    max_tool_result_images = NULL,
+    max_tool_result_image_bytes = NULL,
+    offload_dir = directory
+  )
+  owner <- owned_test_owner(context_policy = policy)
+  child <- owned_test_agent(text = strrep("long answer ", 1000))
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 1))
+  result <- owner$continue_agent(handle, "task", UsageLimits(max_requests = 1))
+
+  expect_identical(result$stop_reason, "complete")
+  expect_length(list.files(directory, recursive = TRUE), 0L)
+  view <- owner$inspect_subagents("owner")[[1L]]
+  expect_identical(view$outcome$runtime$answer_truncated, TRUE)
+  expect_null(view$outcome$runtime$error)
+  expect_length(view$outcome$references, 0L)
+})

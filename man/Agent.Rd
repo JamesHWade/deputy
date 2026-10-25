@@ -135,6 +135,7 @@ hooks with \verb{$add_hook()}.}
     \item \href{#method-Agent-last_run}{\code{Agent$last_run()}}
     \item \href{#method-Agent-last_compaction}{\code{Agent$last_compaction()}}
     \item \href{#method-Agent-resolve_tool_result}{\code{Agent$resolve_tool_result()}}
+    \item \href{#method-Agent-clear_tool_results}{\code{Agent$clear_tool_results()}}
     \item \href{#method-Agent-add_turn}{\code{Agent$add_turn()}}
     \item \href{#method-Agent-add_note}{\code{Agent$add_note()}}
     \item \href{#method-Agent-get_turns}{\code{Agent$get_turns()}}
@@ -1184,6 +1185,27 @@ containing one, such as the placeholder the model saw.}
   \subsection{Returns}{
     The stored R value. ellmer content objects saved during
 compaction come back as text.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-clear_tool_results"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-clear_tool_results}{}}}
+\subsection{\code{Agent$clear_tool_results()}}{
+  Delete the tool results this agent, and the agents it
+retains, saved outside the model context (see \link{ContextPolicy}), for
+example when the conversation ends. They are never deleted otherwise.
+References to them in the conversation stop resolving and the model
+sees only their previews. A session saved with \verb{$save_session()} keeps
+its own copy. This errors while the agent, or one it retains, is
+running.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$clear_tool_results()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The agent, invisibly.
   }
 }
 

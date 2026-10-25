@@ -414,7 +414,11 @@ lead_prepare_outcome <- function(lead, id) {
     ref$scope <- private$delegation_scope
     ref
   })
-  if (record$answer_truncated) {
+  # A policy that saves no tool results saves no long answers either: the
+  # outcome keeps the bounded answer without a reference to the rest.
+  keep <- record$answer_truncated &&
+    !is.null(lead$context_policy$max_tool_result_bytes)
+  if (keep) {
     ref <- tryCatch(
       offload_tool_result(
         text,
