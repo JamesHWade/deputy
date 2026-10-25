@@ -115,6 +115,12 @@ continue_conversation_queued <- function(
   caller = owner,
   front = FALSE
 ) {
+  # Evaluated now, as an unqueued task's are: a task sent from a loop must not
+  # read the loop's later values when its turn comes.
+  force(task)
+  force(usage_limits)
+  force(correlation)
+  force(caller)
   entry <- conversation_entry(owner, handle)
   cp <- entry$agent$.__enclos_env__$private
   if (!entry$busy && !isTRUE(cp$run_active)) {

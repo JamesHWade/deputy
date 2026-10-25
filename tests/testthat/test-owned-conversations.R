@@ -887,6 +887,30 @@ test_that("queued tasks wait for the running one and go in order", {
   )
 })
 
+test_that("a queued task is the one sent, not what its arguments became", {
+  owner <- owned_test_owner()
+  child <- owned_test_agent()
+  handle <- owner$retain_agent(child, UsageLimits(max_requests = 3))
+  pending <- list()
+  for (i in 1:3) {
+    pending[[i]] <- owner$continue_agent_async(
+      handle,
+      paste("task", i),
+      UsageLimits(max_requests = 1),
+      queue = TRUE
+    )
+  }
+  lapply(pending, resolve_async_value)
+  asked <- Filter(
+    function(turn) inherits(turn, "ellmer::UserTurn"),
+    child$turns()
+  )
+  expect_identical(
+    vapply(asked, function(turn) turn@text, character(1)),
+    c("task 1", "task 2", "task 3")
+  )
+})
+
 test_that("a queued task refused when its turn comes lets the next one go", {
   owner <- owned_test_owner()
   child <- owned_test_agent()
