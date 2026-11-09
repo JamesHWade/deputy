@@ -99,6 +99,7 @@ Collate:
     'delegation-manifest.R'
     'agents-multi.R'
     'approval-review.R'
+    'background-tasks.R'
     'chat-composition.R'
     'cli.R'
     'compaction-run.R'

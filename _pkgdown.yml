@@ -74,6 +74,7 @@ articles:
   - multi-agent
   - delegation
   - retained-agents
+  - background-tasks
 
 - title: In applications
   navbar: In applications
@@ -237,6 +238,7 @@ reference:
   contents:
   - adopt_chat
   - delegation_tool
+  - background_tools
   - ContextFork
   - fork_agent
 

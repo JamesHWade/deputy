@@ -40,6 +40,7 @@ deputy/
 │   ├── agent-requests.R    # Public ellmer callbacks and explicit fallback
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
 │   ├── owned-conversations.R # Retained specialist handles, leases and release
+│   ├── background-tasks.R  # Model-started tasks on retained agents and their run-end join
 │   ├── chat-composition.R  # adopt_chat() and delegation_tool() composition
 │   ├── delegation-graph.R  # Atomic host-curated graph setup and release
 │   ├── delegation-tree-budget.R # Graph lifetime budgets and structural admission
@@ -180,6 +181,16 @@ for durable approval and the designated computation. Run
 `devtools::test(filter = "^trusted-mini-agent$")`; launch its `app.R` with Shiny.
 Model commentary cannot write its authoritative host receipt. The recipe is separate from curated-chat composition (ADR-0024) and the
 recursive graph runtime (ADR-0025).
+
+`inst/examples/background-tasks/` is the deterministic background-tasks script
+(ADR-0038): `run.R` sources `fixture.R` (a callr/httpuv OpenAI-compatible
+server scripted per model name, replies indexed by the request's assistant
+turns, task IDs read back from tool results), `workflow.R` (a lead with a
+retained analyst and reviewer) and `report.R` (the host's view). Order is
+fixed by gating the specialists' tools on lead-side hooks, never by holding a
+streaming response (ellmer's `req_perform_connection()` blocks R until
+headers arrive) or by sleeps. Run
+`devtools::test(filter = "background-tasks-example")`.
 
 `inst/examples/commons-subagents/` is the end-to-end Commons workflow for #238:
 actual `commons::commons()` chats as graph members (sales and ops from the root,
@@ -718,6 +729,45 @@ release; parents waiting on children occupy concurrency slots. See ADR-0025.
 `inst/examples/recursive-agents/` supplies the deterministic three-level browser
 fixture; test it with `devtools::test(filter = "recursive|delegation-graph|delegation-tree")`.
 Host-scheduled durable recovery uses the job APIs described above and ADR-0027.
+
+### Background tasks
+
+`background_tools(owner, agents, usage_limits)` returns five composition tools
+(`task_start`, `task_status`, `task_wait`, `task_follow_up`, `task_cancel`)
+for the owner's model (ADR-0038, `R/background-tasks.R`). A task is an
+ordinary retained continuation through `continue_conversation_queued()`; the
+only new behaviour is that the tool call returns before the delegation
+settles. There is no second run engine, scheduler or store: the file keeps the
+owner's private task registry (`.background`), decides when each tool call
+resolves, and joins the tasks when the owner's pass ends.
+
+- Tasks belong to the owner run that started them. At pass end, for any
+  reason, `background_join()` cancels queued tasks, interrupts running ones
+  with `parent_completed` and waits for settlement before `Stop` and
+  `SessionEnd`, so no lease or reservation outlives the run. Task IDs are
+  locators in the current run's registry and carry no authority; settled rows
+  stay readable through `Agent$background_tasks()` until the next run.
+- One lease per retained agent: starts and follow-ups for a busy agent wait in
+  the existing queue. `task_wait` is one tool call resolved on settlement (no
+  model request while waiting) and returns every settled, uncollected task in
+  settlement order.
+- Accounting: a task's allocation is reserved in full before `task_start`
+  returns, and the owner's own limit checks subtract unsettled reservations
+  (`background_limit_status()`), so requests and tool calls are exact across
+  owner plus tasks. `background_admission()` refuses a start that would leave
+  the owner nothing in a limited dimension. Token and cost limits stay
+  observed, one response of overshoot per concurrent producer.
+- Governance is unchanged and checked per subagent tool call: the agent's
+  permissions, the owner's current permissions and forwarded tool hooks. The
+  tools carry the composition marker, so they run only as the owner's governed
+  tool call and are admitted in readonly and plan modes.
+- Refused: an owner in or owning a delegation graph, a retained agent as
+  owner, and an owner with `TrustedResults`. `AgentDefinition` subagents stay
+  blocking. Nothing is durable; host-scheduled jobs are ADR-0027.
+
+Host inspection uses the existing `list_subagents()`, `inspect_subagents()`,
+`observe_subagents()` and `read_subagent_result()` keyed by the task's
+delegation ID. User article: `vignettes/background-tasks.Rmd`.
 
 ### Host-selected context forks
 

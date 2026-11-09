@@ -150,6 +150,13 @@ can be loaded into an Agent to specialize it. Executable tools retain their
 caller-owned state.
 _Avoid_: plugin, extension, module, capability pack
 
+**Background task**:
+A delegation to a retained agent that the owner's model starts and whose tool
+call returns before the delegation finishes. The model collects, follows up on
+or cancels it by task ID. It belongs to the run that started it and ends with
+that run; it is not a job and does not survive the process (ADR-0038).
+_Avoid_: background job, async delegation, detached task
+
 **DelegationInput**:
 An immutable task-specific brief: task, constraints, evidence references,
 deliverable and stop conditions. Evidence selects exact revisions from a scoped

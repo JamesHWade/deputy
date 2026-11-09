@@ -669,11 +669,7 @@ LeadAgent <- R6::R6Class(
           lead_run_delegation(lead_agent, id, child, def, manifest$message) |>
             promises::then(function(outcome) {
               if (!is.null(private$current_usage_limits)) {
-                limit <- usage_limit_status(
-                  private$current_run_usage(),
-                  private$current_usage_limits,
-                  require_followup = TRUE
-                )
+                limit <- private$limit_status(require_followup = TRUE)
                 if (!is.null(limit)) private$mark_usage_limit(limit)
               }
               payload <- delegation_json(S7::props(delegation_outcome(

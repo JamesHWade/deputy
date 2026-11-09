@@ -113,7 +113,9 @@ continue_conversation_queued <- function(
   usage_limits,
   correlation = NULL,
   caller = owner,
-  front = FALSE
+  front = FALSE,
+  admission = NULL,
+  admit = NULL
 ) {
   # Evaluated now, as an unqueued task's are: a task sent from a loop must not
   # read the loop's later values when its turn comes.
@@ -121,6 +123,8 @@ continue_conversation_queued <- function(
   force(usage_limits)
   force(correlation)
   force(caller)
+  force(admission)
+  force(admit)
   entry <- conversation_entry(owner, handle)
   cp <- entry$agent$.__enclos_env__$private
   if (!entry$busy && !isTRUE(cp$run_active)) {
@@ -130,7 +134,8 @@ continue_conversation_queued <- function(
       task,
       usage_limits,
       correlation,
-      caller
+      caller,
+      admission
     ))
   }
   waiting <- promises::promise(function(resolve, reject) {
@@ -156,6 +161,10 @@ continue_conversation_queued <- function(
         ) {
           conversation_abort("The run that sent this task has ended.")
         }
+        # A background task cancelled while it waited never starts.
+        if (is.function(admit) && !isTRUE(admit())) {
+          conversation_abort("The task was cancelled before it started.")
+        }
         continue_conversation_queued(
           owner,
           handle,
@@ -163,7 +172,9 @@ continue_conversation_queued <- function(
           usage_limits,
           correlation,
           caller,
-          front = TRUE
+          front = TRUE,
+          admission = admission,
+          admit = admit
         )
       },
       error = function(error) {
@@ -292,7 +303,8 @@ continue_conversation <- function(
   task,
   usage_limits,
   correlation = NULL,
-  caller = owner
+  caller = owner,
+  admission = NULL
 ) {
   check_conversation_owner(owner)
   entry <- conversation_entry(owner, handle)
@@ -338,6 +350,10 @@ continue_conversation <- function(
     )
   )
   limits <- intersect_usage_limits(limits, child$usage_limits)
+  # A background start checks that its reservation leaves its caller room.
+  if (is.function(admission)) {
+    admission(limits)
+  }
   correlation <- correlation %||%
     list(
       delegation_id = new_deputy_id("delegation_"),

@@ -153,7 +153,8 @@ begin_model_request <- function(agent) {
     return(invisible(NULL))
   }
   status <- tree_usage_status(agent) %||%
-    usage_limit_status(
+    background_limit_status(
+      private,
       private$current_run_usage(),
       state$limits,
       require_followup = TRUE
