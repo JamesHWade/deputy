@@ -5,6 +5,7 @@
 <url><loc>https://jameshwade.github.io/deputy/LICENSE.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/approvals.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/background-jobs.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/articles/background-tasks.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/code-execution.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/conversations.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/articles/delegation.html</loc></url>
@@ -70,6 +71,7 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/approval_read.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/approval_review_ui.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/ask_user_impl.html</loc></url>
+<url><loc>https://jameshwade.github.io/deputy/reference/background_tools.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/delegation_history.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/delegation_tool.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/deputy-errors.html</loc></url>

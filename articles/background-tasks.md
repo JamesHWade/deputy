@@ -1,0 +1,296 @@
+# Background tasks
+
+When a model delegates with `delegate_to_agent` or a
+[`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md),
+it waits for the answer before it does anything else. Background tasks
+remove the wait. The lead’s model starts a task on a [retained
+agent](https://jameshwade.github.io/deputy/articles/retained-agents.md),
+gets a task ID straight away, and keeps working. Later it collects
+whichever result is ready, sends the same agent a follow-up, or cancels
+a task it no longer needs.
+
+Use background tasks when the lead has useful work of its own to do
+while specialists run, when it should act on the first result without
+waiting for the rest, or when it may decide partway through that a task
+isn’t needed. If the model should simply ask and wait, a
+[`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
+is simpler; see [Which kind of delegation](#which-kind-of-delegation)
+below.
+
+Background tasks last only as long as the run that started them. For
+work that should outlive the R process, see [Background
+jobs](https://jameshwade.github.io/deputy/articles/background-jobs.md).
+
+## Set it up
+
+Retain each specialist, then give the lead the task tools with
+[`background_tools()`](https://jameshwade.github.io/deputy/reference/background_tools.md):
+
+``` r
+
+library(deputy)
+
+lead <- Agent$new(
+  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  system_prompt = "You write batch reports with help from two specialists.",
+  usage_limits = UsageLimits(max_requests = 30)
+)
+
+analyst <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = tools_data(),
+  permissions = permissions_readonly(),
+  system_prompt = "You analyse measurement files and explain your reasoning."
+)
+reviewer <- Agent$new(
+  chat = ellmer::chat("openai/gpt-6-luna"),
+  tools = tools_preset("minimal"),
+  permissions = permissions_readonly(),
+  system_prompt = "You review draft reports against the style guide."
+)
+
+handles <- c(
+  analyst = lead$retain_agent(analyst, UsageLimits(max_requests = 20)),
+  reviewer = lead$retain_agent(reviewer, UsageLimits(max_requests = 20))
+)
+
+lead$register_tools(background_tools(
+  lead,
+  agents = handles,
+  usage_limits = UsageLimits(max_requests = 5),
+  descriptions = c(
+    analyst = "Analyses the measurement files",
+    reviewer = "Reviews draft reports"
+  )
+))
+
+result <- lead$run_sync(
+  "Report on batch 12: summarise measurements.csv and have draft.md reviewed."
+)
+```
+
+The names of `agents` are what the model calls the specialists, and
+`descriptions` tells it what each is for. Handles can also come from
+[`adopt_chat()`](https://jameshwade.github.io/deputy/reference/adopt_chat.md).
+`usage_limits` is the budget for each task; the limits given to
+`retain_agent()` cap each specialist’s total across all its tasks.
+
+The model can’t change any of this. It chooses a specialist by name and
+writes the task; the agents, their tools, their permissions and the
+budgets are fixed by your code.
+
+## What the model sees
+
+[`background_tools()`](https://jameshwade.github.io/deputy/reference/background_tools.md)
+returns five tools:
+
+| Tool | What it does | Returns |
+|----|----|----|
+| `task_start(agent, task)` | Starts a task for a specialist | A task ID, at once |
+| `task_status(task_ids)` | Reports each task’s state and progress | At once |
+| `task_wait(task_ids, until)` | Waits for tasks and returns the finished ones’ outcomes | When one task (`until = "any"`, the default) or every task (`"all"`) has finished |
+| `task_follow_up(task_id, task)` | Sends another task to the specialist that ran `task_id` | A new task ID, at once |
+| `task_cancel(task_id, reason)` | Asks a task to stop | The task’s state, at once |
+
+A typical run has the model call `task_start` once or more, do some work
+of its own, and then call `task_wait`.
+
+`task_wait` is a single tool call that stays open until a task finishes.
+The lead makes no model request while it waits, so waiting costs
+nothing. It returns every finished task the model hasn’t collected yet,
+so tasks that finish close together arrive in one result, and it lists
+the tasks still running. Each finished task comes with the same compact
+[outcome](https://jameshwade.github.io/deputy/articles/delegation.html#what-a-delegation-returns)
+as an ordinary delegation. If nothing is pending it returns at once and
+says so. Leaving out `task_ids` waits on every task not yet collected.
+
+A specialist runs one task at a time. A `task_start` or `task_follow_up`
+for a busy specialist is `queued` and starts, in order, when the
+specialist is free. A follow-up continues the specialist’s conversation,
+so it can build on the earlier task without being told everything again.
+
+A task is in one of these states:
+
+| State        | Meaning                                                  |
+|--------------|----------------------------------------------------------|
+| `queued`     | Waiting for a busy specialist                            |
+| `running`    | The specialist is working                                |
+| `cancelling` | Asked to stop, and finishing its current step            |
+| `completed`  | The specialist finished normally                         |
+| `failed`     | The task ended with an error                             |
+| `cancelled`  | Stopped by `task_cancel` or because the lead’s run ended |
+| `stopped`    | A limit or a hook ended it                               |
+| `rejected`   | Refused when its turn came; the reason is reported       |
+
+`completed` means the specialist finished, not that it did the task
+well.
+
+Task IDs work only in the run that created them, and only through these
+tools. A later run of the lead can’t use an earlier run’s IDs.
+
+## What your code sees
+
+`lead$background_tasks()` returns a data frame with one row per task of
+the lead’s current run, or its latest run when none is going:
+
+``` r
+
+tasks <- lead$background_tasks()
+tasks[, c("agent", "state", "collected", "previous_task_id")]
+```
+
+`collected` says whether the model read the result with `task_wait`, and
+`previous_task_id` is set on a follow-up. A task the model cancelled has
+the `stop_reason` `"cancelled"`, with the reason the model gave, if any,
+in `cancel_note`; a task cancelled because the lead stopped has the
+lead’s stop reason, such as `"parent_completed"`. The rows stay until
+the lead’s next run starts.
+
+Each task is an ordinary delegation, so the methods described in
+[Briefing and inspecting
+subagents](https://jameshwade.github.io/deputy/articles/delegation.md)
+work with the `delegation_id` column:
+
+``` r
+
+lead$list_subagents()
+
+# Needs a DelegationDisclosure() on the lead that allows current_user.
+lead$inspect_subagents(current_user, tasks$delegation_id[[1]], transcript = TRUE)
+
+reader <- lead$observe_subagents(current_user)
+reader$poll()$events
+```
+
+Give the lead a
+[`DelegationDisclosure()`](https://jameshwade.github.io/deputy/reference/DelegationDisclosure.md)
+(the `delegation_disclosure` argument of `Agent$new()`) to decide who
+may read specialists’ conversations. `observe_subagents()` shows tool
+calls and text as they happen, which is how an app can show progress
+while the lead is busy. A follow-up’s transcript holds the specialist’s
+whole conversation, earlier tasks included. A task cancelled or rejected
+before its turn came never ran, so it has a row in `background_tasks()`
+and nothing elsewhere.
+
+A specialist keeps its own permissions, and each tool call it makes must
+also pass the lead’s permissions as they are at that moment, and the
+lead’s `PreToolUse`, `PostToolUse` and `PostToolUseFailure` hooks.
+Narrowing the lead’s permissions with `set_permission_mode()` therefore
+applies to tasks already running. A lead in read-only or plan mode can
+still use the task tools, and its specialists are then held to that
+mode.
+
+## Budgets
+
+The lead and its tasks now spend at the same time, so each task’s
+`usage_limits` are set aside from the lead’s run when the task starts.
+When the task finishes, what it didn’t use is returned and what it did
+use is added to the run’s usage. While a task runs, the lead’s own
+requests and tool calls can’t use what is set aside. The lead and its
+tasks together therefore stay within the run’s request and tool-call
+limits, and `result$usage` includes every task.
+
+Three things follow:
+
+- A `task_start` that would leave the lead nothing under one of its
+  run’s limits is refused, and the model is told why. With a lead
+  limited to 30 requests and 10 set aside per task, the model can have
+  two tasks pending and still make requests of its own, but not three.
+- Give `usage_limits` a value for each limit the lead’s run has. If the
+  lead has a `max_tool_calls` and the tasks don’t, a task could use all
+  of it, so every start is refused.
+- Token and cost limits are checked after each response, because the
+  size of a response isn’t known in advance. The lead and each running
+  task can each overshoot them by one response.
+
+A task also can’t exceed what its specialist has left of the budget
+given to `retain_agent()`. `max_active` (default 4) caps how many tasks
+can be queued or running at once, and `max_tasks` (default 16) caps the
+tasks in one run. Starts beyond either are refused until a task
+finishes.
+
+## When the lead stops
+
+Tasks belong to the run that started them. When the lead’s model stops,
+for any reason (it answered, a limit was reached, you called
+`lead$interrupt()`, or an error ended the run), Deputy cancels the tasks
+still queued, asks the running ones to stop, and waits for them before
+the run returns. Nothing keeps running after `run_sync()` returns or the
+promise from `run_async()` resolves, and the run’s usage is complete.
+
+A model that answers without collecting a task therefore loses that
+task’s result. The task still appears in `lead$background_tasks()` with
+`collected = FALSE`, and whatever the specialist did before it stopped
+stays in its conversation.
+
+Because the run waits for running tasks to stop, a specialist in the
+middle of a slow tool call delays the lead’s result until that call
+returns.
+
+## Cancelling
+
+`task_cancel` asks a task to stop. A queued task is removed and never
+starts. A running task finishes the tool call it is in, then stops, and
+the work it did so far stays in the specialist’s conversation.
+Cancelling a task that already finished changes nothing and reports the
+state it finished in.
+
+Deputy can’t interrupt a tool that is running, so a tool with side
+effects completes them even when its task is cancelled.
+
+Your own code can stop a task with
+`lead$interrupt_subagent(delegation_id)`, or everything with
+`lead$interrupt()`.
+
+## Limits
+
+- The lead can’t be part of a delegation graph made with
+  `retain_agent_graph()`, as its root or as a member, and a retained
+  agent can’t start background tasks of its own.
+- A lead with a
+  [`TrustedResults()`](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+  policy can’t register the tools.
+- Subagents defined with
+  [`agent_definition()`](https://jameshwade.github.io/deputy/reference/agent_definition.md)
+  and reached through `delegate_to_agent` always block. A `LeadAgent`
+  can have both: definitions for blocking delegation, and retained
+  agents with background tools.
+- Tasks, handles and conversations live in memory. They don’t survive an
+  R restart and can’t run on a timer or after the run ends. Use
+  [background
+  jobs](https://jameshwade.github.io/deputy/articles/background-jobs.md)
+  for that.
+- Register the tools only on the agent you passed as `owner`. Calling
+  [`background_tools()`](https://jameshwade.github.io/deputy/reference/background_tools.md)
+  again for the same agent replaces its task list, and is an error while
+  tasks are pending.
+
+## Which kind of delegation
+
+|  | Blocking: `delegate_to_agent`, [`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md) | Background: [`background_tools()`](https://jameshwade.github.io/deputy/reference/background_tools.md) | Batch: `parallel_delegate()` |
+|----|----|----|----|
+| Started by | The model | The model | Your code |
+| While the work runs | The lead waits for the answer | The lead keeps working, and waits when it chooses | The lead makes no request |
+| Who does the work | A new subagent from a definition, or a retained agent | Retained agents | New subagents from definitions |
+| Tools for the subagent | Yes | Yes | No, and one request each |
+| Follow-up in the same conversation | With [`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md) | With `task_follow_up` | No |
+| The model can cancel | No | Yes | No |
+
+Choose blocking delegation when the lead needs the answer before it can
+do anything else: it is the simplest for the model to use well. Choose
+background tasks when the lead can make progress in the meantime or may
+not need every result. Choose `parallel_delegate()` when your code, not
+the model, decides to ask several subagents the same kind of question
+and each can answer in one reply without tools.
+
+## A complete example
+
+The `background-tasks` example runs the whole sequence (two starts, the
+lead’s own tool call, a wait, a follow-up, a cancellation) and prints
+what each of the methods above returns. It uses a local test server, so
+it needs no API key:
+
+``` r
+
+source(system.file("examples", "background-tasks", "run.R", package = "deputy"))
+```

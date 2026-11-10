@@ -89,7 +89,10 @@ file and shows how to undo what it wrote.
   subagents’ tool calls appear in the same conversation and are saved
   with it.
 - [Subagents](https://jameshwade.github.io/deputy/articles/multi-agent.html)
-  with their own prompts, tools, permissions and budgets.
+  with their own prompts, tools, permissions and budgets, and
+  [background
+  tasks](https://jameshwade.github.io/deputy/articles/background-tasks.html)
+  that let a lead keep working while its specialists run.
 - [Sandboxed code
   execution](https://jameshwade.github.io/deputy/articles/code-execution.html)
   through mcp-repl and MCP Console, and tools from any [MCP
@@ -398,6 +401,8 @@ Keep a specialist’s conversation across several delegations.
   : Turn an ellmer chat into a retained agent
 - [`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
   : Create a tool that calls a retained agent
+- [`background_tools()`](https://jameshwade.github.io/deputy/reference/background_tools.md)
+  : Create tools for running retained agents in the background
 - [`ContextFork()`](https://jameshwade.github.io/deputy/reference/ContextFork.md)
   : Capture conversation turns for a fork
 - [`fork_agent()`](https://jameshwade.github.io/deputy/reference/fork_agent.md)
@@ -462,6 +467,8 @@ Hand parts of a task to other agents.
   subagents](https://jameshwade.github.io/deputy/articles/delegation.md):
 - [Retained specialists and agent
   graphs](https://jameshwade.github.io/deputy/articles/retained-agents.md):
+- [Background
+  tasks](https://jameshwade.github.io/deputy/articles/background-tasks.md):
 
 ### In applications
 

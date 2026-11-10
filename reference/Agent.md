@@ -103,6 +103,8 @@ would exceed the checkpoint size limits is refused.
 
 - [`Agent$continue_agent_async()`](#method-Agent-continue_agent_async)
 
+- [`Agent$background_tasks()`](#method-Agent-background_tasks)
+
 - [`Agent$continue_agent()`](#method-Agent-continue_agent)
 
 - [`Agent$cancel_agent()`](#method-Agent-cancel_agent)
@@ -628,6 +630,33 @@ A promise that resolves to an
 [AgentResult](https://jameshwade.github.io/deputy/reference/AgentResult.md).
 If the task is cancelled before it starts, the result has zero usage and
 no run ID.
+
+------------------------------------------------------------------------
+
+### `Agent$background_tasks()`
+
+List the background tasks the agent's model started with the tools from
+[`background_tools()`](https://jameshwade.github.io/deputy/reference/background_tools.md)
+in its current run, or in its latest run when none is going. `state` is
+`"queued"`, `"running"`, `"cancelling"`, `"completed"`, `"failed"`,
+`"cancelled"`, `"stopped"` (a limit or a hook ended it) or `"rejected"`
+(refused when its turn came, with the reason in `error`). `"completed"`
+means the agent finished normally, not that it did the task well.
+`collected` says whether the model read the result with `task_wait`. A
+task the model cancelled has the `stop_reason` `"cancelled"` and the
+model's own reason, if it gave one, in `cancel_note`. Pass
+`delegation_id` to `$inspect_subagents()` or `$read_subagent_result()`
+for the task's history and outcome. A task that was cancelled or
+rejected before its turn came never ran, so nothing was recorded for it
+there.
+
+#### Usage
+
+    Agent$background_tasks()
+
+#### Returns
+
+A data frame with one row per task, oldest first.
 
 ------------------------------------------------------------------------
 

@@ -264,6 +264,8 @@ Keep a specialist’s conversation across several delegations.
   : Turn an ellmer chat into a retained agent
 - [`delegation_tool()`](https://jameshwade.github.io/deputy/reference/delegation_tool.md)
   : Create a tool that calls a retained agent
+- [`background_tools()`](https://jameshwade.github.io/deputy/reference/background_tools.md)
+  : Create tools for running retained agents in the background
 - [`ContextFork()`](https://jameshwade.github.io/deputy/reference/ContextFork.md)
   : Capture conversation turns for a fork
 - [`fork_agent()`](https://jameshwade.github.io/deputy/reference/fork_agent.md)

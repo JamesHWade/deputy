@@ -47,6 +47,7 @@ Inherited methods
 - [`Agent$add_hook()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-add_hook)
 - [`Agent$add_note()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-add_note)
 - [`Agent$add_turn()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-add_turn)
+- [`Agent$background_tasks()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-background_tasks)
 - [`Agent$cancel_agent()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-cancel_agent)
 - [`Agent$chat()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-chat)
 - [`Agent$chat_async()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-chat_async)

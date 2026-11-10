@@ -2,6 +2,33 @@
 
 ## deputy (development version)
 
+- Context size estimates count a tool result that hasn’t been sent to
+  the model yet with ellmer 0.5.1 and later. ellmer’s own count leaves
+  such a result out, so automatic compaction could start later than
+  configured.
+
+- New
+  [`background_tools()`](https://jameshwade.github.io/deputy/reference/background_tools.md)
+  lets an agent’s model run retained agents in the background. It
+  returns five tools: `task_start` starts a task and returns a task ID
+  at once, so the model can keep working; `task_wait` returns the
+  outcomes of whichever tasks have finished, without a model request
+  while it waits; `task_follow_up` sends the same agent another task in
+  the same conversation; `task_cancel` asks a task to stop; and
+  `task_status` reports progress. Each task’s `usage_limits` are set
+  aside from the run while it is pending, so the lead and its tasks
+  together stay within the run’s request and tool-call limits. Tasks end
+  with the run that started them: when the model stops, tasks still
+  waiting or running are cancelled and the run waits for them.
+  `Agent$background_tasks()` lists a run’s tasks, and
+  `$inspect_subagents()` and `$observe_subagents()` show their
+  conversations and activity. Not available to an agent with a
+  delegation graph or a
+  [`TrustedResults()`](https://jameshwade.github.io/deputy/reference/TrustedResults.md)
+  policy. See
+  [`vignette("background-tasks")`](https://jameshwade.github.io/deputy/articles/background-tasks.md)
+  and the `background-tasks` example.
+
 - `Agent$add_note()` adds a note to a turn of the conversation: content
   such as a label saying whether an answer’s citations were found in its
   sources. Notes are part of the conversation `$get_turns()` returns,

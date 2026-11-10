@@ -4,6 +4,7 @@ pkgdown_sha: ~
 articles:
   approvals: approvals.html
   background-jobs: background-jobs.html
+  background-tasks: background-tasks.html
   code-execution: code-execution.html
   conversations: conversations.html
   delegation: delegation.html
@@ -21,7 +22,7 @@ articles:
   structured-output: structured-output.html
   tools: tools.html
   trusted-mini-agents: trusted-mini-agents.html
-last_built: 2026-10-25T21:25Z
+last_built: 2026-11-10T01:52Z
 urls:
   reference: https://jameshwade.github.io/deputy/reference
   article: https://jameshwade.github.io/deputy/articles

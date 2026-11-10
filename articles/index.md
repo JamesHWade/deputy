@@ -32,6 +32,8 @@ Hand parts of a task to other agents.
   subagents](https://jameshwade.github.io/deputy/articles/delegation.md):
 - [Retained specialists and agent
   graphs](https://jameshwade.github.io/deputy/articles/retained-agents.md):
+- [Background
+  tasks](https://jameshwade.github.io/deputy/articles/background-tasks.md):
 
 ### In applications
 

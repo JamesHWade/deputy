@@ -53,6 +53,7 @@
     <li><a class="dropdown-item" href="../articles/multi-agent.html">Subagents</a></li>
     <li><a class="dropdown-item" href="../articles/delegation.html">Briefing and inspecting subagents</a></li>
     <li><a class="dropdown-item" href="../articles/retained-agents.html">Retained specialists and agent graphs</a></li>
+    <li><a class="dropdown-item" href="../articles/background-tasks.html">Background tasks</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>In applications</h6></li>
     <li><a class="dropdown-item" href="../articles/example-shiny-chat.html">Shiny chat</a></li>
@@ -176,6 +177,10 @@ budget and everything else are fixed by your code:</p>
 <p>Every call continues the same conversation, whether the model or your
 code makes it. The tool returns the same compact <a href="delegation.html#what-a-delegation-returns">outcome</a> as ordinary
 delegation.</p>
+<p>The model waits for the specialist’s answer before it does anything
+else. To let it start a task, keep working and collect the result later,
+give it <a href="background-tasks.html">background tasks</a>
+instead.</p>
 <p>The specialist keeps its own permissions, and each of its tool calls
 must also pass the owner’s current permissions. An owner in read-only or
 plan mode can still use the tool, and the specialist is then held to

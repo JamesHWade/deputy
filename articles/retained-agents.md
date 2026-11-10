@@ -90,6 +90,12 @@ code makes it. The tool returns the same compact
 [outcome](https://jameshwade.github.io/deputy/articles/delegation.html#what-a-delegation-returns)
 as ordinary delegation.
 
+The model waits for the specialist’s answer before it does anything
+else. To let it start a task, keep working and collect the result later,
+give it [background
+tasks](https://jameshwade.github.io/deputy/articles/background-tasks.md)
+instead.
+
 The specialist keeps its own permissions, and each of its tool calls
 must also pass the owner’s current permissions. An owner in read-only or
 plan mode can still use the tool, and the specialist is then held to
