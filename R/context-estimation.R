@@ -1,5 +1,6 @@
 # ellmer 0.5.0 cannot build its token-preview table when retained tool results
-# have no subsequent assistant response. Ask its public estimator using the
+# have no subsequent assistant response, and later releases leave those
+# results out of a complete count. Ask its public estimator using the
 # last completed pair (whose reported input includes prior context), plus
 # subsequent content. This view is only for estimation; canonical turns stay
 # intact and no provider encoding or synthetic response is introduced.

@@ -1,5 +1,9 @@
 # deputy (development version)
 
+* Context size estimates count a tool result that hasn't been sent to the
+  model yet with ellmer 0.5.1 and later. ellmer's own count leaves such a
+  result out, so automatic compaction could start later than configured.
+
 * New `background_tools()` lets an agent's model run retained agents in the
   background. It returns five tools: `task_start` starts a task and returns a
   task ID at once, so the model can keep working; `task_wait` returns the

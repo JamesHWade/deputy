@@ -63,6 +63,10 @@ install_from_github "tidyverse/ellmer" "ellmer"
 # Persist PATH for subsequent bash commands in this session
 if [ -n "$CLAUDE_ENV_FILE" ]; then
   echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$CLAUDE_ENV_FILE"
+  # The container's default locale is not UTF-8, and tests that read or
+  # compare non-ASCII text fail under it.
+  echo 'export LANG=C.UTF-8' >> "$CLAUDE_ENV_FILE"
+  echo 'export LC_ALL=C.UTF-8' >> "$CLAUDE_ENV_FILE"
 fi
 
 echo "R $(R --version | head -1) installed"
