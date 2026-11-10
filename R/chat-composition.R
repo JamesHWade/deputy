@@ -210,7 +210,8 @@ composition_invocation_id <- function(tool, arguments) {
     is.null(request) ||
       !identical(source, tool) ||
       !identical(request@name, tool@name) ||
-      !identical(request@arguments$task, arguments$task) ||
+      # Exact names: `$` would match another argument that starts with "task".
+      !identical(request@arguments[["task"]], arguments[["task"]]) ||
       !is_nonempty_string(request@id)
   ) {
     conversation_abort(

@@ -34,6 +34,23 @@ uncached_usage_summary <- function(chat) {
   provider_usage_summary_for(chat, chat$get_turns(), FALSE)
 }
 
+# ellmer 0.5.0's get_tokens() fails on a history with a tool result that has
+# no following response; later releases fixed it. Tests of how that failure is
+# observed and avoided only apply where it still happens.
+skip_unless_unpaired_token_table_fails <- function() {
+  chat <- probe_chat()
+  chat$set_turns(list(
+    probe_user(),
+    probe_assistant(10, 5, 0.01),
+    probe_tool_result_turn()
+  ))
+  fails <- inherits(try(chat$get_tokens(), silent = TRUE), "try-error")
+  testthat::skip_if_not(
+    fails,
+    "This ellmer builds a token table for an unpaired tool result."
+  )
+}
+
 test_that("usage summaries are reused only while the turn list is unchanged", {
   chat <- probe_chat()
   chat$set_turns(list(probe_user(), probe_assistant(10, 5, 0.01)))
@@ -103,6 +120,7 @@ test_that("usage summaries are not cached for replaced token methods", {
 
 test_that("unpaired token tables use the same fallback once observed", {
   local_ellmer_observations()
+  skip_unless_unpaired_token_table_fails()
   shapes <- list(
     list(probe_user(), probe_assistant(10, 5, 0.01), probe_tool_result_turn()),
     list(
@@ -222,6 +240,7 @@ test_that("token-count observations expire when namespaces change", {
 
 test_that("other token-count failures are not recorded as unsupported", {
   local_ellmer_observations()
+  skip_unless_unpaired_token_table_fails()
   chat <- probe_chat()
   chat$set_turns(list(
     probe_user(),

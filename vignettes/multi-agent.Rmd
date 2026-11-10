@@ -107,7 +107,9 @@ updates the list of subagents in the lead's system prompt.
 
 When the lead delegates, the subagent runs to completion and its answer comes
 back as the result of the `delegate_to_agent` call. When the model delegates
-several tasks in one turn, they can run concurrently.
+several tasks in one turn, they can run concurrently. The lead waits either
+way; to let its model keep working while a specialist runs, see
+[Background tasks](background-tasks.html).
 
 ### Choose each subagent's model
 
@@ -339,4 +341,6 @@ its lead.
 - [Retained specialists and agent graphs](retained-agents.html): keep a
   specialist's conversation across several tasks, and let specialists delegate
   to each other.
+- [Background tasks](background-tasks.html): let the lead's model start work
+  on a retained agent, carry on while it runs, and collect or cancel it later.
 - [Multi-agent code review](example-code-review.html): a complete example.

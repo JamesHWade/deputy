@@ -112,6 +112,7 @@ hooks with \verb{$add_hook()}.}
     \item \href{#method-Agent-delegation_graph_usage}{\code{Agent$delegation_graph_usage()}}
     \item \href{#method-Agent-release_agent_graph}{\code{Agent$release_agent_graph()}}
     \item \href{#method-Agent-continue_agent_async}{\code{Agent$continue_agent_async()}}
+    \item \href{#method-Agent-background_tasks}{\code{Agent$background_tasks()}}
     \item \href{#method-Agent-continue_agent}{\code{Agent$continue_agent()}}
     \item \href{#method-Agent-cancel_agent}{\code{Agent$cancel_agent()}}
     \item \href{#method-Agent-release_agent}{\code{Agent$release_agent()}}
@@ -454,6 +455,33 @@ fails the waiting ones.}
   \subsection{Returns}{
     A promise that resolves to an \link{AgentResult}. If the task is
 cancelled before it starts, the result has zero usage and no run ID.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Agent-background_tasks"></a>}}
+\if{latex}{\out{\hypertarget{method-Agent-background_tasks}{}}}
+\subsection{\code{Agent$background_tasks()}}{
+  List the background tasks the agent's model started with the tools
+from \code{\link[=background_tools]{background_tools()}} in its current run, or in its latest run when
+none is going. \code{state} is \code{"queued"}, \code{"running"}, \code{"cancelling"},
+\code{"completed"}, \code{"failed"}, \code{"cancelled"}, \code{"stopped"} (a limit or a
+hook ended it) or \code{"rejected"} (refused when its turn came, with the
+reason in \code{error}). \code{"completed"} means the agent finished normally,
+not that it did the task well. \code{collected} says whether the model read
+the result with \code{task_wait}. A task the model cancelled has the
+\code{stop_reason} \code{"cancelled"} and the model's own reason, if it gave one,
+in \code{cancel_note}. Pass \code{delegation_id} to
+\verb{$inspect_subagents()} or \verb{$read_subagent_result()} for the task's
+history and outcome. A task that was cancelled or rejected before its
+turn came never ran, so nothing was recorded for it there.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{Agent$background_tasks()}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A data frame with one row per task, oldest first.
   }
 }
 

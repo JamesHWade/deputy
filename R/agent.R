@@ -486,6 +486,25 @@ Agent <- R6::R6Class(
     },
 
     #' @description
+    #' List the background tasks the agent's model started with the tools
+    #' from [background_tools()] in its current run, or in its latest run when
+    #' none is going. `state` is `"queued"`, `"running"`, `"cancelling"`,
+    #' `"completed"`, `"failed"`, `"cancelled"`, `"stopped"` (a limit or a
+    #' hook ended it) or `"rejected"` (refused when its turn came, with the
+    #' reason in `error`). `"completed"` means the agent finished normally,
+    #' not that it did the task well. `collected` says whether the model read
+    #' the result with `task_wait`. A task the model cancelled has the
+    #' `stop_reason` `"cancelled"` and the model's own reason, if it gave one,
+    #' in `cancel_note`. Pass `delegation_id` to
+    #' `$inspect_subagents()` or `$read_subagent_result()` for the task's
+    #' history and outcome. A task that was cancelled or rejected before its
+    #' turn came never ran, so nothing was recorded for it there.
+    #' @return A data frame with one row per task, oldest first.
+    background_tasks = function() {
+      background_tasks_frame(self)
+    },
+
+    #' @description
     #' Blocking version of `$continue_agent_async()`.
     #' @param handle,task,usage_limits,queue See `$continue_agent_async()`.
     #' @return An [AgentResult].
@@ -2868,6 +2887,11 @@ Agent <- R6::R6Class(
       delegation_scope = list(),
       delegation_max_bytes = 65536L,
       delegation_usage_reservations = list(),
+      # The task registry behind background_tools(), and the delegations whose
+      # reservations the owner's own limit checks subtract
+      # (R/background-tasks.R).
+      .background = NULL,
+      background_reservations = character(),
       .conversation_owner = NULL,
       .delegation_tree = NULL,
       .delegation_ancestors = NULL,
@@ -3058,6 +3082,13 @@ Agent <- R6::R6Class(
         if (identical(name, ".delegation_observe")) {
           return(NULL)
         }
+        # Background tools belong to the agent they were made for.
+        if (identical(name, ".background")) {
+          return(NULL)
+        }
+        if (identical(name, "background_reservations")) {
+          return(character())
+        }
         if (identical(name, ".chat") && is.function(value$clone)) {
           return(clone_governed_chat(value))
         }
@@ -3243,13 +3274,21 @@ Agent <- R6::R6Class(
               "Delegation tools require their owner's active governed run."
             )
           }
+          control <- attr(tool, "deputy_background_control", exact = TRUE)
+          if (is.function(control)) {
+            return(control(arguments))
+          }
           correlation <- private$claim_delegation(
             tool_name = tool@name,
             tool_call_id = execution_id,
             required = TRUE
           )
+          background <- attr(tool, "deputy_background_invoke", exact = TRUE)
+          if (is.function(background)) {
+            return(background(arguments, correlation))
+          }
           invoke <- attr(tool, "deputy_composition_invoke", exact = TRUE)
-          return(invoke(arguments$task, correlation))
+          return(invoke(arguments[["task"]], correlation))
         }
         validate_mcp_tool_owner(tool, self, private$effective_run_context())
         validate_r_session_tool_owner(
@@ -3666,16 +3705,23 @@ Agent <- R6::R6Class(
           usage
         )
         if (!is.null(private$current_usage_limits)) {
-          limit_status <- usage_limit_status(
-            private$current_run_usage(),
-            private$current_usage_limits,
-            require_followup = TRUE
-          )
+          limit_status <- private$limit_status(require_followup = TRUE)
           if (!is.null(limit_status)) {
             private$mark_usage_limit(limit_status)
           }
         }
         invisible(TRUE)
+      },
+
+      # The run's limit status for the agent's own next step: what unsettled
+      # background tasks have set aside is not the agent's to use.
+      limit_status = function(require_followup = FALSE, usage = NULL) {
+        background_limit_status(
+          private,
+          usage %||% private$current_run_usage(),
+          private$current_usage_limits %||% self$usage_limits,
+          require_followup
+        )
       },
 
       mark_usage_limit = function(status) {

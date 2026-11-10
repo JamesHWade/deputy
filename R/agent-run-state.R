@@ -64,6 +64,7 @@ initialize_agent_run <- function(
   private$current_tool_calls <- 0L
   private$current_tool_results <- 0L
   private$current_outer_requests <- 0L
+  background_reset(agent)
   private$current_external_usage <- if (is.null(private$.approval_resume)) {
     initial_usage
   } else {

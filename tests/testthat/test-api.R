@@ -44,6 +44,7 @@ test_that("public API is deliberate", {
     "delegation_history",
     "adopt_chat",
     "delegation_tool",
+    "background_tools",
     "McpConnection",
     "RSession",
     "AgentDefinition",

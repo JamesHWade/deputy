@@ -45,7 +45,8 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       usage <- private$current_run_usage()
       limits <- private$current_usage_limits %||% self$usage_limits
       limit_status <- tree_usage_status(self) %||%
-        usage_limit_status(
+        background_limit_status(
+          private,
           usage,
           limits,
           require_followup = TRUE

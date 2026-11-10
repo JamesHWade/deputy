@@ -39,6 +39,7 @@ its answer. See \code{vignette("multi-agent")}.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_hook"><a href='../../deputy/html/Agent.html#method-Agent-add_hook'><code>Agent$add_hook()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_note"><a href='../../deputy/html/Agent.html#method-Agent-add_note'><code>Agent$add_note()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="add_turn"><a href='../../deputy/html/Agent.html#method-Agent-add_turn'><code>Agent$add_turn()</code></a></span></li>
+  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="background_tasks"><a href='../../deputy/html/Agent.html#method-Agent-background_tasks'><code>Agent$background_tasks()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="cancel_agent"><a href='../../deputy/html/Agent.html#method-Agent-cancel_agent'><code>Agent$cancel_agent()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat"><a href='../../deputy/html/Agent.html#method-Agent-chat'><code>Agent$chat()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="chat_async"><a href='../../deputy/html/Agent.html#method-Agent-chat_async'><code>Agent$chat_async()</code></a></span></li>

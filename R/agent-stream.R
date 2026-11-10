@@ -495,6 +495,10 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       }
       state$finished <- TRUE
       graph_cancel_descendants(self, "parent_completed", by = "parent")
+      # A run's body joins its background tasks before it gets here. A run
+      # that never reached that point, such as a stream dropped unread, still
+      # asks them to stop; they settle on their own.
+      background_join(self, "parent_completed")
       on.exit(finish_run_trace(state), add = TRUE)
       on.exit(remove_request_callbacks(private$.chat), add = TRUE)
       on.exit(
@@ -942,6 +946,11 @@ governed_run_stream <- coro::async_generator(function(
             if (is.null(structured)) "stream" else "structured_output",
           stream_error
         )
+        # Background tasks end with the run that started them.
+        joined <- background_join(agent, "parent_failed")
+        if (promises::is.promising(joined)) {
+          coro::await(joined)
+        }
         rlang::cnd_signal(stream_error)
       }
 
@@ -1014,6 +1023,19 @@ governed_run_stream <- coro::async_generator(function(
       if (!isTRUE(is_generator)) {
         break
       }
+    }
+    # The pass is over, so nothing can collect a background task now: they
+    # are stopped and settle before the run does, and its usage has theirs.
+    joined <- background_join(
+      agent,
+      if (agent$.__enclos_env__$private$should_stop) {
+        agent$.__enclos_env__$private$stop_reason_from_hook %||% "interrupted"
+      } else {
+        "parent_completed"
+      }
+    )
+    if (promises::is.promising(joined)) {
+      coro::await(joined)
     }
     if (
       !is.null(extraction) &&

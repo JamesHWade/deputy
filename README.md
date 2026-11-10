@@ -98,7 +98,9 @@ file and shows how to undo what it wrote.
   subagents’ tool calls appear in the same conversation and are saved
   with it.
 - [Subagents](https://jameshwade.github.io/deputy/articles/multi-agent.html)
-  with their own prompts, tools, permissions and budgets.
+  with their own prompts, tools, permissions and budgets, and
+  [background tasks](https://jameshwade.github.io/deputy/articles/background-tasks.html)
+  that let a lead keep working while its specialists run.
 - [Sandboxed code
   execution](https://jameshwade.github.io/deputy/articles/code-execution.html)
   through mcp-repl and MCP Console, and tools from any [MCP

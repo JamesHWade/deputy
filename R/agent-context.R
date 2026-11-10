@@ -374,9 +374,21 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
         }
       }
 
-      count <- chat_token_count(chat, messages)
-      if (is.null(count) && !ellmer_token_count_unsupported(chat)) {
+      # ellmer's complete count is the last response's reported tokens plus
+      # the new messages. Content kept after that response, such as a tool
+      # result whose request was never sent, is in neither, so it is counted
+      # with the new messages. ellmer 0.5.0 failed on such a history instead.
+      count <- NULL
+      if (
+        is_ellmer_token_count(chat) && !ellmer_token_count_unsupported(chat)
+      ) {
         count <- context_count_after_unpaired_result(chat, messages)
+      }
+      if (is.null(count)) {
+        count <- chat_token_count(chat, messages)
+        if (is.null(count) && !ellmer_token_count_unsupported(chat)) {
+          count <- context_count_after_unpaired_result(chat, messages)
+        }
       }
       if (!is.numeric(count) || length(count) == 0L || anyNA(count)) {
         return(NULL)

@@ -855,6 +855,9 @@ usage_limit_message <- function(status) {
     status$actual,
     " / ",
     status$limit,
+    if (isTRUE(status$reserved > 0)) {
+      paste0(" (", status$reserved, " set aside for background tasks)")
+    },
     "."
   )
 }

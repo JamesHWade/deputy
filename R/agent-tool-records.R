@@ -88,9 +88,9 @@ deputy_agent_tool_records_methods <- function(self = NULL, private = NULL) {
           r_session_generation = extracted$r_session_generation %||% NULL,
           delegation_id = if (
             identical(tool_name, "delegate_to_agent") ||
-              !is.null(composition_tool_owner(private$.chat$get_tools()[[
+              composition_tool_delegates(private$.chat$get_tools()[[
                 tool_name
-              ]]))
+              ]])
           ) {
             new_deputy_id("delegation_")
           } else {
