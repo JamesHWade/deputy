@@ -100,7 +100,7 @@ background_tools <- function(
       !length(agents) ||
       is.null(names) ||
       anyNA(names) ||
-      any(!nzchar(trimws(names))) ||
+      !all(nzchar(trimws(names))) ||
       anyDuplicated(names) ||
       anyDuplicated(unname(agents))
   ) {
