@@ -209,6 +209,43 @@ LeadAgent <- R6::R6Class(
       invisible(self)
     },
 
+    #' @description Replace the lead's system prompt while keeping its
+    #'   generated subagent routing section. Loaded skills and the compaction
+    #'   summary follow [Agent] `$set_system_prompt()` behavior.
+    #' @param value The new system prompt, as one or more strings, or `NULL`.
+    #' @param keep_summary Keep the compaction summary. With `FALSE`, the
+    #'   summary is dropped unless `value` contains it.
+    #' @return The lead, invisibly.
+    set_system_prompt = function(value, keep_summary = TRUE) {
+      if (!(is.null(value) || is.character(value))) {
+        return(super$set_system_prompt(value, keep_summary))
+      }
+
+      definitions <- private$.sub_agent_defs
+      if (is.null(value) && length(definitions) == 0L) {
+        return(super$set_system_prompt(NULL, keep_summary))
+      }
+
+      prompt <- if (is.null(value)) {
+        NULL
+      } else {
+        paste(value, collapse = "\n\n")
+      }
+      if (
+        length(definitions) == 0L &&
+          (is.null(prompt) ||
+            !grepl(deputy_lead_routing_start_marker, prompt, fixed = TRUE))
+      ) {
+        return(super$set_system_prompt(value, keep_summary))
+      }
+
+      if (!is.null(prompt) && !nzchar(trimws(prompt))) {
+        prompt <- NULL
+      }
+      prompt <- private$replace_lead_prompt(prompt, definitions)
+      super$set_system_prompt(prompt, keep_summary)
+    },
+
     #' @description
     #' Replace the sources a subagent can be given as evidence, for example
     #' when a drawing is revised or a document is added during a conversation.

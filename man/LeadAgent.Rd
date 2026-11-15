@@ -24,6 +24,7 @@ its answer. See \code{vignette("multi-agent")}.
 \subsection{Public methods}{
   \itemize{
     \item \href{#method-LeadAgent-initialize}{\code{LeadAgent$new()}}
+    \item \href{#method-LeadAgent-set_system_prompt}{\code{LeadAgent$set_system_prompt()}}
     \item \href{#method-LeadAgent-set_delegation_sources}{\code{LeadAgent$set_delegation_sources()}}
     \item \href{#method-LeadAgent-register_sub_agent}{\code{LeadAgent$register_sub_agent()}}
     \item \href{#method-LeadAgent-available_sub_agents}{\code{LeadAgent$available_sub_agents()}}
@@ -104,7 +105,6 @@ its answer. See \code{vignette("multi-agent")}.
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_context_policy"><a href='../../deputy/html/Agent.html#method-Agent-set_context_policy'><code>Agent$set_context_policy()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_model"><a href='../../deputy/html/Agent.html#method-Agent-set_model'><code>Agent$set_model()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_permission_mode"><a href='../../deputy/html/Agent.html#method-Agent-set_permission_mode'><code>Agent$set_permission_mode()</code></a></span></li>
-  <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_system_prompt"><a href='../../deputy/html/Agent.html#method-Agent-set_system_prompt'><code>Agent$set_system_prompt()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_tools"><a href='../../deputy/html/Agent.html#method-Agent-set_tools'><code>Agent$set_tools()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="set_turns"><a href='../../deputy/html/Agent.html#method-Agent-set_turns'><code>Agent$set_turns()</code></a></span></li>
   <li><span class="pkg-link" data-pkg="deputy" data-topic="Agent" data-id="skills"><a href='../../deputy/html/Agent.html#method-Agent-skills'><code>Agent$skills()</code></a></span></li>
@@ -216,6 +216,32 @@ turns with \verb{$add_note()}; see \link{Agent}.}
   }
   \subsection{Returns}{
     A new \code{LeadAgent} object
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-LeadAgent-set_system_prompt"></a>}}
+\if{latex}{\out{\hypertarget{method-LeadAgent-set_system_prompt}{}}}
+\subsection{\code{LeadAgent$set_system_prompt()}}{
+  Replace the lead's system prompt while keeping its
+generated subagent routing section. Loaded skills and the compaction
+summary follow \link{Agent} \verb{$set_system_prompt()} behavior.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{LeadAgent$set_system_prompt(value, keep_summary = TRUE)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{value}}{The new system prompt, as one or more strings, or \code{NULL}.}
+      \item{\code{keep_summary}}{Keep the compaction summary. With \code{FALSE}, the
+summary is dropped unless \code{value} contains it.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    The lead, invisibly.
   }
 }
 

@@ -72,6 +72,100 @@ test_that("Agent initializes with system prompt", {
   expect_equal(mock_chat$get_system_prompt(), "You are a helpful assistant.")
 })
 
+test_that("reinitializing an Agent starts with the supplied configuration", {
+  skill_tool <- ellmer::tool(
+    fun = function() "from skill",
+    name = "skill_tool",
+    description = "Return the skill value.",
+    arguments = list()
+  )
+  supplied_tool <- ellmer::tool(
+    fun = function() "from supplied chat",
+    name = "supplied_chat_tool",
+    description = "Return the supplied Chat value.",
+    arguments = list()
+  )
+  chat <- create_mock_chat()
+  agent <- Agent$new(chat, system_prompt = "Original prompt.")
+  suppressMessages(agent$load_skill(Skill(
+    "plain",
+    prompt = "Use plain words.",
+    tools = list(skill_tool)
+  )))
+  agent$add_hook(HookMatcher(
+    event = "PreToolUse",
+    callback = function(...) NULL
+  ))
+
+  agent$initialize(chat, system_prompt = "Fresh prompt.")
+
+  expect_identical(agent$skills(), list())
+  expect_identical(agent$get_system_prompt(), "Fresh prompt.")
+  expect_named(agent$get_tools(), "skill_tool")
+  expect_equal(agent$hooks$count(), 0L)
+
+  agent$set_system_prompt("Replacement prompt.")
+  expect_identical(agent$get_system_prompt(), "Replacement prompt.")
+
+  supplied_chat <- create_mock_chat()
+  supplied_chat$set_system_prompt("Supplied Chat prompt.")
+  supplied_chat$register_tool(supplied_tool)
+  agent$initialize(supplied_chat)
+
+  expect_identical(agent$skills(), list())
+  expect_identical(agent$get_system_prompt(), "Supplied Chat prompt.")
+  expect_named(agent$get_tools(), "supplied_chat_tool")
+})
+
+test_that("failed reinitialization restores skills and conversation state", {
+  chat <- create_mock_chat()
+  original_turns <- list(
+    create_mock_user_turn("Original question"),
+    create_mock_assistant_turn("Original answer")
+  )
+  chat$set_turns(original_turns)
+  agent <- Agent$new(chat, system_prompt = "Original prompt.")
+  suppressMessages(agent$load_skill(Skill(
+    "plain",
+    prompt = "Use plain words."
+  )))
+  original_prompt <- agent$get_system_prompt()
+  original_skills <- agent$skills()
+  original_tools <- agent$get_tools()
+
+  incoming_chat <- create_mock_chat()
+  incoming_chat$set_system_prompt("Supplied prompt.")
+  supplied_tool <- ellmer::tool(
+    fun = function() "supplied",
+    name = "supplied_tool",
+    description = "Return the supplied value.",
+    arguments = list()
+  )
+  incoming_chat$register_tool(supplied_tool)
+  register_request <- incoming_chat$on_tool_request
+  incoming_chat$on_tool_request <- function(callback) {
+    stop("tool request registration failed")
+  }
+
+  expect_error(
+    agent$initialize(incoming_chat, system_prompt = "Attempted prompt."),
+    "tool request registration failed",
+    class = "simpleError"
+  )
+
+  expect_identical(agent$skills(), original_skills)
+  expect_identical(agent$get_system_prompt(), original_prompt)
+  expect_identical(agent$get_turns(), original_turns)
+  expect_identical(agent$get_tools(), original_tools)
+  expect_identical(incoming_chat$get_system_prompt(), "Supplied prompt.")
+  expect_named(incoming_chat$get_tools(), "supplied_tool")
+  expect_identical(chat_owners(chat), list(agent))
+  expect_length(chat_owners(incoming_chat), 0L)
+
+  incoming_chat$on_tool_request <- register_request
+  expect_no_error(Agent$new(incoming_chat))
+})
+
 test_that("Agent register_tool works", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat)

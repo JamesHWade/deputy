@@ -531,6 +531,112 @@ test_that("LeadAgent system prompt contains sub-agent info", {
   expect_true(grepl("delegate_to_agent", prompt))
 })
 
+test_that("LeadAgent set_system_prompt keeps routing, skills, and summaries", {
+  chat <- ellmer::chat_openai(
+    model = "gpt-4o-mini",
+    credentials = function() "unused"
+  )
+  chat$set_turns(list(
+    create_mock_user_turn("Question 1"),
+    create_mock_assistant_turn("Answer 1"),
+    create_mock_user_turn("Question 2")
+  ))
+  lead <- LeadAgent$new(
+    chat = chat,
+    sub_agents = list(agent_definition(
+      name = "first",
+      description = "First helper",
+      prompt = "You are the first helper"
+    )),
+    system_prompt = "Lead base."
+  )
+  suppressMessages(lead$load_skill(Skill(
+    "plain",
+    prompt = "Use plain words."
+  )))
+  suppressMessages(lead$compact(keep_last = 1L, summary = "Earlier answers."))
+
+  before_invalid_prompt <- lead$get_system_prompt()
+  expect_error(lead$set_system_prompt(1), class = "rlang_error")
+  expect_identical(lead$get_system_prompt(), before_invalid_prompt)
+  lead$set_system_prompt(c("Part one.", "Part two."))
+
+  expect_match(
+    lead$get_system_prompt(),
+    "Part one.\n\nPart two.",
+    fixed = TRUE
+  )
+  expect_match(lead$get_system_prompt(), "first", fixed = TRUE)
+  expect_match(
+    lead$get_system_prompt(),
+    "# Skill: plain\nUse plain words.",
+    fixed = TRUE
+  )
+  expect_match(lead$get_system_prompt(), "Earlier answers.", fixed = TRUE)
+
+  lead$set_system_prompt(lead$get_system_prompt())
+  suppressMessages(lead$register_sub_agent(agent_definition(
+    name = "second",
+    description = "Second helper",
+    prompt = "You are the second helper"
+  )))
+  expect_match(lead$get_system_prompt(), "First helper", fixed = TRUE)
+  expect_match(lead$get_system_prompt(), "Second helper", fixed = TRUE)
+  expect_equal(
+    sum(
+      gregexpr(
+        "<!-- deputy-lead-routing:v1:start -->",
+        lead$get_system_prompt(),
+        fixed = TRUE
+      )[[1L]] >
+        0L
+    ),
+    1L
+  )
+  expect_equal(
+    sum(
+      gregexpr(
+        "<!-- deputy-lead-routing:v1:end -->",
+        lead$get_system_prompt(),
+        fixed = TRUE
+      )[[1L]] >
+        0L
+    ),
+    1L
+  )
+
+  lead$set_system_prompt(NULL)
+  expect_match(lead$get_system_prompt(), "Second helper", fixed = TRUE)
+  expect_match(lead$get_system_prompt(), "Earlier answers.", fixed = TRUE)
+  expect_equal(
+    sum(
+      gregexpr(
+        "<!-- deputy-lead-routing:v1:start -->",
+        lead$get_system_prompt(),
+        fixed = TRUE
+      )[[1L]] >
+        0L
+    ),
+    1L
+  )
+
+  lead$set_system_prompt("Fresh lead base.", keep_summary = FALSE)
+  expect_match(lead$get_system_prompt(), "Fresh lead base.", fixed = TRUE)
+  expect_match(lead$get_system_prompt(), "Use plain words.", fixed = TRUE)
+  expect_no_match(lead$get_system_prompt(), "Earlier answers.", fixed = TRUE)
+  expect_equal(
+    sum(
+      gregexpr(
+        "<!-- deputy-lead-routing:v1:start -->",
+        lead$get_system_prompt(),
+        fixed = TRUE
+      )[[1L]] >
+        0L
+    ),
+    1L
+  )
+})
+
 test_that("LeadAgent register_sub_agent updates system prompt", {
   mock_chat <- create_mock_chat()
 

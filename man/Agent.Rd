@@ -285,6 +285,15 @@ note you add. A note is usually an instance of your own subclass of
     }
     \if{html}{\out{</div>}}
   }
+  \subsection{Details}{
+    A successful call to \verb{$initialize()} on an existing Agent
+starts a new configuration: hooks and the loaded-skill registry are
+reset. Any prompt and tools already on the supplied Chat are ordinary
+configuration; \code{system_prompt}, when supplied, replaces its prompt.
+Skills are not restored from the old registry, so load any needed
+skills after initializing. A failed reinitialization restores the
+previous Agent, Chat, prompt, tools, and conversation.
+  }
   \subsection{Returns}{
     A new \code{Agent} object.
   }
