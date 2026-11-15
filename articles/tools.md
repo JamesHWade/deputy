@@ -239,9 +239,15 @@ skill_check_requirements(concise)$ok
 prompt and registers the skill’s tools under the agent’s current
 permissions. Missing packages produce a warning, and a tool name that
 clashes with an existing tool is an error unless you pass
-`allow_conflicts = TRUE`. `agent$skills()` lists what’s loaded. A loaded
-skill stays loaded: `agent$set_system_prompt()` adds its prompt back
-after the new prompt, so to drop a skill, start a new agent.
+`allow_conflicts = TRUE`. `agent$skills()` lists what’s loaded. While a
+skill is loaded, `agent$set_system_prompt()` keeps its prompt after the
+new prompt. A successful call to `$initialize()` on an existing agent
+starts a new configuration and clears the loaded-skill list. The
+supplied Chat’s tools remain ordinary configuration, and its prompt is
+used unless you pass `system_prompt`; Deputy does not reload skills from
+the old registry. Load any needed skills after initializing. Use a fresh
+Chat if you also want to discard tools that were already on the supplied
+Chat.
 
 Skills can also live in a directory with a `SKILL.md` prompt and a
 `SKILL.yaml` that lists tools and requirements. Deputy ships two:

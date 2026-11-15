@@ -65,6 +65,14 @@
   error for the second. Routes between the agents of a
   `retain_agent_graph()` still refuse a busy agent.
 
+- `Agent$initialize()` starts a new configuration on success and clears
+  the loaded-skill registry. The supplied Chat’s existing prompt and
+  tools are ordinary configuration, with `system_prompt` replacing its
+  prompt when supplied; load needed skills after initialization. A
+  failed reinitialization restores the existing Agent, Chat, prompt,
+  tools and conversation
+  ([\#256](https://github.com/JamesHWade/deputy/issues/256)).
+
 - `Agent$set_system_prompt()` keeps the compaction summary at the end of
   the new prompt, as compaction put it there, so changing the prompt
   after a compaction no longer makes the model forget what the removed
@@ -116,6 +124,11 @@
   prompt that the new value already contains is not added twice. A skill
   that is loaded again moves to the end, so `$skills()` lists skills in
   the order they were last loaded.
+
+- `LeadAgent$set_system_prompt()` keeps the generated subagent routing
+  section when replacing the base prompt. Loaded skill prompts and the
+  compaction summary follow `Agent$set_system_prompt()` behavior
+  ([\#256](https://github.com/JamesHWade/deputy/issues/256)).
 
 - [`subagent_chat_activity()`](https://jameshwade.github.io/deputy/reference/subagent_chat_activity.md)
   and

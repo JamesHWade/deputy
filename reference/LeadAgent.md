@@ -26,6 +26,8 @@ its answer. See
 
 - [`LeadAgent$new()`](#method-LeadAgent-initialize)
 
+- [`LeadAgent$set_system_prompt()`](#method-LeadAgent-set_system_prompt)
+
 - [`LeadAgent$set_delegation_sources()`](#method-LeadAgent-set_delegation_sources)
 
 - [`LeadAgent$register_sub_agent()`](#method-LeadAgent-register_sub_agent)
@@ -112,7 +114,6 @@ Inherited methods
 - [`Agent$set_context_policy()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_context_policy)
 - [`Agent$set_model()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_model)
 - [`Agent$set_permission_mode()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_permission_mode)
-- [`Agent$set_system_prompt()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_system_prompt)
 - [`Agent$set_tools()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_tools)
 - [`Agent$set_turns()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-set_turns)
 - [`Agent$skills()`](https://jameshwade.github.io/deputy/reference/Agent.html#method-skills)
@@ -313,6 +314,34 @@ Create a new LeadAgent.
 #### Returns
 
 A new `LeadAgent` object
+
+------------------------------------------------------------------------
+
+### `LeadAgent$set_system_prompt()`
+
+Replace the lead's system prompt while keeping its generated subagent
+routing section. Loaded skills and the compaction summary follow
+[Agent](https://jameshwade.github.io/deputy/reference/Agent.md)
+`$set_system_prompt()` behavior.
+
+#### Usage
+
+    LeadAgent$set_system_prompt(value, keep_summary = TRUE)
+
+#### Arguments
+
+- `value`:
+
+  The new system prompt, as one or more strings, or `NULL`.
+
+- `keep_summary`:
+
+  Keep the compaction summary. With `FALSE`, the summary is dropped
+  unless `value` contains it.
+
+#### Returns
+
+The lead, invisibly.
 
 ------------------------------------------------------------------------
 

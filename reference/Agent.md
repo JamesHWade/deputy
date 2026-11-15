@@ -427,6 +427,16 @@ Create a new agent.
   note you add. A note is usually an instance of your own subclass of
   [ellmer::ContentText](https://ellmer.tidyverse.org/reference/Content.html).
 
+#### Details
+
+A successful call to `$initialize()` on an existing Agent starts a new
+configuration: hooks and the loaded-skill registry are reset. Any prompt
+and tools already on the supplied Chat are ordinary configuration;
+`system_prompt`, when supplied, replaces its prompt. Skills are not
+restored from the old registry, so load any needed skills after
+initializing. A failed reinitialization restores the previous Agent,
+Chat, prompt, tools, and conversation.
+
 #### Returns
 
 A new `Agent` object.

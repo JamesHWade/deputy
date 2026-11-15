@@ -95,6 +95,9 @@ result$response
 
 Add a subagent later with `lead$register_sub_agent(definition)`, which
 also updates the list of subagents in the lead’s system prompt.
+`lead$set_system_prompt()` replaces the lead’s base prompt and keeps
+that generated list, along with loaded skill prompts and the compaction
+summary.
 
 When the lead delegates, the subagent runs to completion and its answer
 comes back as the result of the `delegate_to_agent` call. When the model
