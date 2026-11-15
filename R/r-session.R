@@ -360,7 +360,8 @@ RSession <- R6::R6Class(
             governed_execution_id = execution_id,
             run_id = run_id,
             dispatch = dispatch,
-            tool_requests = new.env(parent = emptyenv())
+            tool_requests = new.env(parent = emptyenv()),
+            tool_read_state = new.env(parent = emptyenv())
           ))
         )
         private$drain()
@@ -488,6 +489,14 @@ RSession <- R6::R6Class(
           ),
           error = function(condition) condition
         )
+        if (inherits(request, "deputy_r_session_tool_io")) {
+          # The request has not been parsed or dispatched. Leave it eligible
+          # for the next poll; the execution's existing deadline bounds retries.
+          job$tool_read_state$last_error <- conditionMessage(request)
+          rm(list = request_id, envir = job$tool_requests)
+          next
+        }
+        job$tool_read_state$last_error <- NULL
         if (inherits(request, "condition")) {
           # A malformed request cannot be safely associated with an execution;
           # mark it consumed and leave the worker to report its bounded timeout.
@@ -574,7 +583,7 @@ RSession <- R6::R6Class(
       }
       invisible(NULL)
     },
-    reset = function(reason) {
+    reset = function(reason, detail = NULL) {
       private$cleanup_bridge()
       worker <- private$resource$worker
       private$resource$worker <- NULL
@@ -597,7 +606,12 @@ RSession <- R6::R6Class(
               "R execution ",
               reason,
               "; session variables were discarded. ",
-              "Partial output is unavailable and external effects are not rolled back."
+              "Partial output is unavailable and external effects are not rolled back.",
+              if (is.null(detail)) {
+                ""
+              } else {
+                paste0(" Last mailbox read error: ", detail)
+              }
             )
           )),
           reason
@@ -707,7 +721,12 @@ RSession <- R6::R6Class(
                 }
                 if (unname(proc.time()[["elapsed"]]) >= deadline) {
                   private$reset(
-                    if (dispatched) "timed_out" else "startup_timed_out"
+                    if (dispatched) "timed_out" else "startup_timed_out",
+                    detail = if (dispatched) {
+                      job$tool_read_state$last_error
+                    } else {
+                      NULL
+                    }
                   )
                   return(invisible(NULL))
                 }

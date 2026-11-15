@@ -254,17 +254,63 @@ r_session_tool_atomic_write <- function(path, text) {
   invisible(path)
 }
 
+r_session_tool_read_io <- function(fun, context) {
+  warnings <- character()
+  io_error <- function(causes) {
+    abort_deputy(
+      "Could not read R session mailbox {.val {context}}: {paste(causes, collapse = '; ')}",
+      class = "r_session_tool_io"
+    )
+  }
+  value <- tryCatch(
+    withCallingHandlers(
+      fun(),
+      warning = function(warning) {
+        warnings <<- c(warnings, conditionMessage(warning))
+        invokeRestart("muffleWarning")
+      }
+    ),
+    error = function(error) {
+      io_error(c(warnings, conditionMessage(error)))
+    }
+  )
+  if (length(warnings)) {
+    io_error(warnings)
+  }
+  value
+}
+
+r_session_tool_file_info <- function(path) {
+  file.info(path)
+}
+
+r_session_tool_read_bytes <- function(path, max_bytes) {
+  connection <- file(path, open = "rb")
+  on.exit(close(connection), add = TRUE)
+  readBin(connection, what = "raw", n = max_bytes + 1L)
+}
+
 r_session_tool_read_json <- function(path, max_bytes, context) {
-  info <- file.info(path)
-  if (is.na(info$size) || info$size > max_bytes) {
+  info <- r_session_tool_read_io(
+    function() r_session_tool_file_info(path),
+    context
+  )
+  if (is.na(info$size)) {
+    abort_deputy(
+      "Could not determine the size of R session mailbox {.val {context}}.",
+      class = "r_session_tool_io"
+    )
+  }
+  if (info$size > max_bytes) {
     abort_deputy(
       "R session mailbox {.val {context}} exceeds its size limit.",
       class = "r_session_tool_protocol"
     )
   }
-  connection <- file(path, open = "rb")
-  on.exit(close(connection), add = TRUE)
-  raw <- readBin(connection, what = "raw", n = max_bytes + 1L)
+  raw <- r_session_tool_read_io(
+    function() r_session_tool_read_bytes(path, max_bytes),
+    context
+  )
   if (length(raw) > max_bytes) {
     abort_deputy(
       "R session mailbox {.val {context}} exceeds its size limit.",
