@@ -2,6 +2,11 @@
 
 ## deputy (development version)
 
+- `RSession` retries transient mailbox metadata, open, and read failures
+  during an active call. Host deadline results include the last I/O
+  error; malformed or oversized requests are not retried
+  ([\#261](https://github.com/JamesHWade/deputy/issues/261)).
+
 - Context size estimates count a tool result that hasn’t been sent to
   the model yet with ellmer 0.5.1 and later. ellmer’s own count leaves
   such a result out, so automatic compaction could start later than
