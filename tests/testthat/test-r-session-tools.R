@@ -357,6 +357,22 @@ test_that("bridge transfer rejects runtime attributes and retains portable data"
   expect_snapshot(error = TRUE, r_session_tool_read_json(path, 128, "request"))
 })
 
+test_that("mailbox read failures are marked as retryable I/O errors", {
+  path <- withr::local_tempfile()
+  writeLines("{}", path)
+  local_mocked_bindings(r_session_tool_read_bytes = function(...) {
+    warning("Permission denied while opening request", call. = FALSE)
+    stop("cannot open connection")
+  })
+
+  error <- expect_error(
+    r_session_tool_read_json(path, 4096, "request"),
+    class = "deputy_r_session_tool_io"
+  )
+  expect_match(conditionMessage(error), "Permission denied", fixed = TRUE)
+  expect_match(conditionMessage(error), "cannot open connection", fixed = TRUE)
+})
+
 test_that("a mailbox holding a path or URL is malformed, not followed", {
   target <- withr::local_tempfile(fileext = ".json")
   writeLines('{"tool": "fetch_measurements"}', target)
@@ -500,6 +516,207 @@ test_that("replacing a selected tool during an observer prevents its effect", {
     "replaced after dispatcher admission",
     fixed = TRUE
   )
+})
+
+test_that("transient mailbox read failures retry within the call deadline", {
+  skip_if_not_installed("promises")
+  skip_if_not_installed("later")
+
+  calls <- 0L
+  reads <- 0L
+  read_bytes <- r_session_tool_read_bytes
+  local_mocked_bindings(r_session_tool_read_bytes = function(...) {
+    reads <<- reads + 1L
+    if (reads == 1L) {
+      warning("Temporary mailbox read warning.", call. = FALSE)
+      stop("Temporary mailbox I/O failure.")
+    }
+    read_bytes(...)
+  })
+  fixture <- local_r_tool_journey(
+    r_bridge_test_tool(function() {
+      calls <<- calls + 1L
+      promises::promise(function(resolve, reject) {
+        later::later(function() resolve("retried result"), 0.05)
+      })
+    }),
+    c("invisible(jsonlite::toJSON(1)); cat('warm')", "cat(tools$fetch())"),
+    timeout = 5
+  )
+
+  fixture$agent$chat("Warm up the R session.")
+  expect_identical(fixture$agent$last_run()$stop_reason, "complete")
+  fixture$agent$chat("Retry the mailbox read.")
+
+  expect_gt(reads, 1L)
+  expect_identical(calls, 1L)
+  expect_match(
+    r_bridge_outer_text(fixture$agent),
+    "retried result",
+    fixed = TRUE
+  )
+  expect_identical(fixture$agent$last_run()$stop_reason, "complete")
+})
+
+test_that("mailbox stat failures retry when metadata becomes available", {
+  calls <- 0L
+  reads <- 0L
+  file_info <- r_session_tool_file_info
+  local_mocked_bindings(r_session_tool_file_info = function(path) {
+    reads <<- reads + 1L
+    if (reads == 1L) {
+      return(data.frame(size = NA_real_))
+    }
+    file_info(path)
+  })
+  fixture <- local_r_tool_journey(
+    r_bridge_test_tool(function() {
+      calls <<- calls + 1L
+      "metadata recovered"
+    }),
+    c("invisible(jsonlite::toJSON(1)); cat('warm')", "cat(tools$fetch())"),
+    timeout = 5
+  )
+
+  fixture$agent$chat("Warm up the R session.")
+  expect_identical(fixture$agent$last_run()$stop_reason, "complete")
+  fixture$agent$chat("Retry the mailbox metadata read.")
+
+  expect_gt(reads, 1L)
+  expect_identical(calls, 1L)
+  expect_match(
+    r_bridge_outer_text(fixture$agent),
+    "metadata recovered",
+    fixed = TRUE
+  )
+  expect_identical(fixture$agent$last_run()$stop_reason, "complete")
+})
+
+test_that("permanent mailbox I/O failures remain bounded by the call deadline", {
+  calls <- 0L
+  reads <- 0L
+  first_read <- NULL
+  local_mocked_bindings(r_session_tool_file_info = function(...) {
+    if (is.null(first_read)) {
+      first_read <<- unname(proc.time()[["elapsed"]])
+    }
+    reads <<- reads + 1L
+    data.frame(size = NA_real_)
+  })
+  fixture <- local_r_tool_journey(
+    r_bridge_test_tool(function() {
+      calls <<- calls + 1L
+      "unexpected effect"
+    }),
+    c(
+      "invisible(jsonlite::toJSON(1)); cat('warm')",
+      "tryCatch(tools$fetch(), error = function(error) NULL); Sys.sleep(7)"
+    ),
+    timeout = 5
+  )
+  fixture$agent$chat("Warm up the R session.")
+  expect_identical(fixture$agent$last_run()$stop_reason, "complete")
+
+  fixture$agent$chat("Wait for the mailbox deadline.")
+
+  elapsed <- if (is.null(first_read)) {
+    Inf
+  } else {
+    unname(proc.time()[["elapsed"]]) - first_read
+  }
+  expect_gt(reads, 1L)
+  expect_identical(calls, 0L)
+  expect_identical(fixture$session$status()$last_reset, "timed_out")
+  expect_match(
+    r_bridge_outer_text(fixture$agent),
+    "Could not determine the size",
+    fixed = TRUE
+  )
+  expect_lt(elapsed, 8)
+})
+
+test_that("permanent mailbox read warnings and errors remain bounded", {
+  calls <- 0L
+  reads <- 0L
+  first_read <- NULL
+  local_mocked_bindings(r_session_tool_read_bytes = function(...) {
+    if (is.null(first_read)) {
+      first_read <<- unname(proc.time()[["elapsed"]])
+    }
+    reads <<- reads + 1L
+    warning("Permanent mailbox read warning.", call. = FALSE)
+    stop("Permanent mailbox I/O failure.")
+  })
+  fixture <- local_r_tool_journey(
+    r_bridge_test_tool(function() {
+      calls <<- calls + 1L
+      "unexpected effect"
+    }),
+    c(
+      "invisible(jsonlite::toJSON(1)); cat('warm')",
+      "tryCatch(tools$fetch(), error = function(error) NULL); Sys.sleep(7)"
+    ),
+    timeout = 5
+  )
+  fixture$agent$chat("Warm up the R session.")
+  expect_identical(fixture$agent$last_run()$stop_reason, "complete")
+
+  fixture$agent$chat("Wait for the permanent read failure deadline.")
+
+  elapsed <- if (is.null(first_read)) {
+    Inf
+  } else {
+    unname(proc.time()[["elapsed"]]) - first_read
+  }
+  expect_gt(reads, 1L)
+  expect_identical(calls, 0L)
+  expect_identical(fixture$session$status()$last_reset, "timed_out")
+  expect_match(
+    r_bridge_outer_text(fixture$agent),
+    "Permanent mailbox read warning",
+    fixed = TRUE
+  )
+  expect_match(
+    r_bridge_outer_text(fixture$agent),
+    "Permanent mailbox I/O failure",
+    fixed = TRUE
+  )
+  expect_lt(elapsed, 8)
+})
+
+test_that("mailbox protocol errors are not retried", {
+  calls <- 0L
+  reads <- 0L
+  first_read <- NULL
+  local_mocked_bindings(r_session_tool_read_bytes = function(...) {
+    if (is.null(first_read)) {
+      first_read <<- unname(proc.time()[["elapsed"]])
+    }
+    reads <<- reads + 1L
+    charToRaw("not JSON")
+  })
+  fixture <- local_r_tool_journey(
+    r_bridge_test_tool(function() {
+      calls <<- calls + 1L
+      "unexpected effect"
+    }),
+    c("invisible(jsonlite::toJSON(1)); cat('warm')", "tools$fetch()"),
+    timeout = 5
+  )
+  fixture$agent$chat("Warm up the R session.")
+  expect_identical(fixture$agent$last_run()$stop_reason, "complete")
+
+  fixture$agent$chat("Reject the malformed mailbox request.")
+
+  elapsed <- if (is.null(first_read)) {
+    Inf
+  } else {
+    unname(proc.time()[["elapsed"]]) - first_read
+  }
+  expect_identical(reads, 1L)
+  expect_identical(calls, 0L)
+  expect_match(r_bridge_outer_text(fixture$agent), "timed_out|timed out")
+  expect_lt(elapsed, 8)
 })
 
 test_that("a nested tool call waits for a PreToolUse hook's promised denial", {
