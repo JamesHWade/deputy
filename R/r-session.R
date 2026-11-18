@@ -38,6 +38,22 @@
 #' captured; htmlwidgets and rich HTML tables report `unsupported_output`, so
 #' print the data instead.
 #'
+#' @section Recovering selected R data:
+#' To opt in, give the session a private, host-managed checkpoint directory
+#' and a stable owner ID. The host must authorize access to that directory and
+#' supply the same owner, Agent ID and conversation ID when reopening it.
+#' Queue `$checkpoint()` after the calculations you want to keep, then retain
+#' the receipt's `id`. A new session can queue `$restore_checkpoint(id)`
+#' before its first execution. A reset also permits a fresh restore.
+#'
+#' Checkpoints contain only explicitly selected data. Loaded packages,
+#' unselected variables, tool closures, conversation turns and in-flight
+#' computation are outside this data format. Restoring evaluates no previous
+#' code and reissues no tool requests. Keep saved conversation output and job
+#' effect records separately. A failed R expression may already have changed
+#' R variables, files or an external service. Review the effect record before
+#' deciding how to proceed after an interrupted write.
+#'
 #' @section Calling agent tools from R:
 #' With `tools = c("name")`, code run through the agent's `run_r_code` tool can
 #' call `tools$name(...)`. The calls go through the agent's permissions, hooks
@@ -77,6 +93,12 @@ RSession <- R6::R6Class(
     #' @param libpath The library directories the R process loads packages
     #'   from, searched in order. `NULL` uses your session's `.libPaths()` each
     #'   time a process starts.
+    #' @param checkpoint_dir An existing private directory the host owns and
+    #'   manages, or `NULL` to disable checkpoints. Store only artifacts
+    #'   created by Deputy in this directory. The host manages retention and
+    #'   filesystem permissions.
+    #' @param checkpoint_owner_id A stable owner identifier supplied by the
+    #'   host. Required together with `checkpoint_dir`.
     initialize = function(
       agent,
       timeout = 30,
@@ -87,10 +109,16 @@ RSession <- R6::R6Class(
       plot_height = 650L,
       tools = character(),
       env = NULL,
-      libpath = NULL
+      libpath = NULL,
+      checkpoint_dir = NULL,
+      checkpoint_owner_id = NULL
     ) {
       private$owner <- r_session_owner(agent)
       private$agent <- agent
+      private$checkpoint_config <- r_session_checkpoint_config(
+        checkpoint_dir,
+        checkpoint_owner_id
+      )
       private$tool_names <- r_session_tool_names(tools)
       if (
         length(private$tool_names) &&
@@ -228,6 +256,37 @@ RSession <- R6::R6Class(
       private$enqueue(code, execution_id = NULL)
     },
 
+    #' @description Queue capture of selected global bindings after earlier
+    #'   calls finish. Bindings must exist and contain ordinary R data, such
+    #'   as vectors, lists, matrices, factors, dates or base data frames.
+    #'   The serialized data can occupy up to 8 MiB. A new capture produces
+    #'   a new immutable artifact.
+    #' @param bindings Character vector of distinct global binding names.
+    #' @return A promise for a checkpoint receipt with `id`, `bindings`,
+    #'   `generation`, `bytes` and `sha256`. Capture or persistence errors
+    #'   reject the promise.
+    checkpoint = function(bindings) {
+      private$check_checkpoint()
+      bindings <- r_session_checkpoint_bindings(bindings)
+      private$enqueue_job(list(
+        checkpoint = "capture",
+        bindings = bindings
+      ))
+    },
+
+    #' @description Queue import of a committed checkpoint. At its turn, the
+    #'   session must have no live worker, so import starts in a fresh worker.
+    #' @param id The `id` returned in the checkpoint receipt.
+    #' @return A promise for the original receipt plus `restored_generation`.
+    #'   Lookup, verification or import errors reject the promise.
+    restore_checkpoint = function(id) {
+      private$check_checkpoint()
+      private$enqueue_job(list(
+        checkpoint = "restore",
+        checkpoint_id = id
+      ))
+    },
+
     #' @description Report the session's state without running code.
     #' @return A list with `id`, `state`, `generation` (incremented each time a
     #'   fresh R process starts), `queued`, `last_reset`, `pid` and
@@ -278,6 +337,7 @@ RSession <- R6::R6Class(
     tool_names = character(),
     tool_specs = list(),
     settings = NULL,
+    checkpoint_config = NULL,
     resource = NULL,
     bridge_root = NULL,
     id = NULL,
@@ -337,6 +397,26 @@ RSession <- R6::R6Class(
           run_id = run_id
         )
       }
+      private$enqueue_job(list(
+        code = code,
+        governed_execution_id = execution_id,
+        run_id = run_id,
+        dispatch = dispatch,
+        tool_requests = new.env(parent = emptyenv()),
+        tool_read_state = new.env(parent = emptyenv())
+      ))
+    },
+    check_checkpoint = function() {
+      private$check_current()
+      if (is.null(private$checkpoint_config)) {
+        abort_deputy(
+          "Configure {.arg checkpoint_dir} and {.arg checkpoint_owner_id} to use R session checkpoints.",
+          class = "r_session_checkpoint"
+        )
+      }
+      invisible(NULL)
+    },
+    enqueue_job = function(job) {
       if (
         is.null(private$active) &&
           !is.null(private$resource$worker) &&
@@ -351,19 +431,10 @@ RSession <- R6::R6Class(
         )
       }
       promises::promise(function(resolve, reject) {
-        private$queue <- c(
-          private$queue,
-          list(list(
-            id = new_deputy_id("r_call_"),
-            code = code,
-            resolve = resolve,
-            governed_execution_id = execution_id,
-            run_id = run_id,
-            dispatch = dispatch,
-            tool_requests = new.env(parent = emptyenv()),
-            tool_read_state = new.env(parent = emptyenv())
-          ))
-        )
+        job$id <- new_deputy_id("r_call_")
+        job$resolve <- resolve
+        job$reject <- reject
+        private$queue <- c(private$queue, list(job))
         private$drain()
       })
     },
@@ -597,7 +668,9 @@ RSession <- R6::R6Class(
       private$queue <- list()
       private$state <- "new"
       private$last_reset <- reason
-      if (!is.null(active)) {
+      if (!is.null(active) && !is.null(active$checkpoint)) {
+        private$reject_checkpoint(active, reason)
+      } else if (!is.null(active)) {
         private$settle(
           active,
           list(list(
@@ -618,6 +691,10 @@ RSession <- R6::R6Class(
         )
       }
       for (job in queued) {
+        if (!is.null(job$checkpoint)) {
+          private$reject_checkpoint(job, reason)
+          next
+        }
         private$settle(
           job,
           list(list(
@@ -658,6 +735,105 @@ RSession <- R6::R6Class(
       ))
       invisible(NULL)
     },
+    reject_checkpoint = function(job, reason) {
+      job$reject(tryCatch(
+        abort_deputy(
+          "R session checkpoint operation ended ({.val {reason}}).",
+          class = "r_session_checkpoint"
+        ),
+        error = identity
+      ))
+      invisible(NULL)
+    },
+    prepare_checkpoint = function(job, fresh) {
+      if (identical(job$checkpoint, "capture")) {
+        if (fresh) {
+          abort_deputy(
+            "Start an R execution before capturing its data.",
+            class = "r_session_checkpoint"
+          )
+        }
+        return(job)
+      }
+      if (!fresh) {
+        abort_deputy(
+          "Restore an R session checkpoint before starting a worker or after resetting it.",
+          class = "r_session_checkpoint"
+        )
+      }
+      job$artifact <- r_session_checkpoint_read(
+        private$checkpoint_config,
+        private$owner,
+        job$checkpoint_id
+      )
+      job
+    },
+    finish_checkpoint = function(job, response) {
+      tryCatch(
+        {
+          private$check_current()
+          if (!is.null(response$error)) {
+            abort_deputy(
+              "R session checkpoint failed: {response$error}",
+              class = "r_session_checkpoint"
+            )
+          }
+          receipt <- if (identical(job$checkpoint, "capture")) {
+            r_session_checkpoint_write(
+              private$checkpoint_config,
+              private$owner,
+              job$bindings,
+              response$payload,
+              job$generation
+            )
+          } else {
+            c(job$artifact$receipt, list(restored_generation = job$generation))
+          }
+          job$resolve(receipt)
+        },
+        error = function(error) {
+          job$reject(error)
+          # Avoid retaining a newly started worker after a failed import.
+          if (identical(job$checkpoint, "restore")) {
+            private$reset("restore_failed")
+          }
+        }
+      )
+      invisible(NULL)
+    },
+    call_worker = function(worker, job) {
+      if (!is.null(job$checkpoint)) {
+        worker$call(
+          child_function(r_session_checkpoint_worker),
+          list(
+            operation = job$checkpoint,
+            bindings = job$bindings %||% job$artifact$receipt$bindings,
+            payload = job$artifact$payload,
+            validate_data = child_function(r_session_checkpoint_validate_data),
+            max_bytes = r_session_checkpoint_max_bytes
+          )
+        )
+        return(invisible(NULL))
+      }
+      worker$call(
+        child_function(r_session_evaluate),
+        list(
+          code = job$code,
+          working_dir = private$owner$working_dir,
+          max_output_bytes = private$settings$max_output_bytes,
+          plot_width = private$settings$plot_width,
+          plot_height = private$settings$plot_height,
+          mailbox_dir = job$mailbox_dir,
+          session_id = private$id,
+          call_id = job$id,
+          execution_id = job$governed_execution_id,
+          generation = job$generation,
+          tool_specs = private$tool_specs,
+          tool_timeout = private$settings$timeout
+        )
+      )
+      invisible(NULL)
+    },
     drain = function() {
       if (
         !is.null(private$active) ||
@@ -678,6 +854,19 @@ RSession <- R6::R6Class(
             return(invisible(NULL))
           }
           fresh <- is.null(worker)
+          if (!is.null(job$checkpoint)) {
+            prepared <- tryCatch(
+              private$prepare_checkpoint(job, fresh),
+              error = identity
+            )
+            if (inherits(prepared, "error")) {
+              private$active <- NULL
+              job$reject(prepared)
+              private$drain()
+              return(invisible(NULL))
+            }
+            job <- prepared
+          }
           if (fresh) {
             worker <- callr::r_session$new(
               options = callr::r_session_options(
@@ -696,7 +885,7 @@ RSession <- R6::R6Class(
           }
           job$fresh <- fresh
           job$generation <- private$generation
-          if (length(private$tool_names)) {
+          if (is.null(job$checkpoint) && length(private$tool_names)) {
             job$mailbox_dir <- private$bridge_directory(job)
           }
           private$active <- job
@@ -732,23 +921,7 @@ RSession <- R6::R6Class(
                 }
                 if (!dispatched) {
                   if (identical(worker$get_state(), "idle")) {
-                    worker$call(
-                      child_function(r_session_evaluate),
-                      list(
-                        code = job$code,
-                        working_dir = private$owner$working_dir,
-                        max_output_bytes = private$settings$max_output_bytes,
-                        plot_width = private$settings$plot_width,
-                        plot_height = private$settings$plot_height,
-                        mailbox_dir = job$mailbox_dir,
-                        session_id = private$id,
-                        call_id = job$id,
-                        execution_id = job$governed_execution_id,
-                        generation = job$generation,
-                        tool_specs = private$tool_specs,
-                        tool_timeout = private$settings$timeout
-                      )
-                    )
+                    private$call_worker(worker, job)
                     dispatched <<- TRUE
                     private$state <- "running"
                     deadline <<- unname(proc.time()[["elapsed"]]) +
@@ -769,11 +942,15 @@ RSession <- R6::R6Class(
                     finished <- private$active
                     private$active <- NULL
                     private$state <- "idle"
-                    private$settle(
-                      finished,
-                      response$result$segments,
-                      response$result$outcome
-                    )
+                    if (is.null(finished$checkpoint)) {
+                      private$settle(
+                        finished,
+                        response$result$segments,
+                        response$result$outcome
+                      )
+                    } else {
+                      private$finish_checkpoint(finished, response$result)
+                    }
                     private$drain()
                     return(invisible(NULL))
                   }

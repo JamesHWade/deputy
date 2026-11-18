@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* `RSession$checkpoint()` saves selected R data to a host-owned directory.
+  `$restore_checkpoint()` verifies the artifact and imports its bindings
+  into a fresh worker for the same owner, Agent and conversation. Recovery
+  runs no historical code and repeats no tool calls (#263).
+
 * `RSession` retries transient mailbox metadata, open, and read failures during an active call. Host deadline results include the last I/O error; malformed or oversized requests are not retried (#261).
 
 * Context size estimates count a tool result that hasn't been sent to the
