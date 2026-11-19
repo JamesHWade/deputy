@@ -27,3 +27,21 @@ NODE_PATH="$(npm root -g)" node dev/browser/commons-subagents.js
 binary and the screenshot directory. It needs Node and the `playwright` package;
 it isn't part of `devtools::test()`, whose `commons-subagents-example` tests cover
 the same workflow without a browser.
+
+## Reopened R artifacts
+
+These commands capture Plotly, Leaflet, DT, gt and flextable output in a real
+R worker and reopen the stored artifacts after closing that worker. The R
+fixture decodes and checks each PNG for nonblank pixels. Chrome checks DT
+sorting and filtering, a Plotly trace and a local Leaflet popup, both tables,
+opaque host isolation, and zero external requests.
+
+Run from the package root with the producer packages, `png`, `webshot2`,
+Pandoc, Chrome and the Node `playwright` package available:
+
+```sh
+Rscript dev/browser/r-session-artifacts.R /tmp/deputy-r-artifacts.html
+NODE_PATH="$(npm root -g)" node dev/browser/r-session-artifacts.js /tmp/deputy-r-artifacts.html
+```
+
+Set `CHROMIUM_PATH` to use a particular Chrome or Chromium binary.
