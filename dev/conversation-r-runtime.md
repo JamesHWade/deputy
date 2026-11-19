@@ -172,24 +172,16 @@ workers and a local HTTP provider fixture, including native image serialization,
 ordered output, follow-up variables, independent owners, timeout, interruption,
 saved display and finite context allowances. They make no paid model calls.
 
-## Interactive output extension boundary
+## Interactive output artifacts
 
-Follow-up: [#144](https://github.com/JamesHWade/deputy/issues/144).
+The worker adapts visible htmlwidgets and supported rich tables through the
+producer's public export API. The rendered document, text summary and static
+preview share the call's output budget. The supervisor publishes the document
+in an opt-in host store indexed by owner, Agent, session and SHA-256. Saved
+tool results retain an ordered artifact receipt with media type, renderer,
+dependency provenance and preview outcome.
 
-This first slice supports static graphics and text tables. Visible htmlwidgets
-(including plotly and leaflet), HTML tags, gt and flextable values are detected
-and return `unsupported_output` with an explicit diagnostic and no pretend
-PNG. The value remains in worker memory if code assigned it. This does not
-intercept widgets explicitly printed inside other functions or user-defined
-renderers; hosts must not advertise general interactive output support.
-
-A later rich renderer must add a portable user artifact (self-contained HTML
-or a bundled dependency directory with a durable host URL) and a distinct
-model representation (verified static image plus meaningful text/data). The
-execution record must identify renderer, artifact media type, dependency
-provenance, content digest and fallback outcome. The host owns artifact
-storage, serving and browser isolation; neither temporary file URLs nor blank
-PNG captures count as successful widget output. Such a renderer must obey
-output bounds and preserve reviewability after session save/load before the
-host advertises the capability. No arbitrary HTML renderer callback is exposed
-in this slice.
+The host uses `RSession$artifact_frame(id)` after authorizing the conversation.
+Reopening verifies the file and presents it in an opaque-origin iframe. Saved
+turns retain the reference and static evidence. The host manages storage and
+retention independently of R heap checkpoints.

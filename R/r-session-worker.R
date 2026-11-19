@@ -14,7 +14,10 @@ r_session_evaluate <- function(
   tool_specs = list(),
   tool_timeout = 30,
   max_tool_request_bytes = 256L * 1024L,
-  max_tool_result_bytes = 8L * 1024L * 1024L
+  max_tool_result_bytes = 8L * 1024L * 1024L,
+  render_rich = NULL,
+  max_artifact_bytes = 8L * 1024L^2,
+  artifact_document = identity
 ) {
   setwd(working_dir)
 
@@ -252,6 +255,7 @@ r_session_evaluate <- function(
   truncated <- FALSE
   failed <- FALSE
   unsupported <- FALSE
+  artifact_count <- 0L
   last_plot <- NULL
   add <- function(type, text = NULL, data = NULL) {
     if (truncated) {
@@ -339,15 +343,64 @@ r_session_evaluate <- function(
           ))
       ) {
         flush_plot()
+        if (truncated) {
+          return(invisible(NULL))
+        }
+        reason <- if (is.null(render_rich)) {
+          "Configure an artifact store to capture interactive R results."
+        } else if (artifact_count >= 8L) {
+          "An R call can capture up to eight interactive results."
+        } else {
+          rich <- tryCatch(
+            render_rich(
+              value,
+              min(max_artifact_bytes, max_output_bytes - retained),
+              plot_width,
+              plot_height,
+              artifact_document
+            ),
+            error = identity
+          )
+          if (inherits(rich, "error")) {
+            conditionMessage(rich)
+          } else if (!length(rich$html)) {
+            paste(rich$text, rich$fallback)
+          } else {
+            bytes <- length(rich$html) +
+              length(rich$png) +
+              sum(nchar(
+                c(rich$text, rich$renderer, rich$dependencies, rich$fallback),
+                "bytes"
+              ))
+            if (bytes <= max_output_bytes - retained) {
+              retained <<- retained + bytes
+              artifact_count <<- artifact_count + 1L
+              segments[[length(segments) + 1L]] <<- list(
+                type = "artifact",
+                html = rich$html,
+                png = rich$png,
+                text = rich$text,
+                artifact = list(
+                  renderer = rich$renderer,
+                  dependencies = rich$dependencies,
+                  fallback = rich$fallback
+                )
+              )
+              return(invisible(NULL))
+            }
+            "The interactive result exceeds the remaining output byte limit."
+          }
+        }
         unsupported <<- TRUE
         add(
           "warning",
           text = paste0(
             "Unsupported rich output (",
             paste(class(value), collapse = ", "),
-            "): this R session captures static graphics and printed text. ",
-            "No interactive widget or rich table was saved. ",
-            "Create a static plot or print the underlying data for review."
+            "): ",
+            reason,
+            " No interactive widget or rich table was saved for this output.",
+            " Print the underlying data or create a static plot."
           )
         )
         return(invisible(NULL))
