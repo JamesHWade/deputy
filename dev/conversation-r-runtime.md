@@ -148,9 +148,19 @@ Agent session snapshots retain the current model turns (including their code,
 output, displays and plots) and offload artifacts. Compaction can remove earlier
 turns. Hosts must persist full display/execution records separately when they
 need a complete visible conversation history across compaction.
-Live R objects and executable owners are not resumable state. On reopening,
-create a new owner and recreate needed variables from recorded code. Do not
-claim that a restored plot implies a restored R workspace.
+`RSession$checkpoint()` can capture selected ordinary data after a completed
+call when the host configures a private checkpoint directory. The supervisor
+publishes a versioned artifact after the worker exports the data. Import
+requires the same host owner, Agent and conversation IDs. The host checks
+integrity and identity before starting the fresh worker, where binding
+validation precedes assignment. The restore receipt lists the imported
+bindings and generation. Unselected state must be recreated.
+
+Conversation history, data checkpoints and job or approval evidence have
+independent lifecycles. Checkpoint import evaluates no recorded code and issues
+no historical tool requests. The host keeps the receipt ID, manages retention,
+and reviews indeterminate effects through the existing job or approval record.
+#188 tracks the remaining sandboxed recovery work.
 
 ## Prior art and verification
 

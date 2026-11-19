@@ -45,6 +45,24 @@ captured; htmlwidgets and rich HTML tables report \code{unsupported_output}, so
 print the data instead.
 }
 
+\section{Recovering selected R data}{
+
+To opt in, give the session a private, host-managed checkpoint directory
+and a stable owner ID. The host must authorize access to that directory and
+supply the same owner, Agent ID and conversation ID when reopening it.
+Queue \verb{$checkpoint()} after the calculations you want to keep, then retain
+the receipt's \code{id}. A new session can queue \verb{$restore_checkpoint(id)}
+before its first execution. A reset also permits a fresh restore.
+
+Checkpoints contain only explicitly selected data. Loaded packages,
+unselected variables, tool closures, conversation turns and in-flight
+computation are outside this data format. Restoring evaluates no previous
+code and reissues no tool requests. Keep saved conversation output and job
+effect records separately. A failed R expression may already have changed
+R variables, files or an external service. Review the effect record before
+deciding how to proceed after an interrupted write.
+}
+
 \section{Calling agent tools from R}{
 
 With \code{tools = c("name")}, code run through the agent's \code{run_r_code} tool can
@@ -68,6 +86,8 @@ doesn't limit what the R code can do.
     \item \href{#method-RSession-initialize}{\code{RSession$new()}}
     \item \href{#method-RSession-tools}{\code{RSession$tools()}}
     \item \href{#method-RSession-run}{\code{RSession$run()}}
+    \item \href{#method-RSession-checkpoint}{\code{RSession$checkpoint()}}
+    \item \href{#method-RSession-restore_checkpoint}{\code{RSession$restore_checkpoint()}}
     \item \href{#method-RSession-status}{\code{RSession$status()}}
     \item \href{#method-RSession-cancel}{\code{RSession$cancel()}}
     \item \href{#method-RSession-close}{\code{RSession$close()}}
@@ -90,7 +110,9 @@ doesn't limit what the R code can do.
   plot_height = 650L,
   tools = character(),
   env = NULL,
-  libpath = NULL
+  libpath = NULL,
+  checkpoint_dir = NULL,
+  checkpoint_owner_id = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -115,6 +137,12 @@ holds.}
       \item{\code{libpath}}{The library directories the R process loads packages
 from, searched in order. \code{NULL} uses your session's \code{.libPaths()} each
 time a process starts.}
+      \item{\code{checkpoint_dir}}{An existing private directory the host owns and
+manages, or \code{NULL} to disable checkpoints. Store only artifacts
+created by Deputy in this directory. The host manages retention and
+filesystem permissions.}
+      \item{\code{checkpoint_owner_id}}{A stable owner identifier supplied by the
+host. Required together with \code{checkpoint_dir}.}
     }
     \if{html}{\out{</div>}}
   }
@@ -157,6 +185,58 @@ hooks. Errors at once if \code{code} is invalid or the queue is full.
   \subsection{Returns}{
     A promise for an \code{ellmer::ContentToolResult}. R errors, crashes
 and cancelled calls resolve to a result that describes them.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-RSession-checkpoint"></a>}}
+\if{latex}{\out{\hypertarget{method-RSession-checkpoint}{}}}
+\subsection{\code{RSession$checkpoint()}}{
+  Queue capture of selected global bindings after earlier
+calls finish. Bindings must exist and contain ordinary R data, such
+as vectors, lists, matrices, factors, dates or base data frames.
+The serialized data can occupy up to 8 MiB. A new capture produces
+a new immutable artifact.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{RSession$checkpoint(bindings)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{bindings}}{Character vector of distinct global binding names.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A promise for a checkpoint receipt with \code{id}, \code{bindings},
+\code{generation}, \code{bytes} and \code{sha256}. Capture or persistence errors
+reject the promise.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-RSession-restore_checkpoint"></a>}}
+\if{latex}{\out{\hypertarget{method-RSession-restore_checkpoint}{}}}
+\subsection{\code{RSession$restore_checkpoint()}}{
+  Queue import of a committed checkpoint. At its turn, the
+session must have no live worker, so import starts in a fresh worker.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{RSession$restore_checkpoint(id)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{id}}{The \code{id} returned in the checkpoint receipt.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A promise for the original receipt plus \code{restored_generation}.
+Lookup, verification or import errors reject the promise.
   }
 }
 

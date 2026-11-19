@@ -19,6 +19,6 @@
     Code
       session$run("2")
     Condition
-      Error in `private$enqueue()`:
+      Error in `private$enqueue_job()`:
       ! The R session waiting queue is full.
 

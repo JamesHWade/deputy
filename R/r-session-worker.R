@@ -417,3 +417,71 @@ r_session_evaluate <- function(
     }
   )
 }
+
+# Called on the same serialized worker queue as ordinary R code. The host
+# handles persistence and admission, and reads only the returned raw data.
+r_session_checkpoint_worker <- function(
+  operation,
+  bindings,
+  payload,
+  validate_data,
+  max_bytes
+) {
+  tryCatch(
+    {
+      worker <- globalenv()
+      if (identical(operation, "capture")) {
+        values <- lapply(bindings, function(name) {
+          if (!exists(name, envir = worker, inherits = FALSE)) {
+            stop(paste0("Missing R binding: ", name), call. = FALSE)
+          }
+          if (bindingIsActive(name, worker)) {
+            stop(
+              paste0("Cannot capture active R binding: ", name),
+              call. = FALSE
+            )
+          }
+          if (rlang::env_binding_are_lazy(worker, name)) {
+            stop(paste0("Cannot capture lazy R binding: ", name), call. = FALSE)
+          }
+          get(name, envir = worker, inherits = FALSE)
+        })
+        names(values) <- bindings
+        validate_data(values)
+        bytes <- serialize(values, NULL, version = 2L)
+        if (length(bytes) > max_bytes) {
+          stop("Checkpoint data exceeds 8 MiB.", call. = FALSE)
+        }
+        return(list(payload = bytes))
+      }
+
+      # Decode inside the new worker. Verify the complete import before
+      # assigning any binding, so a rejected artifact imports nothing.
+      values <- unserialize(payload)
+      validate_data(values)
+      if (!is.list(values) || !identical(names(values), bindings)) {
+        stop(
+          "Checkpoint data does not match its binding manifest.",
+          call. = FALSE
+        )
+      }
+      if (
+        any(vapply(
+          bindings,
+          exists,
+          logical(1),
+          envir = worker,
+          inherits = FALSE
+        ))
+      ) {
+        stop(
+          "A checkpoint binding already exists in the fresh worker.",
+          call. = FALSE
+        )
+      }
+      list2env(values, envir = worker)
+      list()
+    },
+    error = function(error) list(error = conditionMessage(error))
+  )
+}
