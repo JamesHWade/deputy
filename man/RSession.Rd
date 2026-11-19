@@ -41,8 +41,11 @@ Each result holds ellmer text and image content, HTML for display, and an
 plots but not the variables, which must be recreated after a restart. Agent
 snapshots keep only the current model context, so with compaction, store the
 full display history yourself. Base, ggplot2, grid and patchwork plots are
-captured; htmlwidgets and rich HTML tables report \code{unsupported_output}, so
-print the data instead.
+captured. With an artifact directory, visible supported htmlwidgets and
+rich tables produce a stored HTML document. Use \verb{$artifact_frame()} to
+reopen it. Tool results carry bounded text, any static preview, and a
+reference in \code{extra$deputy_r$segments}. Keep the artifact directory with
+the saved turns. Rich output without a store reports \code{unsupported_output}.
 }
 
 \section{Recovering selected R data}{
@@ -88,6 +91,7 @@ doesn't limit what the R code can do.
     \item \href{#method-RSession-run}{\code{RSession$run()}}
     \item \href{#method-RSession-checkpoint}{\code{RSession$checkpoint()}}
     \item \href{#method-RSession-restore_checkpoint}{\code{RSession$restore_checkpoint()}}
+    \item \href{#method-RSession-artifact_frame}{\code{RSession$artifact_frame()}}
     \item \href{#method-RSession-status}{\code{RSession$status()}}
     \item \href{#method-RSession-cancel}{\code{RSession$cancel()}}
     \item \href{#method-RSession-close}{\code{RSession$close()}}
@@ -112,7 +116,9 @@ doesn't limit what the R code can do.
   env = NULL,
   libpath = NULL,
   checkpoint_dir = NULL,
-  checkpoint_owner_id = NULL
+  checkpoint_owner_id = NULL,
+  artifact_dir = NULL,
+  artifact_owner_id = NULL
 )}
     \if{html}{\out{</div>}}
   }
@@ -143,6 +149,11 @@ created by Deputy in this directory. The host manages retention and
 filesystem permissions.}
       \item{\code{checkpoint_owner_id}}{A stable owner identifier supplied by the
 host. Required together with \code{checkpoint_dir}.}
+      \item{\code{artifact_dir}}{An existing private directory for interactive R
+documents, or \code{NULL} to disable interactive capture. The host manages
+permissions, access checks and retention.}
+      \item{\code{artifact_owner_id}}{A stable host owner identifier. Required with
+\code{artifact_dir}. Reopening also requires the same Agent and session IDs.}
     }
     \if{html}{\out{</div>}}
   }
@@ -237,6 +248,29 @@ session must have no live worker, so import starts in a fresh worker.
   \subsection{Returns}{
     A promise for the original receipt plus \code{restored_generation}.
 Lookup, verification or import errors reject the promise.
+  }
+}
+
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-RSession-artifact_frame"></a>}}
+\if{latex}{\out{\hypertarget{method-RSession-artifact_frame}{}}}
+\subsection{\code{RSession$artifact_frame()}}{
+  Reopen a verified document in an iframe. Build this UI
+after your host app has authorized the current conversation.
+  \subsection{Usage}{
+    \if{html}{\out{<div class="r">}}
+    \preformatted{RSession$artifact_frame(id)}
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Arguments}{
+    \if{html}{\out{<div class="arguments">}}
+    \describe{
+      \item{\code{id}}{An artifact ID from \code{result@extra$deputy_r$segments}.}
+    }
+    \if{html}{\out{</div>}}
+  }
+  \subsection{Returns}{
+    A sandboxed \code{htmltools} iframe for this owner, Agent and session.
   }
 }
 

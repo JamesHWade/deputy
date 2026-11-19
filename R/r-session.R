@@ -35,8 +35,11 @@
 #' plots but not the variables, which must be recreated after a restart. Agent
 #' snapshots keep only the current model context, so with compaction, store the
 #' full display history yourself. Base, ggplot2, grid and patchwork plots are
-#' captured; htmlwidgets and rich HTML tables report `unsupported_output`, so
-#' print the data instead.
+#' captured. With an artifact directory, visible supported htmlwidgets and
+#' rich tables produce a stored HTML document. Use `$artifact_frame()` to
+#' reopen it. Tool results carry bounded text, any static preview, and a
+#' reference in `extra$deputy_r$segments`. Keep the artifact directory with
+#' the saved turns. Rich output without a store reports `unsupported_output`.
 #'
 #' @section Recovering selected R data:
 #' To opt in, give the session a private, host-managed checkpoint directory
@@ -99,6 +102,11 @@ RSession <- R6::R6Class(
     #'   filesystem permissions.
     #' @param checkpoint_owner_id A stable owner identifier supplied by the
     #'   host. Required together with `checkpoint_dir`.
+    #' @param artifact_dir An existing private directory for interactive R
+    #'   documents, or `NULL` to disable interactive capture. The host manages
+    #'   permissions, access checks and retention.
+    #' @param artifact_owner_id A stable host owner identifier. Required with
+    #'   `artifact_dir`. Reopening also requires the same Agent and session IDs.
     initialize = function(
       agent,
       timeout = 30,
@@ -111,10 +119,17 @@ RSession <- R6::R6Class(
       env = NULL,
       libpath = NULL,
       checkpoint_dir = NULL,
-      checkpoint_owner_id = NULL
+      checkpoint_owner_id = NULL,
+      artifact_dir = NULL,
+      artifact_owner_id = NULL
     ) {
       private$owner <- r_session_owner(agent)
       private$agent <- agent
+      private$artifact_config <- r_session_artifact_config(
+        artifact_dir,
+        artifact_owner_id,
+        private$owner
+      )
       private$checkpoint_config <- r_session_checkpoint_config(
         checkpoint_dir,
         checkpoint_owner_id
@@ -213,7 +228,11 @@ RSession <- R6::R6Class(
             "Variables and loaded packages persist between ordered calls.",
             "You and the user receive output, warnings, errors and rendered plots.",
             "Create static base, ggplot2, grid or patchwork figures normally; print plots inside loops.",
-            "Interactive htmlwidgets and rich HTML tables are not supported; print underlying data for tables.",
+            if (is.null(private$artifact_config)) {
+              "For interactive plots and tables, print underlying data or create a static plot."
+            } else {
+              "Visible supported htmlwidgets and rich tables can be saved for the user. Review their text or static previews."
+            },
             "Perform follow-up calculations and revisions yourself.",
             "After a reported reset, rerun required setup; old variables are gone.",
             "The session uses the local account's files and network access; it is not an OS sandbox.",
@@ -287,6 +306,15 @@ RSession <- R6::R6Class(
       ))
     },
 
+    #' @description Reopen a verified document in an iframe. Build this UI
+    #'   after your host app has authorized the current conversation.
+    #' @param id An artifact ID from `result@extra$deputy_r$segments`.
+    #' @return A sandboxed `htmltools` iframe for this owner, Agent and session.
+    artifact_frame = function(id) {
+      private$check_current()
+      r_session_artifact_frame(private$artifact_config, id)
+    },
+
     #' @description Report the session's state without running code.
     #' @return A list with `id`, `state`, `generation` (incremented each time a
     #'   fresh R process starts), `queued`, `last_reset`, `pid` and
@@ -338,6 +366,7 @@ RSession <- R6::R6Class(
     tool_specs = list(),
     settings = NULL,
     checkpoint_config = NULL,
+    artifact_config = NULL,
     resource = NULL,
     bridge_root = NULL,
     id = NULL,
@@ -723,6 +752,24 @@ RSession <- R6::R6Class(
           tryCatch(abandon(outcome), error = function(condition) NULL)
         }
       }
+      if (!is.null(private$artifact_config)) {
+        segments <- r_session_commit_artifacts(
+          segments,
+          private$artifact_config
+        )
+        if (
+          identical(outcome, "complete") &&
+            any(vapply(
+              segments,
+              function(segment) {
+                identical(segment$artifact$storage, "failed")
+              },
+              logical(1)
+            ))
+        ) {
+          outcome <- "artifact_unavailable"
+        }
+      }
       job$resolve(r_session_result(
         code = job$code,
         segments = segments,
@@ -829,7 +876,12 @@ RSession <- R6::R6Class(
           execution_id = job$governed_execution_id,
           generation = job$generation,
           tool_specs = private$tool_specs,
-          tool_timeout = private$settings$timeout
+          tool_timeout = private$settings$timeout,
+          render_rich = if (!is.null(private$artifact_config)) {
+            child_function(r_session_render_rich)
+          },
+          max_artifact_bytes = r_session_artifact_limit,
+          artifact_document = child_function(r_session_artifact_document)
         )
       )
       invisible(NULL)

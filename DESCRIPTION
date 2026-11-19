@@ -20,6 +20,9 @@ Suggests:
     bslib,
     commonmark,
     commons,
+    DT,
+    flextable,
+    gt,
     httr2,
     ggplot2,
     htmlwidgets,
@@ -27,10 +30,12 @@ Suggests:
     ps,
     httpuv,
     knitr,
+    leaflet,
     mcptools (>= 1.0.2),
     otel (>= 0.2.0),
     otelsdk (>= 0.2.0),
     pdftools,
+    plotly,
     pkgload,
     readr,
     reticulate,
@@ -39,6 +44,7 @@ Suggests:
     shiny,
     shinychat (>= 0.5.0),
     testthat (>= 3.2.2),
+    webshot2,
     withr,
     xml2,
     yaml
@@ -129,8 +135,10 @@ Collate:
     'permission-evaluation.R'
     'permission-policy.R'
     'permissions.R'
+    'r-session-artifacts.R'
     'r-session-checkpoint.R'
     'r-session-result.R'
+    'r-session-rich-renderer.R'
     'r-session-tools.R'
     'r-session-worker.R'
     'r-session.R'

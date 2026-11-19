@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* `RSession` can store interactive htmlwidgets and rich tables as host-owned
+  HTML artifacts. Tool results retain the artifact reference, text summary
+  and any static preview. `$artifact_frame()` verifies and reopens the document
+  in a sandboxed iframe for the same owner, Agent and session (#144).
+
 * `RSession$checkpoint()` saves selected R data to a host-owned directory.
   `$restore_checkpoint()` verifies the artifact and imports its bindings
   into a fresh worker for the same owner, Agent and conversation. Recovery
