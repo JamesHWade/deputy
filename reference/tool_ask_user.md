@@ -34,7 +34,7 @@ an `answers` array with one entry per question, in the same order:
 none was chosen) and `other_text` (the answer the person typed instead
 of, or for a multi-select question as well as, choosing options; `null`
 if none). Read it in R with
-[`jsonlite::parse_json()`](https://jeroen.r-universe.dev/jsonlite/reference/read_json.html).
+[`jsonlite::parse_json()`](https://rdrr.io/pkg/jsonlite/man/read_json.html).
 If the handler returns
 [`AskUserDeferred()`](https://jameshwade.github.io/deputy/reference/AskUserDeferred.md),
 the result is instead a list with the `questions`, `status` `"deferred"`

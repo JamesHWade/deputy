@@ -102,7 +102,7 @@ and an <code>answers</code> array with one entry per question, in the same order
 <code>question</code>, <code>selected</code> (an array of the chosen option labels, empty if
 none was chosen) and <code>other_text</code> (the answer the person typed instead
 of, or for a multi-select question as well as, choosing options; <code>null</code>
-if none). Read it in R with <code><a href="https://jeroen.r-universe.dev/jsonlite/reference/read_json.html" class="external-link">jsonlite::parse_json()</a></code>. If the handler
+if none). Read it in R with <code><a href="https://rdrr.io/pkg/jsonlite/man/read_json.html" class="external-link">jsonlite::parse_json()</a></code>. If the handler
 returns <code><a href="AskUserDeferred.html">AskUserDeferred()</a></code>, the result is instead a list with the
 <code>questions</code>, <code>status</code> <code>"deferred"</code> and <code>instructions</code> for the model.</p>
     </div>

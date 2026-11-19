@@ -99,7 +99,7 @@ deny it later, possibly from another R process, with
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>The agent needs an <code>approval_dir</code>, and the tool must be registered with
 <code>convert = FALSE</code>, so its function receives the raw JSON arguments. Tool
-results should be strings, JSON from <code><a href="https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html" class="external-link">jsonlite::toJSON()</a></code>, or ellmer content
+results should be strings, JSON from <code><a href="https://rdrr.io/pkg/jsonlite/man/fromJSON.html" class="external-link">jsonlite::toJSON()</a></code>, or ellmer content
 objects. Inputs or results shaped like a list with <code>version</code>, <code>class</code> and
 <code>props</code> fields are rejected, because ellmer would read them back as
 serialized objects.</p>

@@ -2,6 +2,12 @@
 
 ## deputy (development version)
 
+- `RSession$checkpoint()` saves selected R data to a host-owned
+  directory. `$restore_checkpoint()` verifies the artifact and imports
+  its bindings into a fresh worker for the same owner, Agent and
+  conversation. Recovery runs no historical code and repeats no tool
+  calls ([\#263](https://github.com/JamesHWade/deputy/issues/263)).
+
 - `RSession` retries transient mailbox metadata, open, and read failures
   during an active call. Host deadline results include the last I/O
   error; malformed or oversized requests are not retried
@@ -201,7 +207,7 @@
   `new_text` and an optional `replace_all`. It no longer accepts a JSON
   string or the `old_string`, `new_string` and `replaceAll` names.
   Parsing that string with
-  [`jsonlite::fromJSON()`](https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html)
+  [`jsonlite::fromJSON()`](https://rdrr.io/pkg/jsonlite/man/fromJSON.html)
   read a string that wasn’t JSON as a file path or URL, so a model could
   make the tool read a local file or fetch a URL. The `RSession` tool
   bridge now reads its messages as JSON text only.

@@ -142,6 +142,24 @@ captured; htmlwidgets and rich HTML tables report <code>unsupported_output</code
 print the data instead.</p>
     </div>
     <div class="section level2">
+    <h2 id="recovering-selected-r-data">Recovering selected R data<a class="anchor" aria-label="anchor" href="#recovering-selected-r-data"></a></h2>
+
+
+<p>To opt in, give the session a private, host-managed checkpoint directory
+and a stable owner ID. The host must authorize access to that directory and
+supply the same owner, Agent ID and conversation ID when reopening it.
+Queue <code>$checkpoint()</code> after the calculations you want to keep, then retain
+the receipt's <code>id</code>. A new session can queue <code>$restore_checkpoint(id)</code>
+before its first execution. A reset also permits a fresh restore.</p>
+<p>Checkpoints contain only explicitly selected data. Loaded packages,
+unselected variables, tool closures, conversation turns and in-flight
+computation are outside this data format. Restoring evaluates no previous
+code and reissues no tool requests. Keep saved conversation output and job
+effect records separately. A failed R expression may already have changed
+R variables, files or an external service. Review the effect record before
+deciding how to proceed after an interrupted write.</p>
+    </div>
+    <div class="section level2">
     <h2 id="calling-agent-tools-from-r">Calling agent tools from R<a class="anchor" aria-label="anchor" href="#calling-agent-tools-from-r"></a></h2>
 
 
@@ -166,6 +184,8 @@ doesn't limit what the R code can do.</p>
 <p></p><ul><li><p><a href="#method-RSession-initialize"><code>RSession$new()</code></a></p></li>
 <li><p><a href="#method-RSession-tools"><code>RSession$tools()</code></a></p></li>
 <li><p><a href="#method-RSession-run"><code>RSession$run()</code></a></p></li>
+<li><p><a href="#method-RSession-checkpoint"><code>RSession$checkpoint()</code></a></p></li>
+<li><p><a href="#method-RSession-restore_checkpoint"><code>RSession$restore_checkpoint()</code></a></p></li>
 <li><p><a href="#method-RSession-status"><code>RSession$status()</code></a></p></li>
 <li><p><a href="#method-RSession-cancel"><code>RSession$cancel()</code></a></p></li>
 <li><p><a href="#method-RSession-close"><code>RSession$close()</code></a></p></li>
@@ -183,7 +203,9 @@ doesn't limit what the R code can do.</p>
 <span>  plot_height <span class="op">=</span> <span class="fl">650L</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  env <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  libpath <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  libpath <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  checkpoint_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  checkpoint_owner_id <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
 <h4 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h4>
@@ -222,6 +244,16 @@ holds.</p></dd>
 <dd><p>The library directories the R process loads packages
 from, searched in order. <code>NULL</code> uses your session's <code><a href="https://rdrr.io/r/base/libPaths.html" class="external-link">.libPaths()</a></code> each
 time a process starts.</p></dd>
+
+      <dt><code>checkpoint_dir</code></dt>
+<dd><p>An existing private directory the host owns and
+manages, or <code>NULL</code> to disable checkpoints. Store only artifacts
+created by Deputy in this directory. The host manages retention and
+filesystem permissions.</p></dd>
+
+      <dt><code>checkpoint_owner_id</code></dt>
+<dd><p>A stable owner identifier supplied by the
+host. Required together with <code>checkpoint_dir</code>.</p></dd>
 
 
 </dl><p></p></div>
@@ -263,13 +295,59 @@ and cancelled calls resolve to a result that describes them.</p>
 
 </div>
 
+<p></p><hr><a id="method-RSession-checkpoint"></a><div class="section">
+<h3 id="rsession-checkpoint-"><code>RSession$checkpoint()</code><a class="anchor" aria-label="anchor" href="#rsession-checkpoint-"></a></h3>
+<p>Queue capture of selected global bindings after earlier
+calls finish. Bindings must exist and contain ordinary R data, such
+as vectors, lists, matrices, factors, dates or base data frames.
+The serialized data can occupy up to 8 MiB. A new capture produces
+a new immutable artifact.</p><div class="section">
+<h4 id="usage-3">Usage<a class="anchor" aria-label="anchor" href="#usage-3"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">RSession</span><span class="op">$</span><span class="fu">checkpoint</span><span class="op">(</span><span class="va">bindings</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-2">Arguments<a class="anchor" aria-label="anchor" href="#arguments-2"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>bindings</code></dt>
+<dd><p>Character vector of distinct global binding names.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-2">Returns<a class="anchor" aria-label="anchor" href="#returns-2"></a></h4>
+<p>A promise for a checkpoint receipt with <code>id</code>, <code>bindings</code>,
+<code>generation</code>, <code>bytes</code> and <code>sha256</code>. Capture or persistence errors
+reject the promise.</p>
+</div>
+
+</div>
+
+<p></p><hr><a id="method-RSession-restore_checkpoint"></a><div class="section">
+<h3 id="rsession-restore-checkpoint-"><code>RSession$restore_checkpoint()</code><a class="anchor" aria-label="anchor" href="#rsession-restore-checkpoint-"></a></h3>
+<p>Queue import of a committed checkpoint. At its turn, the
+session must have no live worker, so import starts in a fresh worker.</p><div class="section">
+<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
+<p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">RSession</span><span class="op">$</span><span class="fu">restore_checkpoint</span><span class="op">(</span><span class="va">id</span><span class="op">)</span></span></code></pre></div><p></p></div>
+</div><p></p><div class="section">
+<h4 id="arguments-3">Arguments<a class="anchor" aria-label="anchor" href="#arguments-3"></a></h4>
+<p></p><div class="arguments"><dl><dt><code>id</code></dt>
+<dd><p>The <code>id</code> returned in the checkpoint receipt.</p></dd>
+
+
+</dl><p></p></div>
+</div><p></p><div class="section">
+<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
+<p>A promise for the original receipt plus <code>restored_generation</code>.
+Lookup, verification or import errors reject the promise.</p>
+</div>
+
+</div>
+
 <p></p><hr><a id="method-RSession-status"></a><div class="section">
 <h3 id="rsession-status-"><code>RSession$status()</code><a class="anchor" aria-label="anchor" href="#rsession-status-"></a></h3>
 <p>Report the session's state without running code.</p><div class="section">
-<h4 id="usage-3">Usage<a class="anchor" aria-label="anchor" href="#usage-3"></a></h4>
+<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">RSession</span><span class="op">$</span><span class="fu">status</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-2">Returns<a class="anchor" aria-label="anchor" href="#returns-2"></a></h4>
+<h4 id="returns-4">Returns<a class="anchor" aria-label="anchor" href="#returns-4"></a></h4>
 <p>A list with <code>id</code>, <code>state</code>, <code>generation</code> (incremented each time a
 fresh R process starts), <code>queued</code>, <code>last_reset</code>, <code>pid</code> and
 <code>working_dir</code>.</p>
@@ -281,10 +359,10 @@ fresh R process starts), <code>queued</code>, <code>last_reset</code>, <code>pid
 <h3 id="rsession-cancel-"><code>RSession$cancel()</code><a class="anchor" aria-label="anchor" href="#rsession-cancel-"></a></h3>
 <p>Cancel running and queued calls and discard the session's
 variables.</p><div class="section">
-<h4 id="usage-4">Usage<a class="anchor" aria-label="anchor" href="#usage-4"></a></h4>
+<h4 id="usage-6">Usage<a class="anchor" aria-label="anchor" href="#usage-6"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">RSession</span><span class="op">$</span><span class="fu">cancel</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div><p></p><div class="section">
-<h4 id="returns-3">Returns<a class="anchor" aria-label="anchor" href="#returns-3"></a></h4>
+<h4 id="returns-5">Returns<a class="anchor" aria-label="anchor" href="#returns-5"></a></h4>
 <p>Invisible <code>NULL</code>.</p>
 </div>
 
@@ -293,7 +371,7 @@ variables.</p><div class="section">
 <p></p><hr><a id="method-RSession-close"></a><div class="section">
 <h3 id="rsession-close-"><code>RSession$close()</code><a class="anchor" aria-label="anchor" href="#rsession-close-"></a></h3>
 <p>Close the session for good and stop its R process.</p><div class="section">
-<h4 id="usage-5">Usage<a class="anchor" aria-label="anchor" href="#usage-5"></a></h4>
+<h4 id="usage-7">Usage<a class="anchor" aria-label="anchor" href="#usage-7"></a></h4>
 <p></p><div class="r"><div class="sourceCode"><pre><code><span><span class="va">RSession</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div><p></p></div>
 </div>
 

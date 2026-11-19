@@ -42,6 +42,25 @@ compaction, store the full display history yourself. Base, ggplot2, grid
 and patchwork plots are captured; htmlwidgets and rich HTML tables
 report `unsupported_output`, so print the data instead.
 
+## Recovering selected R data
+
+To opt in, give the session a private, host-managed checkpoint directory
+and a stable owner ID. The host must authorize access to that directory
+and supply the same owner, Agent ID and conversation ID when reopening
+it. Queue `$checkpoint()` after the calculations you want to keep, then
+retain the receipt's `id`. A new session can queue
+`$restore_checkpoint(id)` before its first execution. A reset also
+permits a fresh restore.
+
+Checkpoints contain only explicitly selected data. Loaded packages,
+unselected variables, tool closures, conversation turns and in-flight
+computation are outside this data format. Restoring evaluates no
+previous code and reissues no tool requests. Keep saved conversation
+output and job effect records separately. A failed R expression may
+already have changed R variables, files or an external service. Review
+the effect record before deciding how to proceed after an interrupted
+write.
+
 ## Calling agent tools from R
 
 With `tools = c("name")`, code run through the agent's `run_r_code` tool
@@ -68,6 +87,10 @@ them doesn't limit what the R code can do.
 
 - [`RSession$run()`](#method-RSession-run)
 
+- [`RSession$checkpoint()`](#method-RSession-checkpoint)
+
+- [`RSession$restore_checkpoint()`](#method-RSession-restore_checkpoint)
+
 - [`RSession$status()`](#method-RSession-status)
 
 - [`RSession$cancel()`](#method-RSession-cancel)
@@ -92,7 +115,9 @@ Create a session. The R process starts on the first call.
       plot_height = 650L,
       tools = character(),
       env = NULL,
-      libpath = NULL
+      libpath = NULL,
+      checkpoint_dir = NULL,
+      checkpoint_owner_id = NULL
     )
 
 #### Arguments
@@ -141,6 +166,17 @@ Create a session. The R process starts on the first call.
   [`.libPaths()`](https://rdrr.io/r/base/libPaths.html) each time a
   process starts.
 
+- `checkpoint_dir`:
+
+  An existing private directory the host owns and manages, or `NULL` to
+  disable checkpoints. Store only artifacts created by Deputy in this
+  directory. The host manages retention and filesystem permissions.
+
+- `checkpoint_owner_id`:
+
+  A stable owner identifier supplied by the host. Required together with
+  `checkpoint_dir`.
+
 ------------------------------------------------------------------------
 
 ### `RSession$tools()`
@@ -178,6 +214,52 @@ A promise for an
 [`ellmer::ContentToolResult`](https://ellmer.tidyverse.org/reference/Content.html).
 R errors, crashes and cancelled calls resolve to a result that describes
 them.
+
+------------------------------------------------------------------------
+
+### `RSession$checkpoint()`
+
+Queue capture of selected global bindings after earlier calls finish.
+Bindings must exist and contain ordinary R data, such as vectors, lists,
+matrices, factors, dates or base data frames. The serialized data can
+occupy up to 8 MiB. A new capture produces a new immutable artifact.
+
+#### Usage
+
+    RSession$checkpoint(bindings)
+
+#### Arguments
+
+- `bindings`:
+
+  Character vector of distinct global binding names.
+
+#### Returns
+
+A promise for a checkpoint receipt with `id`, `bindings`, `generation`,
+`bytes` and `sha256`. Capture or persistence errors reject the promise.
+
+------------------------------------------------------------------------
+
+### `RSession$restore_checkpoint()`
+
+Queue import of a committed checkpoint. At its turn, the session must
+have no live worker, so import starts in a fresh worker.
+
+#### Usage
+
+    RSession$restore_checkpoint(id)
+
+#### Arguments
+
+- `id`:
+
+  The `id` returned in the checkpoint receipt.
+
+#### Returns
+
+A promise for the original receipt plus `restored_generation`. Lookup,
+verification or import errors reject the promise.
 
 ------------------------------------------------------------------------
 

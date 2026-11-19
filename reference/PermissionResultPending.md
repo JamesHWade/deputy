@@ -29,7 +29,7 @@ A `PermissionResultPending` object.
 The agent needs an `approval_dir`, and the tool must be registered with
 `convert = FALSE`, so its function receives the raw JSON arguments. Tool
 results should be strings, JSON from
-[`jsonlite::toJSON()`](https://jeroen.r-universe.dev/jsonlite/reference/fromJSON.html),
+[`jsonlite::toJSON()`](https://rdrr.io/pkg/jsonlite/man/fromJSON.html),
 or ellmer content objects. Inputs or results shaped like a list with
 `version`, `class` and `props` fields are rejected, because ellmer would
 read them back as serialized objects.

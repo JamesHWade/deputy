@@ -87,8 +87,8 @@ discards its variables; the next call starts a fresh worker and says so.
 Call `$close()` when the conversation ends, for example from
 `session$onSessionEnded()` in Shiny.
 
-A saved conversation keeps the code, output and plots, but not the
-worker’s variables. After a restart the model has to recreate them.
+A saved conversation keeps the code, output and plots. Use an explicit
+checkpoint to keep selected worker variables across a restart.
 
 The worker loads packages from your session’s
 [`.libPaths()`](https://rdrr.io/r/base/libPaths.html). To give it a
@@ -100,6 +100,63 @@ session’s search path doesn’t change.
 Static plots from base graphics, ggplot2, grid and patchwork are
 captured. htmlwidgets and other interactive output are reported as
 unsupported.
+
+### Recover selected R data after a restart
+
+Give each conversation a stable owner, Agent and session ID from your
+application. Configure an existing private directory where your
+application keeps checkpoint artifacts. The example uses a temporary
+directory. For reopening after a supervisor restart, use durable storage
+and retain the checkpoint receipt’s ID in your application.
+
+``` r
+
+directory <- tempfile()
+dir.create(directory, mode = "0700")
+
+open_worker <- function() {
+  agent <- Agent$new(
+    chat = ellmer::chat("openai/gpt-6-luna"),
+    agent_id = "analysis",
+    session_id = "analysis-17"
+  )
+  RSession$new(
+    agent,
+    checkpoint_dir = directory,
+    checkpoint_owner_id = "research-team"
+  )
+}
+
+worker <- open_worker()
+promises::then(worker$run("measurements <- mtcars[1:5, ]; scratch <- 10"), function(result) {
+  worker$checkpoint("measurements")
+}) |>
+  promises::then(function(receipt) {
+    worker$close()
+    reopened <- open_worker()
+    promises::then(reopened$restore_checkpoint(receipt$id), function(restored) {
+      print(restored$bindings)
+      reopened$run("nrow(measurements)")
+    }) |>
+      promises::finally(function() reopened$close())
+  })
+```
+
+Checkpoint operations and R executions share one queue. Wait for the
+restore promise to resolve before submitting dependent code. Captures
+support ordinary R data such as base data frames, matrices, factors and
+lists of vectors. The artifact stores at most 8 MiB of serialized data.
+A receipt identifies the selected bindings and their capture generation.
+The restore receipt adds the generation that imported them. Variables
+outside the selection must be recreated. Configure the new Agent and
+register its tools as you would for a new worker.
+
+Keep R data checkpoints, conversation output and job or approval effect
+records in their respective stores. Importing data does not repeat the R
+expressions that produced it. A failed expression can leave partial
+changes in R or in files and services. If a job’s effect outcome is
+indeterminate, inspect its external receipt before deciding whether to
+make another request.
 
 ### Call your tools from R code
 
