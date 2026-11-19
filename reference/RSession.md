@@ -39,8 +39,12 @@ an `extra$deputy_r` record of the call. Saved turns keep the code,
 output and plots but not the variables, which must be recreated after a
 restart. Agent snapshots keep only the current model context, so with
 compaction, store the full display history yourself. Base, ggplot2, grid
-and patchwork plots are captured; htmlwidgets and rich HTML tables
-report `unsupported_output`, so print the data instead.
+and patchwork plots are captured. With an artifact directory, visible
+supported htmlwidgets and rich tables produce a stored HTML document.
+Use `$artifact_frame()` to reopen it. Tool results carry bounded text,
+any static preview, and a reference in `extra$deputy_r$segments`. Keep
+the artifact directory with the saved turns. Rich output without a store
+reports `unsupported_output`.
 
 ## Recovering selected R data
 
@@ -91,6 +95,8 @@ them doesn't limit what the R code can do.
 
 - [`RSession$restore_checkpoint()`](#method-RSession-restore_checkpoint)
 
+- [`RSession$artifact_frame()`](#method-RSession-artifact_frame)
+
 - [`RSession$status()`](#method-RSession-status)
 
 - [`RSession$cancel()`](#method-RSession-cancel)
@@ -117,7 +123,9 @@ Create a session. The R process starts on the first call.
       env = NULL,
       libpath = NULL,
       checkpoint_dir = NULL,
-      checkpoint_owner_id = NULL
+      checkpoint_owner_id = NULL,
+      artifact_dir = NULL,
+      artifact_owner_id = NULL
     )
 
 #### Arguments
@@ -176,6 +184,17 @@ Create a session. The R process starts on the first call.
 
   A stable owner identifier supplied by the host. Required together with
   `checkpoint_dir`.
+
+- `artifact_dir`:
+
+  An existing private directory for interactive R documents, or `NULL`
+  to disable interactive capture. The host manages permissions, access
+  checks and retention.
+
+- `artifact_owner_id`:
+
+  A stable host owner identifier. Required with `artifact_dir`.
+  Reopening also requires the same Agent and session IDs.
 
 ------------------------------------------------------------------------
 
@@ -260,6 +279,27 @@ have no live worker, so import starts in a fresh worker.
 
 A promise for the original receipt plus `restored_generation`. Lookup,
 verification or import errors reject the promise.
+
+------------------------------------------------------------------------
+
+### `RSession$artifact_frame()`
+
+Reopen a verified document in an iframe. Build this UI after your host
+app has authorized the current conversation.
+
+#### Usage
+
+    RSession$artifact_frame(id)
+
+#### Arguments
+
+- `id`:
+
+  An artifact ID from `result@extra$deputy_r$segments`.
+
+#### Returns
+
+A sandboxed `htmltools` iframe for this owner, Agent and session.
 
 ------------------------------------------------------------------------
 

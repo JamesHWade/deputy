@@ -55,6 +55,20 @@ policy](https://jameshwade.github.io/deputy/articles/conversations.md):
 long conversations are compacted automatically, and large tool results
 are stored outside the model’s context.
 
+## Async replies in a shared R process
+
+[`chat_server()`](https://posit-dev.github.io/shinychat/r/reference/chat_app.html)
+calls the Agent’s governed `stream_async()` method. If your app needs a
+single promise, `agent$chat_async()` collects the same governed stream.
+On curl 8.1.0, httr2 1.3.0 and ellmer 0.5.2, both methods stalled the R
+event loop for about two seconds in loopback tests with delayed headers
+or body. A development build of httr2 shortened the delayed-body stall.
+Delayed headers still block the process, which can pause other Shiny
+sessions. Direct ellmer nonstreaming requests stayed responsive in the
+fixture and run outside Deputy’s permissions, hooks and usage limits.
+[Transport qualification and release
+status](https://github.com/JamesHWade/deputy/issues/200).
+
 ## Tell users when older messages are summarised
 
 When compaction runs, the model sees a summary instead of the oldest

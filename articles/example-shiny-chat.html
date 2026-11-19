@@ -147,6 +147,20 @@ are compacted automatically, and large tool results are stored outside
 the model’s context.</p>
 </div>
 <div class="section level2">
+<h2 id="async-replies-in-a-shared-r-process">Async replies in a shared R process<a class="anchor" aria-label="anchor" href="#async-replies-in-a-shared-r-process"></a>
+</h2>
+<p><code><a href="https://posit-dev.github.io/shinychat/r/reference/chat_app.html" class="external-link">chat_server()</a></code> calls the Agent’s governed
+<code>stream_async()</code> method. If your app needs a single promise,
+<code>agent$chat_async()</code> collects the same governed stream. On
+curl 8.1.0, httr2 1.3.0 and ellmer 0.5.2, both methods stalled the R
+event loop for about two seconds in loopback tests with delayed headers
+or body. A development build of httr2 shortened the delayed-body stall.
+Delayed headers still block the process, which can pause other Shiny
+sessions. Direct ellmer nonstreaming requests stayed responsive in the
+fixture and run outside Deputy’s permissions, hooks and usage limits. <a href="https://github.com/JamesHWade/deputy/issues/200" class="external-link">Transport
+qualification and release status</a>.</p>
+</div>
+<div class="section level2">
 <h2 id="tell-users-when-older-messages-are-summarised">Tell users when older messages are summarised<a class="anchor" aria-label="anchor" href="#tell-users-when-older-messages-are-summarised"></a>
 </h2>
 <p>When compaction runs, the model sees a summary instead of the oldest

@@ -98,8 +98,47 @@ name the directories in order with `libpath`:
 session’s search path doesn’t change.
 
 Static plots from base graphics, ggplot2, grid and patchwork are
-captured. htmlwidgets and other interactive output are reported as
-unsupported.
+captured. To keep supported interactive outputs, opt into an artifact
+directory.
+
+### Reopen interactive R results
+
+Use an existing private directory and a stable host owner ID. Visible
+Plotly, DT and Leaflet widgets with bundled resources, and tables from
+gt or flextable, can be exported to HTML. htmlwidgets export uses
+Pandoc. The result includes a bounded text summary and a static PNG when
+the renderer can capture one. Browser previews use optional webshot2 and
+Chrome. Flextable exports its own static image. The HTML, text and image
+share the call’s output budget.
+
+``` r
+
+worker <- RSession$new(
+  agent,
+  artifact_dir = app_artifact_dir,
+  artifact_owner_id = app_owner_id
+)
+agent$register_tools(worker$tools())
+
+# In a host callback, use the saved ContentToolResult for this conversation.
+interactive <- Filter(
+  function(segment) !is.null(segment$artifact$id),
+  result@extra$deputy_r$segments
+)
+if (length(interactive)) {
+  frame <- worker$artifact_frame(interactive[[1L]]$artifact$id)
+  # Return the frame from shiny::renderUI() for this authorized conversation.
+}
+```
+
+After a restart, load the saved conversation and recreate `RSession`
+with the original owner, Agent and session IDs and artifact directory.
+The saved tool card carries the display evidence and reference. The host
+can show the verified frame beside that card without starting an R
+worker. The frame isolates the document from the host page and restricts
+subresource loads to bundled content. Use local layers for Leaflet maps.
+Server-backed outputs require a live renderer. The host controls
+authorization and retention.
 
 ### Recover selected R data after a restart
 
