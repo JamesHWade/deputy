@@ -169,7 +169,7 @@ graph_validate_existing_tools <- function(agent, node_name) {
   invisible(NULL)
 }
 
-graph_validate_routes <- function(routes, nodes, agents) {
+graph_validate_routes <- function(routes, nodes, agents, graph_limits) {
   if (is.null(routes)) {
     routes <- list()
   }
@@ -287,6 +287,16 @@ graph_validate_routes <- function(routes, nodes, agents) {
         normalize_usage_limits(spec$usage_limits),
         error = function(error) graph_abort(conditionMessage(error))
       )
+      # An opt-in on the graph covers its routes. The shared ceiling is
+      # checked separately at model dispatch, including during wrap-up.
+      if (
+        identical(graph_limits$on_exceed, "wrap_up") &&
+          identical(limits$on_exceed, "stop")
+      ) {
+        fields <- S7::props(limits)
+        fields$on_exceed <- "wrap_up"
+        limits <- do.call(UsageLimits, fields)
+      }
       normalized_specs[[tool_name]] <- list(
         target = target,
         description = description,
@@ -480,7 +490,7 @@ retain_agent_graph <- function(
   max_delegations <- graph_positive_integer(max_delegations, "max_delegations")
   max_concurrency <- graph_positive_integer(max_concurrency, "max_concurrency")
   max_runs <- graph_positive_integer(max_runs, "max_runs")
-  routes <- graph_validate_routes(routes, node_names, all_agents)
+  routes <- graph_validate_routes(routes, node_names, all_agents, limits)
 
   root_tools <- graph_node_tools(owner)
   member_tools <- lapply(agents, graph_node_tools)

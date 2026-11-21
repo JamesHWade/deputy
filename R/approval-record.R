@@ -246,7 +246,10 @@ approval_record_content <- function(value) {
     value@error <- conditionMessage(value@error)
   }
   approval_check_content_value(value)
-  record <- approval_content_record_values(ellmer::contents_record(value))
+  record <- approval_content_record_values(
+    ellmer::contents_record(value),
+    value
+  )
   approval_portable(record)
   record
 }
@@ -565,21 +568,47 @@ intersect_usage_limits <- function(left, right) {
   } else {
     "continue"
   }
-  fields$on_exceed <- if ("error" %in% c(left$on_exceed, right$on_exceed)) {
+  settings <- c(left$on_exceed, right$on_exceed)
+  # A looser hard ceiling still holds when the tighter limit allows one
+  # more request. Keep the hard stop when its ceiling determines the limit.
+  hard_wrap_up_limit <- function(limits) {
+    identical(limits$on_exceed, "stop") &&
+      (isTRUE(limits$max_requests == fields$max_requests) ||
+        isTRUE(limits$max_tool_calls == fields$max_tool_calls))
+  }
+  fields$on_exceed <- if ("error" %in% settings) {
     "error"
+  } else if (hard_wrap_up_limit(left) || hard_wrap_up_limit(right)) {
+    "stop"
+  } else if ("wrap_up" %in% settings) {
+    "wrap_up"
   } else {
     "stop"
   }
   do.call(UsageLimits, fields)
 }
 
-# ellmer records keep their display-only currency class on numeric costs.
-approval_content_record_values <- function(value) {
+# Convert display-only currency and S7's stored NULL representation to
+# portable values. The public property distinguishes NULL from a real symbol.
+approval_content_record_values <- function(value, source) {
   if (inherits(value, "ellmer_dollars")) {
     return(as.numeric(value))
   }
+  if (S7::S7_inherits(source)) {
+    for (name in names(value$props)) {
+      property <- S7::prop(source, name)
+      recorded <- value$props[[name]]
+      portable <- if (is.symbol(recorded) && is.null(property)) {
+        NULL
+      } else {
+        approval_content_record_values(recorded, property)
+      }
+      value$props[name] <- list(portable)
+    }
+    return(value)
+  }
   if (is.list(value) && !is.object(value)) {
-    return(lapply(value, approval_content_record_values))
+    return(Map(approval_content_record_values, value, source))
   }
   value
 }

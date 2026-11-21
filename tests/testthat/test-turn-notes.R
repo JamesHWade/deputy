@@ -176,7 +176,9 @@ test_that("a saved session keeps its notes", {
   # The session lists its notes, so the receiver needs no notes function.
   receiver <- Agent$new(create_mock_chat())
   suppressMessages(receiver$load_session(path))
-  expect_identical(receiver$get_turns()[[2L]]@contents[[2L]], note)
+  restored <- receiver$get_turns()[[2L]]@contents[[2L]]
+  expect_s7_class(restored, NoteText)
+  expect_identical(S7::props(restored), S7::props(note))
   expect_identical(receiver$get_context_turns(), note_turns())
 })
 

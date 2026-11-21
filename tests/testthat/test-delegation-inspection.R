@@ -84,7 +84,7 @@ test_that("batch outcomes retain failures and repeated specialist identities", {
   first <- lead$parallel_delegate(c(a = "one", b = "two"))
   second <- lead$parallel_delegate(c(a = "again"))
   expect_s7_class(first$outcomes$a, DelegationOutcome)
-  expect_snapshot(error = TRUE, first$outcomes$a@answer <- "altered")
+  expect_snapshot_s7_error(error = TRUE, first$outcomes$a@answer <- "altered")
   ids <- vapply(
     lead$inspect_subagents("owner"),
     function(x) x$outcome$runtime$conversation_id,
@@ -1184,4 +1184,48 @@ test_that("structured claim omissions are explicit for models and hosts", {
       list(omitted_entries = 1L, text_truncated = FALSE)
     )
   }
+})
+
+test_that("a delegation outcome says when the specialist's answer was cut off", {
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "delegate_to_agent",
+      arguments = list(agent_name = "worker", task = "write at length")
+    ),
+    runtime_reply(text = "half an answ", finish = "length"),
+    runtime_reply(
+      tool = "delegate_to_agent",
+      arguments = list(agent_name = "worker", task = "say it briefly")
+    ),
+    runtime_reply(text = "a whole answer"),
+    runtime_reply(text = "lead is done")
+  ))
+  lead <- LeadAgent$new(
+    runtime_chat(server),
+    sub_agents = list(agent_definition("worker", "Worker", "Answer tasks.")),
+    permissions = permissions_full()
+  )
+
+  suppressWarnings(lead$run_sync("Delegate twice"))
+
+  outcomes <- lapply(
+    Filter(
+      function(event) identical(event$tool_name, "delegate_to_agent"),
+      Filter(
+        function(event) identical(event$type, "tool_end"),
+        lead$last_run()$events
+      )
+    ),
+    function(event) {
+      jsonlite::fromJSON(event$tool_result, simplifyVector = FALSE)
+    }
+  )
+  expect_length(outcomes, 2L)
+  expect_identical(outcomes[[1]]$runtime$finish_reason, "max_tokens")
+  expect_true(outcomes[[1]]$runtime$cut_off)
+  # The status and stop reason keep their meaning.
+  expect_identical(outcomes[[1]]$runtime$status, "completed")
+  expect_identical(outcomes[[1]]$runtime$stop_reason, "complete")
+  expect_identical(outcomes[[2]]$runtime$finish_reason, "success")
+  expect_false(outcomes[[2]]$runtime$cut_off)
 })

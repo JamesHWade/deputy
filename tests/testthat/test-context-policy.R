@@ -1084,9 +1084,15 @@ test_that("S7 context policies freeze configuration and reject list lookalikes",
   policy <- ContextPolicy(max_tokens = NULL, max_tool_result_bytes = NULL)
   expect_s7_class(policy, ContextPolicy)
   expect_identical(policy$compact_to, S7::prop(policy, "compact_to"))
-  expect_snapshot(error = TRUE, policy$max_tokens <- 100L)
-  expect_snapshot(error = TRUE, S7::prop(policy, "offload_dir") <- "changed")
-  expect_snapshot(error = TRUE, S7::props(policy) <- list(fallback = "text"))
+  expect_snapshot_s7_error(error = TRUE, policy$max_tokens <- 100L)
+  expect_snapshot_s7_error(
+    error = TRUE,
+    S7::prop(policy, "offload_dir") <- "changed"
+  )
+  expect_snapshot_s7_error(
+    error = TRUE,
+    S7::props(policy) <- list(fallback = "text")
+  )
   fields <- S7::props(policy)
   fields$max_tokens <- 100L
   replacement <- do.call(ContextPolicy, fields)
@@ -1132,10 +1138,16 @@ test_that("S7 compactions preserve provider evidence while freezing records", {
   expect_identical(outcome$turns_compacted, 2L)
   expect_identical(outcome$estimated_tokens, 100)
   expect_s3_class(outcome$compacted_at, "POSIXct")
-  expect_snapshot(error = TRUE, outcome$run_id <- "changed")
-  expect_snapshot(error = TRUE, outcome@attempts[[1L]]$provider <- "changed")
-  expect_snapshot(error = TRUE, outcome@usage@requests <- 3L)
-  expect_snapshot(error = TRUE, S7::props(outcome) <- list(summary = "changed"))
+  expect_snapshot_s7_error(error = TRUE, outcome$run_id <- "changed")
+  expect_snapshot_s7_error(
+    error = TRUE,
+    outcome@attempts[[1L]]$provider <- "changed"
+  )
+  expect_snapshot_s7_error(error = TRUE, outcome@usage@requests <- 3L)
+  expect_snapshot_s7_error(
+    error = TRUE,
+    S7::props(outcome) <- list(summary = "changed")
+  )
   fields <- S7::props(outcome)
   fields$attempts[[1L]]$provider <- "copy"
   expect_identical(outcome$attempts[[1L]]$provider, "test")
@@ -1157,11 +1169,11 @@ test_that("S7 compaction constructors validate counts and optional evidence", {
     error = TRUE,
     DeputyCompaction("none", FALSE, 0, 0, run_id = c("one", "two"))
   )
-  expect_snapshot(
+  expect_snapshot_s7_error(
     error = TRUE,
     DeputyCompaction("none", FALSE, 0, 0, attempts = "invalid")
   )
-  expect_snapshot(
+  expect_snapshot_s7_error(
     error = TRUE,
     DeputyCompaction(
       "none",
@@ -1391,4 +1403,75 @@ test_that("a policy that saves no tool results doesn't save long subagent answer
   expect_identical(view$outcome$runtime$answer_truncated, TRUE)
   expect_null(view$outcome$runtime$error)
   expect_length(view$outcome$references, 0L)
+})
+
+test_that("ContextPolicy derives the in-run ceiling from max_tokens", {
+  policy <- ContextPolicy(max_tokens = 200000)
+  expect_identical(policy$max_tokens_in_run, 250000L)
+  # The property keeps what was asked for, so the default follows max_tokens
+  # when a copy changes it.
+  expect_null(S7::prop(policy, "max_tokens_in_run"))
+  settings <- S7::props(policy)
+  settings$max_tokens <- 24000L
+  expect_identical(do.call(ContextPolicy, settings)$max_tokens_in_run, 30000L)
+
+  explicit <- ContextPolicy(max_tokens = 200000, max_tokens_in_run = 260000)
+  expect_identical(explicit$max_tokens_in_run, 260000L)
+  expect_identical(
+    ContextPolicy(max_tokens = 100, max_tokens_in_run = 100)$max_tokens_in_run,
+    100L
+  )
+
+  # Without a compaction threshold there is no ceiling to apply.
+  expect_null(ContextPolicy(max_tokens = NULL)$max_tokens_in_run)
+  expect_null(
+    ContextPolicy(max_tokens = NULL, max_tokens_in_run = 5000)$max_tokens_in_run
+  )
+  expect_identical(ContextPolicy(max_tokens = 3)$max_tokens_in_run, 4L)
+})
+
+test_that("ContextPolicy validates the in-run ceiling", {
+  expect_error(
+    ContextPolicy(max_tokens = 1000, max_tokens_in_run = 999),
+    "at least"
+  )
+  expect_error(ContextPolicy(max_tokens_in_run = 0), "positive whole number")
+  expect_error(ContextPolicy(max_tokens_in_run = 1.5), "positive whole number")
+  expect_identical(
+    normalize_context_policy(ContextPolicy(
+      max_tokens_in_run = 50000
+    ))$max_tokens_in_run,
+    50000L
+  )
+  expect_match(
+    paste(
+      capture.output(print(ContextPolicy(max_tokens = 1000))),
+      collapse = "\n"
+    ),
+    "in a run: 1250 tokens",
+    fixed = TRUE
+  )
+})
+
+test_that("the reader says so when a reference matches no saved result", {
+  directory <- withr::local_tempdir(pattern = "deputy-empty-reader-")
+  policy <- ContextPolicy(
+    max_tokens = NULL,
+    max_tool_result_bytes = 32,
+    offload_dir = directory
+  )
+  made_up <- paste0(
+    "deputy://tool-result/result_",
+    strrep("a", 64),
+    "?text_sha256=",
+    strrep("b", 64)
+  )
+  error <- expect_error(
+    read_tool_result_chunk(made_up, 0, 100, policy, "session-1"),
+    "No saved tool result matches",
+    class = "deputy_tool_result_not_found"
+  )
+  expect_match(conditionMessage(error), "exactly as a tool result gave it")
+  # Nothing was written for a lookup that found nothing.
+  expect_length(list.files(directory, recursive = TRUE), 0L)
 })

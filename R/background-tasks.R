@@ -417,7 +417,12 @@ background_admission <- function(owner) {
       if (is.null(left) || is.na(left)) {
         next
       }
-      asked <- S7::prop(limits, field) %||% left
+      asked <- if (identical(field, "max_requests")) {
+        delegation_request_allowance(limits)
+      } else {
+        S7::prop(limits, field)
+      }
+      asked <- asked %||% left
       if (left - asked <= 0) {
         background_abort(paste0(
           "This task would set aside all that is left of the run's ",

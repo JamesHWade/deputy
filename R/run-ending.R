@@ -40,6 +40,10 @@ run_ending_cut_off_reasons <- c(
   "content_filter"
 )
 
+is_cut_off_finish_reason <- function(reason) {
+  isTRUE(reason %in% run_ending_cut_off_reasons)
+}
+
 run_ending_stop_reasons <- c(
   interrupted = "caller",
   hook_requested_stop = "hook",
@@ -71,7 +75,10 @@ ending_optional_text <- function(value, arg) {
 #'   and `reason` is the reason they gave.
 #' * `RunEndingLimit`: the run reached a limit. `reason` names it, and `field`,
 #'   `actual` and `limit` give the [UsageLimits] field, the figure reached and
-#'   the figure allowed, when the limit has them.
+#'   the figure allowed, when the limit has them. `wrapped_up` is `TRUE` when
+#'   the model was given one more request, without tools, to answer with what
+#'   it had (only with `on_exceed = "wrap_up"`), and the result's `response` is that answer (see
+#'   [UsageLimits]).
 #' * `RunEndingCutOff`: the provider cut the answer short. `finish_reason` says
 #'   why. The result's `stop_reason` is still `"complete"`, since the run was
 #'   not stopped.
@@ -115,6 +122,8 @@ ending_optional_text <- function(value, arg) {
 #' @param actual The figure the run reached, or `NULL`. `NA` when it is
 #'   unknown, as the cost is for `"cost_unavailable"`.
 #' @param limit The figure the limit allowed, or `NULL`.
+#' @param wrapped_up `TRUE` if the model answered in the extra request that a
+#'   request or tool-call limit allows when `on_exceed = "wrap_up"`, `FALSE` (the default) otherwise.
 #' @param finish_reason The provider's finish reason, as ellmer names it: one
 #'   of `"max_tokens"`, `"context_window"` or `"content_filter"`.
 #' @param error The condition that ended the run, or `NULL`.
@@ -190,9 +199,16 @@ RunEndingLimit <- S7::new_class(
     limit = readonly_property(
       "limit",
       S7::new_union(S7::class_numeric, NULL)
-    )
+    ),
+    wrapped_up = readonly_property("wrapped_up", S7::class_logical)
   ),
-  constructor = function(reason, field = NULL, actual = NULL, limit = NULL) {
+  constructor = function(
+    reason,
+    field = NULL,
+    actual = NULL,
+    limit = NULL,
+    wrapped_up = FALSE
+  ) {
     reason <- match.arg(reason, run_ending_limit_reasons)
     if (!is.null(actual) && (!is.numeric(actual) || length(actual) != 1L)) {
       cli_abort("{.arg actual} must be NULL or one number")
@@ -203,12 +219,16 @@ RunEndingLimit <- S7::new_class(
     ) {
       cli_abort("{.arg limit} must be NULL or one non-missing number")
     }
+    if (!rlang::is_bool(wrapped_up)) {
+      cli_abort("{.arg wrapped_up} must be TRUE or FALSE")
+    }
     value <- S7::new_object(
       S7::S7_object(),
       reason = reason,
       field = ending_optional_text(field, "field"),
       actual = actual,
-      limit = limit
+      limit = limit,
+      wrapped_up = wrapped_up
     )
     freeze_value(value)
   }
@@ -295,15 +315,12 @@ run_ending_for <- function(
   limit_status = NULL,
   finish_reason = NULL,
   error = NULL,
-  phase = NULL
+  phase = NULL,
+  wrapped_up = FALSE
 ) {
   if (identical(reason, "complete")) {
     finish_reason <- as.character(finish_reason)
-    if (
-      length(finish_reason) == 1L &&
-        !is.na(finish_reason) &&
-        finish_reason %in% run_ending_cut_off_reasons
-    ) {
+    if (is_cut_off_finish_reason(finish_reason)) {
       return(RunEndingCutOff(finish_reason))
     }
     return(RunEndingAnswered())
@@ -314,7 +331,8 @@ run_ending_for <- function(
       reason,
       field = if (same) limit_status$field,
       actual = if (same) limit_status$actual,
-      limit = if (same) limit_status$limit
+      limit = if (same) limit_status$limit,
+      wrapped_up = isTRUE(wrapped_up)
     ))
   }
   if (is.null(by) && reason %in% run_ending_failure_reasons) {

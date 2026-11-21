@@ -1,12 +1,18 @@
 # Automatic context transitions share the run lifecycle and budget. Summary
 # requests stay on isolated Chats; ellmer owns their IO, retries and cancellation.
-governed_compaction <- function(agent, messages) {
+governed_compaction <- function(agent, messages, mid_run = FALSE) {
   private <- agent$.__enclos_env__$private
   state <- private$current_run_state
   # The operation records artifacts here so cleanup runs however it settles.
   holder <- new.env(parent = emptyenv())
   holder$artifacts <- NULL
-  operation <- governed_compaction_async(agent, private, messages, holder)
+  operation <- governed_compaction_async(
+    agent,
+    private,
+    messages,
+    holder,
+    mid_run
+  )
   operation <- promises::finally(operation, function() {
     artifacts <- holder$artifacts
     if (!is.null(artifacts)) private$finish_compaction_artifacts(artifacts)
@@ -23,7 +29,8 @@ governed_compaction_async <- coro::async(function(
   agent,
   private,
   messages,
-  holder
+  holder,
+  mid_run = FALSE
 ) {
   policy <- private$.context_policy
   if (
@@ -35,7 +42,9 @@ governed_compaction_async <- coro::async(function(
   }
   estimate <- private$context_estimate(messages)
   estimated <- estimate$tokens
-  if (is.null(estimated) || estimated <= policy$max_tokens) {
+  # Between a tool call and its result only the in-run ceiling compacts.
+  threshold <- compaction_threshold(policy, mid_run)
+  if (is.null(estimated) || estimated <= threshold) {
     return(NULL)
   }
   keep_last <- private$compaction_keep_last(
@@ -102,6 +111,10 @@ governed_compaction_async <- coro::async(function(
   compaction_can_continue(agent)
   result
 })
+
+compaction_threshold <- function(policy, mid_run) {
+  if (isTRUE(mid_run)) policy$max_tokens_in_run else policy$max_tokens
+}
 
 compaction_can_continue <- function(agent) {
   private <- agent$.__enclos_env__$private

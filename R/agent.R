@@ -2843,11 +2843,16 @@ Agent <- R6::R6Class(
           "max_total_tokens",
           "max_cost_usd"
         )
-        private$delegation_usage_reservations[[delegation_id]] <- vapply(
+        reservation <- vapply(
           fields,
           function(field) S7::prop(limits, field) %||% 0,
           numeric(1)
         )
+        reservation[["max_requests"]] <- delegation_request_allowance(
+          limits
+        ) %||%
+          0
+        private$delegation_usage_reservations[[delegation_id]] <- reservation
         if (is.function(private$.job_checkpoint)) {
           private$.job_checkpoint(
             self,

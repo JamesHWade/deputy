@@ -15,6 +15,32 @@ NULL
 #' Token and cost limits can only be checked after a response arrives, so a run
 #' can go over them by one response.
 #'
+#' @section When a limit ends a run:
+#' By default a request or tool-call limit is a hard ceiling: the run stops
+#' and makes no further request. With `on_exceed = "wrap_up"`, a run that
+#' reaches `max_requests` or `max_tool_calls` before the model has
+#' answered gets one more request, with no tools, and a short instruction to
+#' answer now with what it has and say what it could not check. That request is
+#' made in addition to `max_requests`, so **with `"wrap_up"` a run may make one
+#' request more than `max_requests`** (a run limited to 5 requests may make 6).
+#' It is counted in the run's usage, and its answer becomes the result's
+#' `response`. The `stop_reason` is still the limit's, and the result's
+#' `ending$wrapped_up` is `TRUE`. Token and cost limits never get this
+#' request: a run that has reached `max_input_tokens`, `max_output_tokens`,
+#' `max_total_tokens` or `max_cost_usd`, or that has less room left under
+#' `max_input_tokens` or `max_total_tokens` than its conversation is estimated
+#' to take, ends at once, because the extra request is what those limits
+#' exist to prevent. The same goes for a run
+#' inside a delegation graph or tree whose shared budget is spent, for
+#' structured-output runs, for a run that has answered, and for a run that was
+#' stopped for another reason. Subagents, specialists and background tasks
+#' inherit the lead's `on_exceed`. Setting `"wrap_up"` on a graph applies to its
+#' routes. A lead's request count includes its delegates' wrap-up requests
+#' and can exceed its own `max_requests` by at most one. An explicit
+#' hard request or tool-call limit on an agent, retained conversation or
+#' background task still applies. If the extra request fails, the run still
+#' ends on the limit.
+#'
 #' Limits passed to `Agent$new()` apply to every run. Limits passed to a single
 #' run take any `NULL` field from the agent's limits, so they can't remove a
 #' limit the agent sets. A single run keeps its own `on_exceed` and
@@ -41,7 +67,10 @@ NULL
 #'   names the limit, such as `"request_limit"`, `"tool_call_limit"` or
 #'   `"cost_limit"`. `"error"` ends the run the same way, then signals an error
 #'   that inherits from `deputy_budget` (see [deputy-errors]). The result is
-#'   still available from `$last_run()`.
+#'   still available from `$last_run()`. `"wrap_up"` ends the run on the limit
+#'   the same way as `"stop"`, but first makes one more request, without tools,
+#'   so the model can answer with what it has; see the section above. Delegates
+#'   inherit this choice.
 #' @param on_unknown_cost What happens when `max_cost_usd` is set and the cost
 #'   of a response is unknown. `"stop"` (the default) ends the run with
 #'   `"cost_unavailable"`. `"continue"` lets the run go on. The limit is then
@@ -94,7 +123,7 @@ UsageLimits <- S7::new_class(
     max_output_tokens = NULL,
     max_total_tokens = NULL,
     max_cost_usd = NULL,
-    on_exceed = c("stop", "error"),
+    on_exceed = c("stop", "error", "wrap_up"),
     on_unknown_cost = c("stop", "continue")
   ) {
     on_exceed <- match.arg(on_exceed)
@@ -557,6 +586,16 @@ usage_limits_remaining <- function(limits, usage, reserved = NULL) {
     max(0, limit - used[[field]] - held)
   })
   stats::setNames(remaining, fields)
+}
+
+# Reserve a child's possible wrap-up with its requests so concurrent
+# delegations draw from the same allowance.
+delegation_request_allowance <- function(limits) {
+  requests <- limits$max_requests
+  if (isTRUE(requests > 0) && identical(limits$on_exceed, "wrap_up")) {
+    return(requests + 1)
+  }
+  requests
 }
 
 merge_usage_limits <- function(override, defaults) {

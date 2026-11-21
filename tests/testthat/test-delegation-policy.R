@@ -230,7 +230,10 @@ test_that("sub-agents inherit remaining lead run budgets", {
   expect_equal(child$usage_limits$max_total_tokens, 550)
   expect_equal(child$usage_limits$max_cost_usd, 0.20)
   expect_s7_class(child$usage_limits, UsageLimits)
-  expect_snapshot(error = TRUE, child$usage_limits@max_requests <- 100L)
+  expect_snapshot_s7_error(
+    error = TRUE,
+    child$usage_limits@max_requests <- 100L
+  )
   expect_snapshot(error = TRUE, child$usage_limits <- UsageLimits())
   expect_identical(private$current_usage_limits$max_requests, 6L)
 
@@ -413,7 +416,10 @@ test_that("delegated S7 policies preserve ceilings after serialization", {
     permissions_check(child$permissions, "read_file", list(path = "x")),
     PermissionResultDeny
   )
-  expect_snapshot(error = TRUE, child$permissions@tool_denylist <- NULL)
+  expect_snapshot_s7_error(
+    error = TRUE,
+    child$permissions@tool_denylist <- NULL
+  )
   expect_snapshot(error = TRUE, child$permissions <- permissions_full())
   expect_snapshot(error = TRUE, child$set_permission_mode("full"))
 })

@@ -568,8 +568,8 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       as.integer(max(minimum_keep, length(turns) - recent + 1L))
     },
 
-    maybe_auto_compact = function(messages) {
-      governed_compaction(self, messages)
+    maybe_auto_compact = function(messages, mid_run = FALSE) {
+      governed_compaction(self, messages, mid_run = mid_run)
     },
 
     prepare_compaction = function(

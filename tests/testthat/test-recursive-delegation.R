@@ -654,3 +654,87 @@ test_that("root completion leaves host-launched descendants settled and releasab
   expect_length(root$.__enclos_env__$private$active_subagents, 0L)
   root$release_agent_graph()
 })
+
+test_that("a delegate that inherits on_exceed = 'wrap_up' answers at its limit, and the graph counts it", {
+  tool <- ellmer::tool(
+    function() "export-0042",
+    name = "export_findings",
+    description = "Export the findings"
+  )
+  # The reviewer's route allows 2 requests: a tool round trip uses both, so
+  # the third request is the wrap-up.
+  fixture <- recursive_fixture(
+    leaf_tool = tool,
+    leaf_responses = list(
+      runtime_reply(tool = "export_findings"),
+      runtime_reply(tool = "export_findings"),
+      runtime_reply("Partial evidence from the reviewer.", finish = "length")
+    ),
+    graph_limits = UsageLimits(max_requests = 12L, on_exceed = "wrap_up")
+  )
+  fixture$configure()
+  result <- suppressWarnings(fixture$root$run_sync("compose"))
+
+  expect_identical(trimws(result$response), "root synthesis")
+  requests <- fixture$servers[[3L]]$requests()
+  expect_length(requests, 3L)
+  expect_false(is.null(requests[[2L]]$body$tools))
+  expect_null(requests[[3L]]$body$tools)
+  views <- fixture$root$inspect_subagents("host", transcript = TRUE)
+  expect_identical(views[[2L]]$usage$requests, 3L)
+  expect_identical(views[[2L]]$outcome$runtime$finish_reason, "max_tokens")
+  expect_true(views[[2L]]$outcome$runtime$cut_off)
+  expect_identical(fixture$root$delegation_graph_usage()$requests, 7L)
+})
+
+test_that("a delegate in a graph whose budget is spent gets no answer request", {
+  tool <- ellmer::tool(
+    function() "export-0042",
+    name = "export_findings",
+    description = "Export the findings"
+  )
+  fixture <- recursive_fixture(
+    leaf_tool = tool,
+    leaf_responses = list(
+      runtime_reply(tool = "export_findings"),
+      runtime_reply("never asked for")
+    ),
+    graph_limits = UsageLimits(max_requests = 3L, on_exceed = "wrap_up")
+  )
+  fixture$configure()
+  result <- fixture$root$run_sync("compose")
+  expect_identical(result$stop_reason, "request_limit")
+  expect_length(fixture$servers[[3L]]$requests(), 1L)
+})
+
+test_that("a delegate whose lead keeps the default makes no answer request", {
+  tool <- ellmer::tool(
+    function() "export-0042",
+    name = "export_findings",
+    description = "Export the findings"
+  )
+  fixture <- recursive_fixture(
+    leaf_tool = tool,
+    leaf_responses = list(
+      runtime_reply(tool = "export_findings"),
+      runtime_reply(tool = "export_findings"),
+      runtime_reply("never asked for")
+    )
+  )
+  fixture$configure()
+  fixture$root$run_sync("compose")
+  expect_length(fixture$servers[[3L]]$requests(), 2L)
+})
+
+test_that("a delegate derives the lead's on_exceed, including 'wrap_up'", {
+  for (choice in c("stop", "error", "wrap_up")) {
+    agent <- Agent$new(
+      runtime_chat(local_runtime_server(list(runtime_reply("ok")))),
+      usage_limits = UsageLimits(max_requests = 6, on_exceed = choice)
+    )
+    derived <- agent$.__enclos_env__$private$derive_subagent_usage_limits(
+      agent_definition("child", "Child", "Respond once.")
+    )
+    expect_identical(derived$on_exceed, choice)
+  }
+})

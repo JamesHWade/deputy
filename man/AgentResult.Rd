@@ -22,7 +22,8 @@ AgentResult(
   parent_run_id = NULL,
   delegation_id = NULL,
   run_context = list(),
-  ending = NULL
+  ending = NULL,
+  finish_reason = NULL
 )
 }
 \arguments{
@@ -51,9 +52,13 @@ subagent, to the parent run and delegation.}
 \item{run_context}{The run's \code{run_context}, a named list.}
 
 \item{ending}{How the run ended, as a \link{RunEnding} object, or \code{NULL} to
-derive it from \code{stop_reason}. The five classes are \code{\link[=RunEndingAnswered]{RunEndingAnswered()}},
+derive it from \code{stop_reason} and \code{finish_reason}. The five classes are \code{\link[=RunEndingAnswered]{RunEndingAnswered()}},
 \code{\link[=RunEndingStopped]{RunEndingStopped()}}, \code{\link[=RunEndingLimit]{RunEndingLimit()}}, \code{\link[=RunEndingCutOff]{RunEndingCutOff()}} and
 \code{\link[=RunEndingFailed]{RunEndingFailed()}}.}
+
+\item{finish_reason}{The provider's finish reason for the final response,
+or \code{NULL}. With no \code{ending}, a \code{stop_reason} of \code{"complete"} and a cut-off
+\code{finish_reason} give a \link{RunEndingCutOff} ending.}
 }
 \value{
 An \code{AgentResult} object.
@@ -71,6 +76,15 @@ Results are read-only. Read fields with \code{$}, for example
 
 \code{ending} says how the run ended in terms of its own classes, so a host need
 not parse \code{stop_reason}; see \link{RunEnding}.
+
+\code{finish_reason} is the provider's finish reason for the run's final
+response, such as \code{"success"} or \code{"max_tokens"}, or \code{NULL} if there was none.
+\code{cut_off} is \code{TRUE} when the provider cut that response short (the output
+token limit, the context window or a content filter). Without another stop
+reason, the result has a \link{RunEndingCutOff} ending, its \code{stop_reason} is
+\code{"complete"}, and \code{result_is_success()} is \code{TRUE}. A truncated wrap-up answer
+keeps its \link{RunEndingLimit} ending and also has \code{cut_off = TRUE}. Check
+\code{cut_off} whenever you need a whole answer.
 
 \code{usage} covers this run only, but \code{cost} covers the whole conversation,
 including earlier runs and turns that compaction removed from the model
