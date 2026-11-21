@@ -40,6 +40,10 @@ run_ending_cut_off_reasons <- c(
   "content_filter"
 )
 
+is_cut_off_finish_reason <- function(reason) {
+  isTRUE(reason %in% run_ending_cut_off_reasons)
+}
+
 run_ending_stop_reasons <- c(
   interrupted = "caller",
   hook_requested_stop = "hook",
@@ -316,11 +320,7 @@ run_ending_for <- function(
 ) {
   if (identical(reason, "complete")) {
     finish_reason <- as.character(finish_reason)
-    if (
-      length(finish_reason) == 1L &&
-        !is.na(finish_reason) &&
-        finish_reason %in% run_ending_cut_off_reasons
-    ) {
+    if (is_cut_off_finish_reason(finish_reason)) {
       return(RunEndingCutOff(finish_reason))
     }
     return(RunEndingAnswered())

@@ -80,12 +80,11 @@ not parse \code{stop_reason}; see \link{RunEnding}.
 \code{finish_reason} is the provider's finish reason for the run's final
 response, such as \code{"success"} or \code{"max_tokens"}, or \code{NULL} if there was none.
 \code{cut_off} is \code{TRUE} when the provider cut that response short (the output
-token limit, the context window or a content filter), which is the
-\link{RunEndingCutOff} ending. A cut-off run still has \code{stop_reason}
-\code{"complete"}, since nothing stopped it, so check \code{cut_off} before treating
-the response as a whole answer. \code{result_is_success()} is still \code{TRUE} for a
-cut-off run, because nothing failed; a caller that needs a whole answer
-reads \code{cut_off}.
+token limit, the context window or a content filter). Without another stop
+reason, the result has a \link{RunEndingCutOff} ending, its \code{stop_reason} is
+\code{"complete"}, and \code{result_is_success()} is \code{TRUE}. A truncated wrap-up answer
+keeps its \link{RunEndingLimit} ending and also has \code{cut_off = TRUE}. Check
+\code{cut_off} whenever you need a whole answer.
 
 \code{usage} covers this run only, but \code{cost} covers the whole conversation,
 including earlier runs and turns that compaction removed from the model

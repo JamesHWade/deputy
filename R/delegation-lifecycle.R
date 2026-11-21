@@ -163,8 +163,12 @@ lead_settle_delegation <- function(
     if (!is.null(error)) "error" else "not_started"
   # The finish reason of the child's final response, so a lead can tell an
   # answer the provider cut short from a finished one.
-  record$finish_reason <- result$finish_reason
-  record$cut_off <- isTRUE(result$cut_off)
+  response_result <- result %||%
+    if (identical(last_result$delegation_id, id)) {
+      last_result
+    }
+  record$finish_reason <- response_result$finish_reason
+  record$cut_off <- isTRUE(response_result$cut_off)
   record$error <- if (!is.null(error)) conditionMessage(error)
   record$input_error <- if (inherits(error, "deputy_delegation_input_error")) {
     error$reason

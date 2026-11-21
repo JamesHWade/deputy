@@ -161,6 +161,45 @@ test_that("the headroom check does not depend on the configured estimator", {
   }
 })
 
+test_that("unknown request size prevents wrap-up under a token ceiling", {
+  local_mocked_bindings(local_context_estimate = function(...) {
+    rlang::abort("Cannot estimate request size.")
+  })
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "export_findings"),
+    runtime_reply("never asked for")
+  ))
+  agent <- wrap_up_agent(
+    server,
+    UsageLimits(
+      max_requests = 1,
+      max_total_tokens = 1000000,
+      on_exceed = "wrap_up"
+    )
+  )
+
+  result <- agent$run_sync("Export the findings")
+
+  expect_identical(result$stop_reason, "request_limit")
+  expect_false(result$ending$wrapped_up)
+  expect_length(server$requests(), 1L)
+})
+
+test_that("combining limits preserves an explicit hard stop", {
+  opt_in <- UsageLimits(max_requests = 1, on_exceed = "wrap_up")
+  expect_identical(
+    intersect_usage_limits(UsageLimits(), opt_in)$on_exceed,
+    "wrap_up"
+  )
+  for (hard in list(
+    UsageLimits(max_requests = 1),
+    UsageLimits(max_tool_calls = 1)
+  )) {
+    expect_identical(intersect_usage_limits(hard, opt_in)$on_exceed, "stop")
+    expect_identical(intersect_usage_limits(opt_in, hard)$on_exceed, "stop")
+  }
+})
+
 test_that("a request limit with token room left still gets the answer request", {
   server <- local_runtime_server(list(
     runtime_reply(tool = "export_findings"),
@@ -240,6 +279,64 @@ test_that("an interrupt does not get an answer request", {
   expect_length(server$requests(), 1L)
 })
 
+test_that("a truncated wrap-up answer keeps its limit and cutoff", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "export_findings"),
+    runtime_reply("Partial answer.", finish = "length")
+  ))
+  agent <- wrap_up_agent(
+    server,
+    UsageLimits(max_requests = 1, on_exceed = "wrap_up")
+  )
+
+  result <- suppressWarnings(agent$run_sync("Export the findings"))
+
+  expect_identical(result$stop_reason, "request_limit")
+  expect_true(result$ending$wrapped_up)
+  expect_identical(result$finish_reason, "max_tokens")
+  expect_true(result$cut_off)
+  expect_identical(trimws(result$response), "Partial answer.")
+})
+
+test_that("an interrupt from a post-model hook survives wrap-up", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "export_findings"),
+    runtime_reply("Answer.")
+  ))
+  agent <- wrap_up_agent(
+    server,
+    UsageLimits(max_requests = 1, on_exceed = "wrap_up")
+  )
+  endings <- list()
+  agent$add_hook(HookMatcher(
+    event = "PostModelRequest",
+    callback = function(context, ...) {
+      if (context$request_number == 2L) {
+        agent$interrupt("cancelled")
+      }
+      NULL
+    }
+  ))
+  for (event in c("Stop", "SessionEnd")) {
+    agent$add_hook(HookMatcher(
+      event = event,
+      callback = function(context, ...) {
+        endings[[length(endings) + 1L]] <<- context$ending
+        NULL
+      }
+    ))
+  }
+
+  result <- agent$run_sync("Export the findings")
+
+  expect_identical(result$stop_reason, "cancelled")
+  expect_s7_class(result$ending, RunEndingStopped)
+  expect_identical(result$ending$by, "caller")
+  expect_identical(endings, rep(list(result$ending), 2L))
+  expect_length(server$requests(), 2L)
+  expect_named(agent$get_tools(), "export_findings")
+})
+
 test_that("a run that already answered keeps its complete ending at the limit", {
   server <- local_runtime_server(list(runtime_reply("Done.")))
   agent <- wrap_up_agent(
@@ -265,6 +362,7 @@ test_that("the default makes no answer request, so a request limit stays hard", 
   expect_identical(UsageLimits()$on_exceed, "stop")
   expect_identical(result$stop_reason, "request_limit")
   expect_false(result$ending$wrapped_up)
+  expect_identical(result$finish_reason, "tool_use")
   expect_length(server$requests(), 1L)
   expect_identical(result$usage$requests, 1L)
 })

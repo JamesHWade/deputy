@@ -421,11 +421,14 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
     # The provider's finish reason for the run's final response, or NULL.
     run_finish_reason = function(state) {
       turns <- private$.chat$get_turns()
-      last_turn <- if (length(turns) > state$turns_before) {
-        tryCatch(private$.chat$last_turn(), error = function(e) NULL)
+      added <- max(0L, length(turns) - state$turns_before)
+      for (turn in rev(utils::tail(turns, added))) {
+        if (inherits(turn, "ellmer::AssistantTurn")) {
+          reason <- turn@finish_reason
+          return(if (rlang::is_string(reason)) reason else NULL)
+        }
       }
-      reason <- tryCatch(last_turn@finish_reason, error = function(e) NULL)
-      if (rlang::is_string(reason)) reason else NULL
+      NULL
     },
 
     # The run's RunEnding as it stands. Built from the same facts for the
@@ -528,9 +531,8 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
         add = TRUE
       )
 
-      cleanup_error <- NULL
       # A stream dropped during the answer request still gives the tools back.
-      limit_wrap_up_end(self, state)
+      cleanup_error <- limit_wrap_up_end(self, state)
       tryCatch(
         {
           observed_last_turn <- tryCatch(
@@ -608,7 +610,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
           }
         },
         error = function(error) {
-          cleanup_error <<- error
+          cleanup_error <<- cleanup_error %||% error
         }
       )
 
@@ -1044,7 +1046,10 @@ governed_run_stream <- coro::async_generator(function(
       }
     }
     if (isTRUE(stream_state$wrap_up_active)) {
-      limit_wrap_up_end(agent, stream_state)
+      restore_error <- limit_wrap_up_end(agent, stream_state)
+      if (!is.null(restore_error)) {
+        rlang::cnd_signal(restore_error)
+      }
     }
     # The pass is over, so nothing can collect a background task now: they
     # are stopped and settle before the run does, and its usage has theirs.

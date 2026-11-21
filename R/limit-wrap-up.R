@@ -94,6 +94,10 @@ limit_wrap_up_fits <- function(agent, state) {
     return(FALSE)
   }
   remaining <- usage_limits_remaining(ceilings, usage)
+  room <- unlist(remaining[c("max_input_tokens", "max_total_tokens")])
+  if (!length(room)) {
+    return(TRUE)
+  }
   # Estimated here, from the Chat as it stands, whichever estimator the
   # context policy uses (a provider count would be a request of its own) and
   # without recording a frame snapshot for a request that is not made.
@@ -107,15 +111,9 @@ limit_wrap_up_fits <- function(agent, state) {
       usage_after = private$.usage_stale_turns,
       frame_snapshots = private$.frame_snapshots
     ),
-    error = function(error) 0
+    error = function(error) NA_real_
   )
-  for (field in c("max_input_tokens", "max_total_tokens")) {
-    room <- remaining[[field]]
-    if (!is.null(room) && room <= needed) {
-      return(FALSE)
-    }
-  }
-  TRUE
+  isTRUE(needed < min(room))
 }
 
 # Starts the answer pass. Returns the stream to read, or NULL if the run ends
@@ -144,11 +142,6 @@ limit_wrap_up_start <- function(
     turns = plan$turns,
     response_parts = state$response_parts
   )
-  private$record_run_event(private$agent_event(
-    "limit_wrap_up",
-    reason = plan$status$reason,
-    request_number = state$request_number
-  ))
   tryCatch(
     {
       # The results of the calls that were not run travel with the question,
@@ -173,14 +166,17 @@ limit_wrap_up_start <- function(
       )
     },
     error = function(error) {
-      limit_wrap_up_end(agent, state, plan$status$reason)
+      restore_error <- limit_wrap_up_end(agent, state, plan$status$reason)
+      if (!is.null(restore_error)) {
+        rlang::cnd_signal(restore_error)
+      }
       NULL
     }
   )
 }
 
-# Ends the answer pass: the agent has its tools and, if the model never
-# answered, its turns back, and the run ends on the limit that started it.
+# Restore the tools and any unanswered turns. Keep a stop that arrived during
+# the answer pass, or restore the limit that prompted the pass.
 limit_wrap_up_end <- function(agent, state, reason = state$wrap_up_reason) {
   private <- agent$.__enclos_env__$private
   saved <- state$wrap_up_saved
@@ -190,14 +186,34 @@ limit_wrap_up_end <- function(agent, state, reason = state$wrap_up_reason) {
   }
   state$wrap_up_saved <- NULL
   chat <- private$.chat
-  try(chat$set_tools(saved$tools), silent = TRUE)
+  tools_error <- tryCatch(
+    {
+      chat$set_tools(saved$tools)
+      NULL
+    },
+    error = identity
+  )
+  turns_error <- NULL
   if (!isTRUE(state$wrap_up_answered)) {
-    try(chat$set_turns(saved$turns), silent = TRUE)
+    turns_error <- tryCatch(
+      {
+        chat$set_turns(saved$turns)
+        NULL
+      },
+      error = identity
+    )
     state$response_parts <- saved$response_parts
   }
-  private$should_stop <- TRUE
-  private$stop_reason_from_hook <- reason
-  private$stop_requested_by <- NULL
-  state$reason <- reason
+  restore_error <- tools_error %||% turns_error
+  if (!is.null(restore_error)) {
+    state$reason <- "error"
+    record_run_failure(agent, "wrap_up_restore", restore_error)
+    return(restore_error)
+  }
+  if (!isTRUE(private$should_stop)) {
+    private$should_stop <- TRUE
+    private$stop_reason_from_hook <- reason
+  }
+  state$reason <- private$stop_reason_from_hook %||% "interrupted"
   invisible(NULL)
 }

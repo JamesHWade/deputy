@@ -187,12 +187,11 @@ S7::method(print, AgentEvent) <- function(x, ...) {
 #' `finish_reason` is the provider's finish reason for the run's final
 #' response, such as `"success"` or `"max_tokens"`, or `NULL` if there was none.
 #' `cut_off` is `TRUE` when the provider cut that response short (the output
-#' token limit, the context window or a content filter), which is the
-#' [RunEndingCutOff] ending. A cut-off run still has `stop_reason`
-#' `"complete"`, since nothing stopped it, so check `cut_off` before treating
-#' the response as a whole answer. `result_is_success()` is still `TRUE` for a
-#' cut-off run, because nothing failed; a caller that needs a whole answer
-#' reads `cut_off`.
+#' token limit, the context window or a content filter). Without another stop
+#' reason, the result has a [RunEndingCutOff] ending, its `stop_reason` is
+#' `"complete"`, and `result_is_success()` is `TRUE`. A truncated wrap-up answer
+#' keeps its [RunEndingLimit] ending and also has `cut_off = TRUE`. Check
+#' `cut_off` whenever you need a whole answer.
 #'
 #' `usage` covers this run only, but `cost` covers the whole conversation,
 #' including earlier runs and turns that compaction removed from the model
@@ -357,7 +356,13 @@ AgentResult <- S7::new_class(
     if (!is.null(ending) && !S7::S7_inherits(ending, RunEnding)) {
       cli_abort("{.arg ending} must be NULL or a RunEnding")
     }
-    finish_reason <- ending_optional_text(finish_reason, "finish_reason")
+    finish_reason <- ending_optional_text(
+      finish_reason %||%
+        if (S7::S7_inherits(ending, RunEndingCutOff)) {
+          ending$finish_reason
+        },
+      "finish_reason"
+    )
     ending <- ending %||%
       run_ending_for(stop_reason, finish_reason = finish_reason)
     value <- S7::new_object(
@@ -380,7 +385,7 @@ AgentResult <- S7::new_class(
       run_context = run_context,
       ending = ending,
       finish_reason = finish_reason,
-      cut_off = S7::S7_inherits(ending, RunEndingCutOff)
+      cut_off = is_cut_off_finish_reason(finish_reason)
     )
     freeze_value(value)
   }

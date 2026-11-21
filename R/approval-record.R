@@ -568,9 +568,16 @@ intersect_usage_limits <- function(left, right) {
   } else {
     "continue"
   }
-  fields$on_exceed <- if ("error" %in% c(left$on_exceed, right$on_exceed)) {
+  settings <- c(left$on_exceed, right$on_exceed)
+  hard_wrap_up_limit <- function(limits) {
+    identical(limits$on_exceed, "stop") &&
+      (!is.null(limits$max_requests) || !is.null(limits$max_tool_calls))
+  }
+  fields$on_exceed <- if ("error" %in% settings) {
     "error"
-  } else if ("wrap_up" %in% c(left$on_exceed, right$on_exceed)) {
+  } else if (hard_wrap_up_limit(left) || hard_wrap_up_limit(right)) {
+    "stop"
+  } else if ("wrap_up" %in% settings) {
     "wrap_up"
   } else {
     "stop"

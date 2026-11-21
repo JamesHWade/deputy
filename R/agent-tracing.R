@@ -105,7 +105,7 @@ finish_run_trace <- function(state) {
   if (!is.null(state$ending)) {
     span$set_attribute(
       "deputy.cut_off",
-      S7::S7_inherits(state$ending, RunEndingCutOff)
+      is_cut_off_finish_reason(state$finish_reason)
     )
   }
   span$set_status(if (identical(state$reason, "complete")) "ok" else "error")

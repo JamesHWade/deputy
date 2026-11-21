@@ -34,10 +34,10 @@ NULL
 #' inside a delegation graph or tree whose shared budget is spent, for
 #' structured-output runs, for a run that has answered, and for a run that was
 #' stopped for another reason. Subagents, specialists and background tasks
-#' inherit the lead's `on_exceed`, so under `"wrap_up"` each one gets the
-#' request at its own limit like any other run, and it is counted in the
-#' shared budget; it is skipped only when that budget is already spent. If the
-#' extra request fails, the run still ends on the limit.
+#' inherit the lead's `on_exceed`. The extra request counts toward the shared
+#' budget. A retained conversation or background task with an explicit hard
+#' request or tool-call limit keeps its stop rule when its limits are
+#' combined. If the extra request fails, the run still ends on the limit.
 #'
 #' Limits passed to `Agent$new()` apply to every run. Limits passed to a single
 #' run take any `NULL` field from the agent's limits, so they can't remove a

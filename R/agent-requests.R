@@ -159,14 +159,14 @@ begin_model_request <- function(agent) {
   }
   if (isTRUE(state$wrap_up_active)) {
     # The one request the limit leaves for an answer; it is not checked
-    # against the limit that allowed it, and there is no second one.
-    if (state$wrap_up_requests >= 1L) {
+    # against the limit that allowed it. Recheck the shared budget now that
+    # any pending hooks have settled.
+    if (state$wrap_up_requests >= 1L || !is.null(tree_usage_status(agent))) {
       cli_abort(
         "The governed run has stopped",
         class = c("deputy_run_stopped", "deputy_error")
       )
     }
-    state$wrap_up_requests <- state$wrap_up_requests + 1L
   } else {
     status <- tree_usage_status(agent) %||%
       background_limit_status(
@@ -184,6 +184,14 @@ begin_model_request <- function(agent) {
       "The governed run has stopped",
       class = c("deputy_run_stopped", "deputy_error")
     )
+  }
+  if (isTRUE(state$wrap_up_active)) {
+    state$wrap_up_requests <- state$wrap_up_requests + 1L
+    private$record_run_event(private$agent_event(
+      "limit_wrap_up",
+      reason = state$wrap_up_reason,
+      request_number = state$request_number
+    ))
   }
   private$current_outer_requests <- private$current_outer_requests + 1L
   state$request_number <- state$request_number + 1L
