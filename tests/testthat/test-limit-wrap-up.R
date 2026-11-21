@@ -191,6 +191,10 @@ test_that("combining limits preserves an explicit hard stop", {
     intersect_usage_limits(UsageLimits(), opt_in)$on_exceed,
     "wrap_up"
   )
+  expect_identical(
+    intersect_usage_limits(UsageLimits(max_requests = 2), opt_in)$on_exceed,
+    "wrap_up"
+  )
   for (hard in list(
     UsageLimits(max_requests = 1),
     UsageLimits(max_tool_calls = 1)

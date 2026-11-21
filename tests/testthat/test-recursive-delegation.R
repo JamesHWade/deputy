@@ -668,12 +668,12 @@ test_that("a delegate that inherits on_exceed = 'wrap_up' answers at its limit, 
     leaf_responses = list(
       runtime_reply(tool = "export_findings"),
       runtime_reply(tool = "export_findings"),
-      runtime_reply("Partial evidence from the reviewer.")
+      runtime_reply("Partial evidence from the reviewer.", finish = "length")
     ),
     graph_limits = UsageLimits(max_requests = 12L, on_exceed = "wrap_up")
   )
   fixture$configure()
-  result <- fixture$root$run_sync("compose")
+  result <- suppressWarnings(fixture$root$run_sync("compose"))
 
   expect_identical(trimws(result$response), "root synthesis")
   requests <- fixture$servers[[3L]]$requests()
@@ -682,6 +682,8 @@ test_that("a delegate that inherits on_exceed = 'wrap_up' answers at its limit, 
   expect_null(requests[[3L]]$body$tools)
   views <- fixture$root$inspect_subagents("host", transcript = TRUE)
   expect_identical(views[[2L]]$usage$requests, 3L)
+  expect_identical(views[[2L]]$outcome$runtime$finish_reason, "max_tokens")
+  expect_true(views[[2L]]$outcome$runtime$cut_off)
   expect_identical(fixture$root$delegation_graph_usage()$requests, 7L)
 })
 

@@ -569,9 +569,12 @@ intersect_usage_limits <- function(left, right) {
     "continue"
   }
   settings <- c(left$on_exceed, right$on_exceed)
+  # A looser hard ceiling still holds when the tighter limit allows one
+  # more request. Keep the hard stop when its ceiling determines the limit.
   hard_wrap_up_limit <- function(limits) {
     identical(limits$on_exceed, "stop") &&
-      (!is.null(limits$max_requests) || !is.null(limits$max_tool_calls))
+      (isTRUE(limits$max_requests == fields$max_requests) ||
+        isTRUE(limits$max_tool_calls == fields$max_tool_calls))
   }
   fields$on_exceed <- if ("error" %in% settings) {
     "error"
