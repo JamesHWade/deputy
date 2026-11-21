@@ -1,6 +1,6 @@
 Package: deputy
 Title: Run Tasks with Language Models and R Tools
-Version: 0.0.0.9006
+Version: 0.0.0.9007
 Authors@R:
     person("James", "Wade", , "github@jameshwade.com", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0002-9740-1905"))
@@ -125,6 +125,7 @@ Collate:
     'hook-validation.R'
     'hooks.R'
     'ids.R'
+    'limit-wrap-up.R'
     'mcp-connection.R'
     'mcp-console.R'
     'mcp-metadata.R'

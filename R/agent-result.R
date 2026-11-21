@@ -40,6 +40,9 @@ NULL
 #'   [TrustedResults]). `result_id`, `result_type`, `tool_name`, `value`.
 #' * `"compaction_start"`, `"compaction"`, `"compaction_error"`: automatic
 #'   compaction started, finished or failed.
+#' * `"limit_wrap_up"`: a request or tool-call limit was reached in the middle
+#'   of a run with `on_exceed = "wrap_up"` and the model is given one more request, without tools, to
+#'   answer with what it has. `reason`, `request_number`.
 #' * `"fallback"`: a fallback Chat took over after a transient error.
 #'   `fallback_index`, `condition`, `usage`.
 #' * `"structured_attempt"`: one attempt at structured output, with the
@@ -181,6 +184,16 @@ S7::method(print, AgentEvent) <- function(x, ...) {
 #' `ending` says how the run ended in terms of its own classes, so a host need
 #' not parse `stop_reason`; see [RunEnding].
 #'
+#' `finish_reason` is the provider's finish reason for the run's final
+#' response, such as `"success"` or `"max_tokens"`, or `NULL` if there was none.
+#' `cut_off` is `TRUE` when the provider cut that response short (the output
+#' token limit, the context window or a content filter), which is the
+#' [RunEndingCutOff] ending. A cut-off run still has `stop_reason`
+#' `"complete"`, since nothing stopped it, so check `cut_off` before treating
+#' the response as a whole answer. `result_is_success()` is still `TRUE` for a
+#' cut-off run, because nothing failed; a caller that needs a whole answer
+#' reads `cut_off`.
+#'
 #' `usage` covers this run only, but `cost` covers the whole conversation,
 #' including earlier runs and turns that compaction removed from the model
 #' context.
@@ -200,8 +213,11 @@ S7::method(print, AgentEvent) <- function(x, ...) {
 #'   subagent, to the parent run and delegation.
 #' @param usage [AgentUsage] for this run only, or `NULL`.
 #' @param run_context The run's `run_context`, a named list.
+#' @param finish_reason The provider's finish reason for the final response,
+#'   or `NULL`. With no `ending`, a `stop_reason` of `"complete"` and a cut-off
+#'   `finish_reason` give a [RunEndingCutOff] ending.
 #' @param ending How the run ended, as a [RunEnding] object, or `NULL` to
-#'   derive it from `stop_reason`. The five classes are [RunEndingAnswered()],
+#'   derive it from `stop_reason` and `finish_reason`. The five classes are [RunEndingAnswered()],
 #'   [RunEndingStopped()], [RunEndingLimit()], [RunEndingCutOff()] and
 #'   [RunEndingFailed()].
 #' @return An `AgentResult` object.
@@ -265,7 +281,12 @@ AgentResult <- S7::new_class(
       S7::new_union(NULL, S7::class_character)
     ),
     run_context = readonly_property("run_context", S7::class_list),
-    ending = readonly_property("ending", RunEnding)
+    ending = readonly_property("ending", RunEnding),
+    finish_reason = readonly_property(
+      "finish_reason",
+      S7::new_union(NULL, S7::class_character)
+    ),
+    cut_off = readonly_property("cut_off", S7::class_logical)
   ),
   constructor = function(
     response = NULL,
@@ -291,7 +312,8 @@ AgentResult <- S7::new_class(
     parent_run_id = NULL,
     delegation_id = NULL,
     run_context = list(),
-    ending = NULL
+    ending = NULL,
+    finish_reason = NULL
   ) {
     ids <- list(
       session_id = session_id,
@@ -335,7 +357,9 @@ AgentResult <- S7::new_class(
     if (!is.null(ending) && !S7::S7_inherits(ending, RunEnding)) {
       cli_abort("{.arg ending} must be NULL or a RunEnding")
     }
-    ending <- ending %||% run_ending_for(stop_reason)
+    finish_reason <- ending_optional_text(finish_reason, "finish_reason")
+    ending <- ending %||%
+      run_ending_for(stop_reason, finish_reason = finish_reason)
     value <- S7::new_object(
       S7::S7_object(),
       response = response,
@@ -354,7 +378,9 @@ AgentResult <- S7::new_class(
       parent_run_id = parent_run_id,
       delegation_id = delegation_id,
       run_context = run_context,
-      ending = ending
+      ending = ending,
+      finish_reason = finish_reason,
+      cut_off = S7::S7_inherits(ending, RunEndingCutOff)
     )
     freeze_value(value)
   }

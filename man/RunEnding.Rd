@@ -15,7 +15,13 @@ RunEndingAnswered()
 
 RunEndingStopped(by, reason = NULL)
 
-RunEndingLimit(reason, field = NULL, actual = NULL, limit = NULL)
+RunEndingLimit(
+  reason,
+  field = NULL,
+  actual = NULL,
+  limit = NULL,
+  wrapped_up = FALSE
+)
 
 RunEndingCutOff(finish_reason)
 
@@ -39,6 +45,9 @@ unknown, as the cost is for \code{"cost_unavailable"}.}
 
 \item{limit}{The figure the limit allowed, or \code{NULL}.}
 
+\item{wrapped_up}{\code{TRUE} if the model answered in the extra request that a
+request or tool-call limit allows when \code{on_exceed = "wrap_up"}, \code{FALSE} (the default) otherwise.}
+
 \item{finish_reason}{The provider's finish reason, as ellmer names it: one
 of \code{"max_tokens"}, \code{"context_window"} or \code{"content_filter"}.}
 
@@ -60,7 +69,10 @@ ending without reading the \code{stop_reason} string:
 and \code{reason} is the reason they gave.
 \item \code{RunEndingLimit}: the run reached a limit. \code{reason} names it, and \code{field},
 \code{actual} and \code{limit} give the \link{UsageLimits} field, the figure reached and
-the figure allowed, when the limit has them.
+the figure allowed, when the limit has them. \code{wrapped_up} is \code{TRUE} when
+the model was given one more request, without tools, to answer with what
+it had (only with \code{on_exceed = "wrap_up"}), and the result's \code{response} is that answer (see
+\link{UsageLimits}).
 \item \code{RunEndingCutOff}: the provider cut the answer short. \code{finish_reason} says
 why. The result's \code{stop_reason} is still \code{"complete"}, since the run was
 not stopped.

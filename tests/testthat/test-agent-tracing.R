@@ -405,3 +405,24 @@ test_that("permission events contain only the final Deputy decision", {
     expect_length(executed, as.integer(decision == "allow"))
   }
 })
+
+test_that("a run the provider cut off is marked on its span", {
+  server <- local_runtime_server(list(
+    runtime_reply(text = "partial", finish = "length"),
+    runtime_reply(text = "whole")
+  ))
+  record <- record_runtime_trace(server$url)
+  run <- record$traces[["deputy.run"]]
+  expect_identical(run$attributes[["deputy.stop_reason"]], "complete")
+  expect_identical(run$attributes[["deputy.finish_reason"]], "max_tokens")
+  expect_true(run$attributes[["deputy.cut_off"]])
+  # A cut-off response is a finished request, not an error.
+  expect_identical(run$status, "ok")
+
+  server <- local_runtime_server(list(runtime_reply(text = "whole")))
+  record <- record_runtime_trace(server$url)
+  run <- record$traces[["deputy.run"]]
+  expect_identical(run$attributes[["deputy.finish_reason"]], "success")
+  expect_false(run$attributes[["deputy.cut_off"]])
+  expect_identical(run$status, "ok")
+})

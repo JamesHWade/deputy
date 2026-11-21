@@ -97,6 +97,17 @@ finish_run_trace <- function(state) {
     return(invisible(NULL))
   }
   span$set_attribute("deputy.stop_reason", trace_stop_reason(state$reason))
+  # A response the provider cut short finished its request, so the status
+  # stays "ok" (it would raise error alerts); the attributes say it was cut.
+  if (!is.null(state$finish_reason)) {
+    span$set_attribute("deputy.finish_reason", state$finish_reason)
+  }
+  if (!is.null(state$ending)) {
+    span$set_attribute(
+      "deputy.cut_off",
+      S7::S7_inherits(state$ending, RunEndingCutOff)
+    )
+  }
   span$set_status(if (identical(state$reason, "complete")) "ok" else "error")
   otel::end_span(span)
   invisible(NULL)

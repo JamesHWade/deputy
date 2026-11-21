@@ -45,6 +45,9 @@ retries are not separate requests.
 \link{TrustedResults}). \code{result_id}, \code{result_type}, \code{tool_name}, \code{value}.
 \item \code{"compaction_start"}, \code{"compaction"}, \code{"compaction_error"}: automatic
 compaction started, finished or failed.
+\item \code{"limit_wrap_up"}: a request or tool-call limit was reached in the middle
+of a run with \code{on_exceed = "wrap_up"} and the model is given one more request, without tools, to
+answer with what it has. \code{reason}, \code{request_number}.
 \item \code{"fallback"}: a fallback Chat took over after a transient error.
 \code{fallback_index}, \code{condition}, \code{usage}.
 \item \code{"structured_attempt"}: one attempt at structured output, with the

@@ -238,6 +238,12 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       state$result <- NULL
       state$turns_before <- 0L
       state$ending <- NULL
+      state$finish_reason <- NULL
+      state$wrap_up_active <- FALSE
+      state$wrap_up_done <- FALSE
+      state$wrap_up_answered <- FALSE
+      state$wrap_up_requests <- 0L
+      state$wrap_up_saved <- NULL
       state$run_error <- NULL
       state$cost_warned <- FALSE
       state$stop_hook_active <- FALSE
@@ -268,6 +274,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
 
       AgentResult(
         ending = state$ending,
+        finish_reason = state$finish_reason,
         response = response,
         turns = private$.chat$get_turns(),
         cost = state$cost %||% self$cost(),
@@ -411,16 +418,20 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       invisible(NULL)
     },
 
-    # The run's RunEnding as it stands. Built from the same facts for the
-    # hooks that read it and for the run's result.
-    run_ending_now = function(state) {
+    # The provider's finish reason for the run's final response, or NULL.
+    run_finish_reason = function(state) {
       turns <- private$.chat$get_turns()
       last_turn <- if (length(turns) > state$turns_before) {
         tryCatch(private$.chat$last_turn(), error = function(e) NULL)
       }
-      finish_reason <- tryCatch(last_turn@finish_reason, error = function(e) {
-        NULL
-      })
+      reason <- tryCatch(last_turn@finish_reason, error = function(e) NULL)
+      if (rlang::is_string(reason)) reason else NULL
+    },
+
+    # The run's RunEnding as it stands. Built from the same facts for the
+    # hooks that read it and for the run's result.
+    run_ending_now = function(state) {
+      finish_reason <- private$run_finish_reason(state)
       run_ending_for(
         state$reason,
         # Who asked matters only when the run's reason is the one they gave.
@@ -433,7 +444,8 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
         limit_status = private$last_limit_status,
         finish_reason = finish_reason,
         error = state$run_error$condition,
-        phase = state$run_error$phase
+        phase = state$run_error$phase,
+        wrapped_up = isTRUE(state$wrap_up_answered)
       )
     },
 
@@ -517,6 +529,8 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       )
 
       cleanup_error <- NULL
+      # A stream dropped during the answer request still gives the tools back.
+      limit_wrap_up_end(self, state)
       tryCatch(
         {
           observed_last_turn <- tryCatch(
@@ -559,6 +573,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
               turn_number = max(1L, usage$requests)
             ))
           }
+          state$finish_reason <- private$run_finish_reason(state)
           state$ending <- private$run_ending_now(state)
           private$record_run_event(private$agent_event(
             "usage",
@@ -904,6 +919,10 @@ governed_run_stream <- coro::async_generator(function(
       }
 
       if (!is.null(stream_error)) {
+        # A failed answer request leaves the run on the limit that asked it.
+        if (isTRUE(stream_state$wrap_up_active)) {
+          break
+        }
         if (agent$.__enclos_env__$private$should_stop) {
           stream_state$reason <-
             agent$.__enclos_env__$private$stop_reason_from_hook %||%
@@ -1024,6 +1043,9 @@ governed_run_stream <- coro::async_generator(function(
         break
       }
     }
+    if (isTRUE(stream_state$wrap_up_active)) {
+      limit_wrap_up_end(agent, stream_state)
+    }
     # The pass is over, so nothing can collect a background task now: they
     # are stopped and settle before the run does, and its usage has theirs.
     joined <- background_join(
@@ -1061,6 +1083,22 @@ governed_run_stream <- coro::async_generator(function(
         }
       )
       stream_state$structured_output <- extracted_output
+    }
+    # A request or tool-call limit that ended the run in the middle of its
+    # work leaves the model one request, without tools, to answer.
+    answer <- limit_wrap_up_start(
+      agent,
+      stream_state,
+      tool_mode,
+      stream_mode,
+      stream_type,
+      structured,
+      extraction
+    )
+    if (!is.null(answer)) {
+      stream <- answer
+      is_generator <- inherits(stream, "coro_generator_instance")
+      next
     }
     held <- agent$.__enclos_env__$private$take_held_hooks()
     if (length(held)) {

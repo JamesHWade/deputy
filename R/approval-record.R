@@ -567,6 +567,8 @@ intersect_usage_limits <- function(left, right) {
   }
   fields$on_exceed <- if ("error" %in% c(left$on_exceed, right$on_exceed)) {
     "error"
+  } else if ("wrap_up" %in% c(left$on_exceed, right$on_exceed)) {
+    "wrap_up"
   } else {
     "stop"
   }

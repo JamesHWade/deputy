@@ -57,6 +57,8 @@ lead_admit_delegation <- function(lead, definition, task, correlation) {
     completed_at = as.POSIXct(NA_real_, origin = "1970-01-01", tz = "UTC"),
     status = "queued",
     stop_reason = NULL,
+    finish_reason = NULL,
+    cut_off = FALSE,
     error = NULL,
     hook_error = NULL,
     result = NULL,
@@ -159,6 +161,10 @@ lead_settle_delegation <- function(
     record$cancel_reason %||%
     stop_reason %||%
     if (!is.null(error)) "error" else "not_started"
+  # The finish reason of the child's final response, so a lead can tell an
+  # answer the provider cut short from a finished one.
+  record$finish_reason <- result$finish_reason
+  record$cut_off <- isTRUE(result$cut_off)
   record$error <- if (!is.null(error)) conditionMessage(error)
   record$input_error <- if (inherits(error, "deputy_delegation_input_error")) {
     error$reason

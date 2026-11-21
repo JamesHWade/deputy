@@ -22,7 +22,8 @@ AgentResult(
   parent_run_id = NULL,
   delegation_id = NULL,
   run_context = list(),
-  ending = NULL
+  ending = NULL,
+  finish_reason = NULL
 )
 }
 \arguments{
@@ -51,9 +52,13 @@ subagent, to the parent run and delegation.}
 \item{run_context}{The run's \code{run_context}, a named list.}
 
 \item{ending}{How the run ended, as a \link{RunEnding} object, or \code{NULL} to
-derive it from \code{stop_reason}. The five classes are \code{\link[=RunEndingAnswered]{RunEndingAnswered()}},
+derive it from \code{stop_reason} and \code{finish_reason}. The five classes are \code{\link[=RunEndingAnswered]{RunEndingAnswered()}},
 \code{\link[=RunEndingStopped]{RunEndingStopped()}}, \code{\link[=RunEndingLimit]{RunEndingLimit()}}, \code{\link[=RunEndingCutOff]{RunEndingCutOff()}} and
 \code{\link[=RunEndingFailed]{RunEndingFailed()}}.}
+
+\item{finish_reason}{The provider's finish reason for the final response,
+or \code{NULL}. With no \code{ending}, a \code{stop_reason} of \code{"complete"} and a cut-off
+\code{finish_reason} give a \link{RunEndingCutOff} ending.}
 }
 \value{
 An \code{AgentResult} object.
@@ -71,6 +76,16 @@ Results are read-only. Read fields with \code{$}, for example
 
 \code{ending} says how the run ended in terms of its own classes, so a host need
 not parse \code{stop_reason}; see \link{RunEnding}.
+
+\code{finish_reason} is the provider's finish reason for the run's final
+response, such as \code{"success"} or \code{"max_tokens"}, or \code{NULL} if there was none.
+\code{cut_off} is \code{TRUE} when the provider cut that response short (the output
+token limit, the context window or a content filter), which is the
+\link{RunEndingCutOff} ending. A cut-off run still has \code{stop_reason}
+\code{"complete"}, since nothing stopped it, so check \code{cut_off} before treating
+the response as a whole answer. \code{result_is_success()} is still \code{TRUE} for a
+cut-off run, because nothing failed; a caller that needs a whole answer
+reads \code{cut_off}.
 
 \code{usage} covers this run only, but \code{cost} covers the whole conversation,
 including earlier runs and turns that compaction removed from the model
