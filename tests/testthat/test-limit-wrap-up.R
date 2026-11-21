@@ -371,6 +371,61 @@ test_that("the default makes no answer request, so a request limit stays hard", 
   expect_identical(result$usage$requests, 1L)
 })
 
+test_that("a lead and concurrent delegates share the extra request allowance", {
+  for (concurrent in c(FALSE, TRUE)) {
+    calls <- lapply(seq_len(if (concurrent) 2L else 1L), function(i) {
+      list(
+        id = paste0("review_", i),
+        name = "delegate_to_agent",
+        arguments = list(agent_name = "reviewer", task = paste("Review", i))
+      )
+    })
+    lead_server <- local_runtime_server(list(
+      runtime_tool_calls_reply(calls),
+      runtime_reply("Lead synthesis.")
+    ))
+    child_replies <- list(runtime_reply(tool = "review_evidence"))
+    if (!concurrent) {
+      child_replies <- c(
+        child_replies,
+        list(runtime_reply(tool = "review_evidence"))
+      )
+    }
+    child_server <- local_runtime_server(c(
+      child_replies,
+      list(runtime_reply("Reviewer synthesis."))
+    ))
+    tool <- ellmer::tool(
+      function() "Evidence.",
+      name = "review_evidence",
+      description = "Read the evidence"
+    )
+    lead <- LeadAgent$new(
+      runtime_chat(lead_server),
+      sub_agents = list(agent_definition(
+        "reviewer",
+        "Review evidence",
+        "Review the evidence.",
+        tools = list(tool),
+        max_requests = if (concurrent) 1L else 2L
+      )),
+      delegation_policy = DelegationPolicy(chat = function(...) {
+        runtime_chat(child_server)
+      }),
+      permissions = permissions_full(),
+      usage_limits = UsageLimits(max_requests = 3, on_exceed = "wrap_up")
+    )
+
+    result <- lead$run_sync("Review the findings")
+
+    expect_identical(result$stop_reason, "request_limit")
+    expect_identical(result$usage$requests, 4L)
+    expect_identical(result$ending$wrapped_up, concurrent)
+    expect_length(child_server$requests(), if (concurrent) 2L else 3L)
+    expect_length(lead_server$requests(), if (concurrent) 2L else 1L)
+  }
+})
+
 test_that("on_exceed accepts 'wrap_up' and prints it", {
   limits <- UsageLimits(max_requests = 2, on_exceed = "wrap_up")
   expect_identical(limits$on_exceed, "wrap_up")

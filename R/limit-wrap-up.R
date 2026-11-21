@@ -85,11 +85,15 @@ limit_wrap_up_plan <- function(agent, state, structured, extraction) {
 limit_wrap_up_fits <- function(agent, state) {
   private <- agent$.__enclos_env__$private
   limits <- state$limits
+  usage <- private$current_run_usage()
+  # A delegate may already have used the extra request in this run's budget.
+  if (isTRUE(usage$requests > limits$max_requests)) {
+    return(FALSE)
+  }
   settings <- S7::props(limits)
   settings$max_requests <- NULL
   settings$max_tool_calls <- NULL
   ceilings <- do.call(UsageLimits, settings)
-  usage <- private$current_run_usage()
   if (!is.null(usage_limit_status(usage, ceilings, require_followup = TRUE))) {
     return(FALSE)
   }

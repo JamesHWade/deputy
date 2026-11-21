@@ -84,7 +84,8 @@ inside a delegation graph or tree whose shared budget is spent, for
 structured-output runs, for a run that has answered, and for a run that was
 stopped for another reason. Subagents, specialists and background tasks
 inherit the lead's \code{on_exceed}. Setting \code{"wrap_up"} on a graph applies to its
-routes, and the extra request counts toward the shared budget. An explicit
+routes. A lead's request count includes its delegates' wrap-up requests
+and can exceed its own \code{max_requests} by at most one. An explicit
 hard request or tool-call limit on an agent, retained conversation or
 background task still applies. If the extra request fails, the run still
 ends on the limit.

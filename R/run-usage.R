@@ -35,7 +35,8 @@ NULL
 #' structured-output runs, for a run that has answered, and for a run that was
 #' stopped for another reason. Subagents, specialists and background tasks
 #' inherit the lead's `on_exceed`. Setting `"wrap_up"` on a graph applies to its
-#' routes, and the extra request counts toward the shared budget. An explicit
+#' routes. A lead's request count includes its delegates' wrap-up requests
+#' and can exceed its own `max_requests` by at most one. An explicit
 #' hard request or tool-call limit on an agent, retained conversation or
 #' background task still applies. If the extra request fails, the run still
 #' ends on the limit.
@@ -585,6 +586,16 @@ usage_limits_remaining <- function(limits, usage, reserved = NULL) {
     max(0, limit - used[[field]] - held)
   })
   stats::setNames(remaining, fields)
+}
+
+# Reserve a child's possible wrap-up with its requests so concurrent
+# delegations draw from the same allowance.
+delegation_request_allowance <- function(limits) {
+  requests <- limits$max_requests
+  if (isTRUE(requests > 0) && identical(limits$on_exceed, "wrap_up")) {
+    return(requests + 1)
+  }
+  requests
 }
 
 merge_usage_limits <- function(override, defaults) {
