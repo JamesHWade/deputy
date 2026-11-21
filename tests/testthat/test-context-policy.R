@@ -1084,9 +1084,15 @@ test_that("S7 context policies freeze configuration and reject list lookalikes",
   policy <- ContextPolicy(max_tokens = NULL, max_tool_result_bytes = NULL)
   expect_s7_class(policy, ContextPolicy)
   expect_identical(policy$compact_to, S7::prop(policy, "compact_to"))
-  expect_snapshot(error = TRUE, policy$max_tokens <- 100L)
-  expect_snapshot(error = TRUE, S7::prop(policy, "offload_dir") <- "changed")
-  expect_snapshot(error = TRUE, S7::props(policy) <- list(fallback = "text"))
+  expect_snapshot_s7_error(error = TRUE, policy$max_tokens <- 100L)
+  expect_snapshot_s7_error(
+    error = TRUE,
+    S7::prop(policy, "offload_dir") <- "changed"
+  )
+  expect_snapshot_s7_error(
+    error = TRUE,
+    S7::props(policy) <- list(fallback = "text")
+  )
   fields <- S7::props(policy)
   fields$max_tokens <- 100L
   replacement <- do.call(ContextPolicy, fields)
@@ -1132,10 +1138,16 @@ test_that("S7 compactions preserve provider evidence while freezing records", {
   expect_identical(outcome$turns_compacted, 2L)
   expect_identical(outcome$estimated_tokens, 100)
   expect_s3_class(outcome$compacted_at, "POSIXct")
-  expect_snapshot(error = TRUE, outcome$run_id <- "changed")
-  expect_snapshot(error = TRUE, outcome@attempts[[1L]]$provider <- "changed")
-  expect_snapshot(error = TRUE, outcome@usage@requests <- 3L)
-  expect_snapshot(error = TRUE, S7::props(outcome) <- list(summary = "changed"))
+  expect_snapshot_s7_error(error = TRUE, outcome$run_id <- "changed")
+  expect_snapshot_s7_error(
+    error = TRUE,
+    outcome@attempts[[1L]]$provider <- "changed"
+  )
+  expect_snapshot_s7_error(error = TRUE, outcome@usage@requests <- 3L)
+  expect_snapshot_s7_error(
+    error = TRUE,
+    S7::props(outcome) <- list(summary = "changed")
+  )
   fields <- S7::props(outcome)
   fields$attempts[[1L]]$provider <- "copy"
   expect_identical(outcome$attempts[[1L]]$provider, "test")
@@ -1157,11 +1169,11 @@ test_that("S7 compaction constructors validate counts and optional evidence", {
     error = TRUE,
     DeputyCompaction("none", FALSE, 0, 0, run_id = c("one", "two"))
   )
-  expect_snapshot(
+  expect_snapshot_s7_error(
     error = TRUE,
     DeputyCompaction("none", FALSE, 0, 0, attempts = "invalid")
   )
-  expect_snapshot(
+  expect_snapshot_s7_error(
     error = TRUE,
     DeputyCompaction(
       "none",

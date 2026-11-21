@@ -962,17 +962,20 @@ test_that("nullable S7 permission properties and bulk replacement stay frozen", 
   expect_null(policy@tool_allowlist)
   expect_null(policy@tool_denylist)
   expect_null(policy@permission_prompt_tool_name)
-  expect_snapshot(
+  expect_snapshot_s7_error(
     error = TRUE,
     policy@can_use_tool <- function(...) PermissionResultAllow()
   )
-  expect_snapshot(error = TRUE, policy@tool_allowlist <- "write_file")
-  expect_snapshot(error = TRUE, policy@tool_denylist <- "read_file")
-  expect_snapshot(
+  expect_snapshot_s7_error(error = TRUE, policy@tool_allowlist <- "write_file")
+  expect_snapshot_s7_error(error = TRUE, policy@tool_denylist <- "read_file")
+  expect_snapshot_s7_error(
     error = TRUE,
     policy@permission_prompt_tool_name <- "ask_user"
   )
-  expect_snapshot(error = TRUE, S7::props(policy) <- list(file_write = TRUE))
+  expect_snapshot_s7_error(
+    error = TRUE,
+    S7::props(policy) <- list(file_write = TRUE)
+  )
   expect_s7_class(
     permissions_check(policy, "write_file", list(path = "x")),
     PermissionResultDeny

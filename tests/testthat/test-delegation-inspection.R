@@ -84,7 +84,7 @@ test_that("batch outcomes retain failures and repeated specialist identities", {
   first <- lead$parallel_delegate(c(a = "one", b = "two"))
   second <- lead$parallel_delegate(c(a = "again"))
   expect_s7_class(first$outcomes$a, DelegationOutcome)
-  expect_snapshot(error = TRUE, first$outcomes$a@answer <- "altered")
+  expect_snapshot_s7_error(error = TRUE, first$outcomes$a@answer <- "altered")
   ids <- vapply(
     lead$inspect_subagents("owner"),
     function(x) x$outcome$runtime$conversation_id,

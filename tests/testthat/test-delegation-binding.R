@@ -24,7 +24,7 @@ binding_run <- function(lead, task = "task") {
 test_that("binding configuration is immutable and rejects unsupported combinations", {
   policy <- DelegationPolicy()
   expect_identical(policy$resource_mode, "shared")
-  expect_snapshot(error = TRUE, policy@resource_mode <- "owned")
+  expect_snapshot_s7_error(error = TRUE, policy@resource_mode <- "owned")
   expect_snapshot(error = TRUE, DelegationPolicy("exclusive"))
   expect_snapshot(error = TRUE, DelegationPolicy("owned"))
   expect_snapshot(

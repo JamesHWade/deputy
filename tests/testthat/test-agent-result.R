@@ -175,8 +175,11 @@ test_that("S7 run results preserve evidence and independent list values", {
   expect_identical(result@run_context$product$revision, "v1")
   expect_identical(S7::S7_inherits(result, ellmer::Turn), FALSE)
   expect_identical(S7::S7_inherits(result, ellmer::Round), FALSE)
-  expect_snapshot(error = TRUE, result@response <- "replacement")
-  expect_snapshot(error = TRUE, result@structured_output <- list(value = 1))
+  expect_snapshot_s7_error(error = TRUE, result@response <- "replacement")
+  expect_snapshot_s7_error(
+    error = TRUE,
+    result@structured_output <- list(value = 1)
+  )
 })
 
 test_that("every S7 result property is read-only", {
@@ -202,6 +205,9 @@ test_that("S7 result constructors reject malformed metadata", {
   expect_snapshot(error = TRUE, AgentResult(duration = Inf))
   expect_snapshot(error = TRUE, AgentResult(events = list(list(type = "text"))))
   expect_snapshot(error = TRUE, AgentResult(session_id = ""))
-  expect_snapshot(error = TRUE, AgentResult(turns = "turn"))
-  expect_snapshot(error = TRUE, AgentResult(usage = list(requests = 1)))
+  expect_snapshot_s7_error(error = TRUE, AgentResult(turns = "turn"))
+  expect_snapshot_s7_error(
+    error = TRUE,
+    AgentResult(usage = list(requests = 1))
+  )
 })

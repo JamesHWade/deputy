@@ -299,10 +299,10 @@ test_that("both definition constructors expose the same S7 contract", {
   definition <- agent_definition(" Reviewer ", "Reviews text", "Read carefully")
   expect_s7_class(definition, AgentDefinition)
   expect_identical(definition$name, S7::prop(definition, "name"))
-  expect_snapshot(error = TRUE, definition@name <- "changed")
-  expect_snapshot(error = TRUE, definition@max_requests <- 2L)
-  expect_snapshot(error = TRUE, definition@permission_mode <- "full")
-  expect_snapshot(
+  expect_snapshot_s7_error(error = TRUE, definition@name <- "changed")
+  expect_snapshot_s7_error(error = TRUE, definition@max_requests <- 2L)
+  expect_snapshot_s7_error(error = TRUE, definition@permission_mode <- "full")
+  expect_snapshot_s7_error(
     error = TRUE,
     S7::props(definition) <- list(prompt = "changed")
   )
@@ -346,10 +346,10 @@ test_that("definition values compose original tools and frozen skills", {
   expect_identical(snapshot$skills[[1L]], skill)
   expect_identical(snapshot$tools[[1L]](), 1L)
   expect_identical(state$count, 1L)
-  expect_snapshot(error = TRUE, skill@prompt <- "Use one sentence")
+  expect_snapshot_s7_error(error = TRUE, skill@prompt <- "Use one sentence")
   expect_identical(snapshot$skills[[1L]]$prompt, "Keep it short")
-  expect_snapshot(error = TRUE, definition@tools <- list())
-  expect_snapshot(error = TRUE, definition@skills <- list())
+  expect_snapshot_s7_error(error = TRUE, definition@tools <- list())
+  expect_snapshot_s7_error(error = TRUE, definition@skills <- list())
   fields <- S7::props(definition)
   fields$tools <- list()
   expect_length(definition$tools, 1L)
