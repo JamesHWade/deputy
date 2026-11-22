@@ -69,10 +69,26 @@ commit: the maintainer prefers following upstream development over freezing a
 revision, and CI surfaces any upstream break. This is a deliberate, time-limited
 exception to this ADR's release policy:
 
-- The required CI matrix installs coro's current main branch; no other
-  dependency comes from GitHub.
+- The required CI matrix installs coro's current main branch.
 - CRAN submission (#86) is blocked until a coro release includes #72. At that
   point remove `Remotes:` and require the released version.
 - coro's main branch also contains unreleased 2025 generator-environment
   changes (r-lib/coro#67). The full suite and R CMD check qualified main at
   a8efdec; later upstream changes are qualified by ordinary CI runs.
+
+## Temporary GitHub httr2 dependency (2026-11-22)
+
+Deputy uses httr2's development branch while the streaming fix in
+[r-lib/httr2#919](https://github.com/r-lib/httr2/pull/919) is unreleased.
+`DESCRIPTION` requires httr2 >= 1.3.0.9000 and declares `r-lib/httr2` as a
+remote. httr2's own `Remotes` entry selects a curl build with
+[jeroen/curl#460](https://github.com/jeroen/curl/pull/460), which must also
+be installed for the fix to take effect.
+
+When response headers arrive promptly, `Agent$stream_async()` and
+`Agent$chat_async()` can service the R event loop while waiting for the body.
+A provider or proxy that holds back the headers can still block the R
+process. [Deputy #200](https://github.com/JamesHWade/deputy/issues/200) tracks
+that remaining delay and qualification of the released transport. Repeat
+both delay cases with the loopback probe before dropping the httr2 remote
+and returning to released dependencies.

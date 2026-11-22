@@ -1,5 +1,10 @@
 # deputy (development version)
 
+* Deputy temporarily uses development httr2 and its curl dependency so
+  `Agent$stream_async()` and `Agent$chat_async()` can keep the R event loop
+  responsive while waiting for a delayed response body. Waiting for
+  response headers can still block (#200).
+
 * `Agent` no longer compacts between a tool call and the request that carries
   its result unless the estimated context has passed the new
   `ContextPolicy(max_tokens_in_run =)`, which defaults to 1.25 times
