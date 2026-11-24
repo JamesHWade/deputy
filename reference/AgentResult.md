@@ -20,6 +20,19 @@ and
 need not parse `stop_reason`; see
 [RunEnding](https://jameshwade.github.io/deputy/reference/RunEnding.md).
 
+`finish_reason` is the provider's finish reason for the run's final
+response, such as `"success"` or `"max_tokens"`, or `NULL` if there was
+none. `cut_off` is `TRUE` when the provider cut that response short (the
+output token limit, the context window or a content filter). Without
+another stop reason, the result has a
+[RunEndingCutOff](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+ending, its `stop_reason` is `"complete"`, and
+[`result_is_success()`](https://jameshwade.github.io/deputy/reference/result_is_success.md)
+is `TRUE`. A truncated wrap-up answer keeps its
+[RunEndingLimit](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+ending and also has `cut_off = TRUE`. Check `cut_off` whenever you need
+a whole answer.
+
 `usage` covers this run only, but `cost` covers the whole conversation,
 including earlier runs and turns that compaction removed from the model
 context.
@@ -45,7 +58,8 @@ AgentResult(
   parent_run_id = NULL,
   delegation_id = NULL,
   run_context = list(),
-  ending = NULL
+  ending = NULL,
+  finish_reason = NULL
 )
 ```
 
@@ -103,14 +117,22 @@ AgentResult(
 
   How the run ended, as a
   [RunEnding](https://jameshwade.github.io/deputy/reference/RunEnding.md)
-  object, or `NULL` to derive it from `stop_reason`. The five classes
-  are
+  object, or `NULL` to derive it from `stop_reason` and `finish_reason`.
+  The five classes are
   [`RunEndingAnswered()`](https://jameshwade.github.io/deputy/reference/RunEnding.md),
   [`RunEndingStopped()`](https://jameshwade.github.io/deputy/reference/RunEnding.md),
   [`RunEndingLimit()`](https://jameshwade.github.io/deputy/reference/RunEnding.md),
   [`RunEndingCutOff()`](https://jameshwade.github.io/deputy/reference/RunEnding.md)
   and
   [`RunEndingFailed()`](https://jameshwade.github.io/deputy/reference/RunEnding.md).
+
+- finish_reason:
+
+  The provider's finish reason for the final response, or `NULL`. With
+  no `ending`, a `stop_reason` of `"complete"` and a cut-off
+  `finish_reason` give a
+  [RunEndingCutOff](https://jameshwade.github.io/deputy/reference/RunEnding.md)
+  ending.
 
 ## Value
 

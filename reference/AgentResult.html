@@ -9,6 +9,14 @@ result$response, or use result_n_turns(), result_tool_calls(),
 result_tool_results(), result_text_chunks() and result_is_success().
 ending says how the run ended in terms of its own classes, so a host need
 not parse stop_reason; see RunEnding.
+finish_reason is the provider's finish reason for the run's final
+response, such as &quot;success&quot; or &quot;max_tokens&quot;, or NULL if there was none.
+cut_off is TRUE when the provider cut that response short (the output
+token limit, the context window or a content filter). Without another stop
+reason, the result has a RunEndingCutOff ending, its stop_reason is
+&quot;complete&quot;, and result_is_success() is TRUE. A truncated wrap-up answer
+keeps its RunEndingLimit ending and also has cut_off = TRUE. Check
+cut_off whenever you need a whole answer.
 usage covers this run only, but cost covers the whole conversation,
 including earlier runs and turns that compaction removed from the model
 context."><meta property="og:description" content="An AgentResult describes one finished run. Agent$run_sync(),
@@ -21,6 +29,14 @@ result$response, or use result_n_turns(), result_tool_calls(),
 result_tool_results(), result_text_chunks() and result_is_success().
 ending says how the run ended in terms of its own classes, so a host need
 not parse stop_reason; see RunEnding.
+finish_reason is the provider's finish reason for the run's final
+response, such as &quot;success&quot; or &quot;max_tokens&quot;, or NULL if there was none.
+cut_off is TRUE when the provider cut that response short (the output
+token limit, the context window or a content filter). Without another stop
+reason, the result has a RunEndingCutOff ending, its stop_reason is
+&quot;complete&quot;, and result_is_success() is TRUE. A truncated wrap-up answer
+keeps its RunEndingLimit ending and also has cut_off = TRUE. Check
+cut_off whenever you need a whole answer.
 usage covers this run only, but cost covers the whole conversation,
 including earlier runs and turns that compaction removed from the model
 context."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
@@ -31,7 +47,7 @@ context."><meta property="og:image" content="https://jameshwade.github.io/deputy
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9006</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9007</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -100,6 +116,14 @@ session.</p>
 <code><a href="result_tool_results.html">result_tool_results()</a></code>, <code><a href="result_text_chunks.html">result_text_chunks()</a></code> and <code><a href="result_is_success.html">result_is_success()</a></code>.</p>
 <p><code>ending</code> says how the run ended in terms of its own classes, so a host need
 not parse <code>stop_reason</code>; see <a href="RunEnding.html">RunEnding</a>.</p>
+<p><code>finish_reason</code> is the provider's finish reason for the run's final
+response, such as <code>"success"</code> or <code>"max_tokens"</code>, or <code>NULL</code> if there was none.
+<code>cut_off</code> is <code>TRUE</code> when the provider cut that response short (the output
+token limit, the context window or a content filter). Without another stop
+reason, the result has a <a href="RunEnding.html">RunEndingCutOff</a> ending, its <code>stop_reason</code> is
+<code>"complete"</code>, and <code><a href="result_is_success.html">result_is_success()</a></code> is <code>TRUE</code>. A truncated wrap-up answer
+keeps its <a href="RunEnding.html">RunEndingLimit</a> ending and also has <code>cut_off = TRUE</code>. Check
+<code>cut_off</code> whenever you need a whole answer.</p>
 <p><code>usage</code> covers this run only, but <code>cost</code> covers the whole conversation,
 including earlier runs and turns that compaction removed from the model
 context.</p>
@@ -125,7 +149,8 @@ context.</p>
 <span>  parent_run_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  delegation_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  run_context <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>  ending <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  ending <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  finish_reason <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -179,9 +204,15 @@ subagent, to the parent run and delegation.</p></dd>
 
 <dt id="arg-ending">ending<a class="anchor" aria-label="anchor" href="#arg-ending"></a></dt>
 <dd><p>How the run ended, as a <a href="RunEnding.html">RunEnding</a> object, or <code>NULL</code> to
-derive it from <code>stop_reason</code>. The five classes are <code><a href="RunEnding.html">RunEndingAnswered()</a></code>,
+derive it from <code>stop_reason</code> and <code>finish_reason</code>. The five classes are <code><a href="RunEnding.html">RunEndingAnswered()</a></code>,
 <code><a href="RunEnding.html">RunEndingStopped()</a></code>, <code><a href="RunEnding.html">RunEndingLimit()</a></code>, <code><a href="RunEnding.html">RunEndingCutOff()</a></code> and
 <code><a href="RunEnding.html">RunEndingFailed()</a></code>.</p></dd>
+
+
+<dt id="arg-finish-reason">finish_reason<a class="anchor" aria-label="anchor" href="#arg-finish-reason"></a></dt>
+<dd><p>The provider's finish reason for the final response,
+or <code>NULL</code>. With no <code>ending</code>, a <code>stop_reason</code> of <code>"complete"</code> and a cut-off
+<code>finish_reason</code> give a <a href="RunEnding.html">RunEndingCutOff</a> ending.</p></dd>
 
 </dl></div>
     <div class="section level2">

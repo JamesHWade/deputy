@@ -19,7 +19,7 @@ Agent$resolve_tool_result()."><meta property="og:image" content="https://jameshw
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9006</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9007</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -98,7 +98,8 @@ reference in the context. The model can read the rest with the
 <span>  summary_fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  max_tool_result_image_bytes <span class="op">=</span> <span class="fl">2</span> <span class="op">*</span> <span class="fl">1024</span> <span class="op">*</span> <span class="fl">1024</span>,</span>
 <span>  max_tool_result_images <span class="op">=</span> <span class="fl">4L</span>,</span>
-<span>  estimator <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"provider"</span><span class="op">)</span></span>
+<span>  estimator <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"auto"</span>, <span class="st">"provider"</span><span class="op">)</span>,</span>
+<span>  max_tokens_in_run <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -175,6 +176,18 @@ document page, so they run high for typical text. <code>"provider"</code> uses o
 the provider's count, so automatic compaction doesn't run when the
 provider can't count.</p></dd>
 
+
+<dt id="arg-max-tokens-in-run">max_tokens_in_run<a class="anchor" aria-label="anchor" href="#arg-max-tokens-in-run"></a></dt>
+<dd><p>Estimated context size, in tokens, above which a
+run compacts between a tool call and the request that carries its result.
+Below it, compaction waits for the start of the next run, so the
+conversation between a user message and a tool result stays as the model
+saw it and the provider's prompt cache is not lost. It must be at least
+<code>max_tokens</code>. <code>NULL</code> (the default) uses 1.25 times <code>max_tokens</code>. Ignored
+when <code>max_tokens</code> is <code>NULL</code>. Read the policy's <code>$max_tokens_in_run</code> for the
+value in effect; the property itself keeps <code>NULL</code> so the default follows
+<code>max_tokens</code> when you change it.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -182,8 +195,11 @@ provider can't count.</p></dd>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Automatic compaction runs at the start of a run and between rounds of tool
-calls. Summary requests count toward the run's <a href="UsageLimits.html">UsageLimits</a>. The summary is
+    <p>Automatic compaction runs at the start of a run. Within a run it runs
+between rounds of tool calls only when the estimated context has passed
+<code>max_tokens_in_run</code>; otherwise it waits for the start of the next run, since
+compaction rewrites the system prompt and drops the turns the model was
+working from. Summary requests count toward the run's <a href="UsageLimits.html">UsageLimits</a>. The summary is
 appended to the system prompt and the model context keeps only the recent
 turns; the removed turns stay available from <a href="Agent.html">Agent</a><code>$get_turns()</code> and in
 saved sessions. If summarising fails or is cancelled, the conversation is
@@ -211,6 +227,7 @@ loading agent's policy.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">ContextPolicy</span>, <span class="va">settings</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;ContextPolicy&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   compact at: 24000 tokens</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   in a run: 30000 tokens</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   compact to: 50%</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   estimator: auto</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   fallback: text</span>

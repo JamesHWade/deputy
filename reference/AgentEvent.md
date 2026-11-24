@@ -65,6 +65,11 @@ An `AgentEvent` object.
 - `"compaction_start"`, `"compaction"`, `"compaction_error"`: automatic
   compaction started, finished or failed.
 
+- `"limit_wrap_up"`: a request or tool-call limit was reached in the
+  middle of a run with `on_exceed = "wrap_up"` and the model is given
+  one more request, without tools, to answer with what it has. `reason`,
+  `request_number`.
+
 - `"fallback"`: a fallback Chat took over after a transient error.
   `fallback_index`, `condition`, `usage`.
 
@@ -102,7 +107,7 @@ parent and delegation IDs in subagent runs.
 # Create a start event
 AgentEvent("start", task = "Analyze data.csv")
 #> <AgentEvent: start >
-#>   timestamp: 2026-11-19 03:05:58
+#>   timestamp: 2026-11-24 23:41:12
 #>   task: Analyze data.csv
 
 # Create a text event

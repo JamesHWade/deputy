@@ -22,7 +22,8 @@ ContextPolicy(
   summary_fallback_chats = list(),
   max_tool_result_image_bytes = 2 * 1024 * 1024,
   max_tool_result_images = 4L,
-  estimator = c("auto", "provider")
+  estimator = c("auto", "provider"),
+  max_tokens_in_run = NULL
 )
 ```
 
@@ -100,14 +101,29 @@ ContextPolicy(
   only the provider's count, so automatic compaction doesn't run when
   the provider can't count.
 
+- max_tokens_in_run:
+
+  Estimated context size, in tokens, above which a run compacts between
+  a tool call and the request that carries its result. Below it,
+  compaction waits for the start of the next run, so the conversation
+  between a user message and a tool result stays as the model saw it and
+  the provider's prompt cache is not lost. It must be at least
+  `max_tokens`. `NULL` (the default) uses 1.25 times `max_tokens`.
+  Ignored when `max_tokens` is `NULL`. Read the policy's
+  `$max_tokens_in_run` for the value in effect; the property itself
+  keeps `NULL` so the default follows `max_tokens` when you change it.
+
 ## Value
 
 A `ContextPolicy` object.
 
 ## Details
 
-Automatic compaction runs at the start of a run and between rounds of
-tool calls. Summary requests count toward the run's
+Automatic compaction runs at the start of a run. Within a run it runs
+between rounds of tool calls only when the estimated context has passed
+`max_tokens_in_run`; otherwise it waits for the start of the next run,
+since compaction rewrites the system prompt and drops the turns the
+model was working from. Summary requests count toward the run's
 [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md).
 The summary is appended to the system prompt and the model context keeps
 only the recent turns; the removed turns stay available from
@@ -141,6 +157,7 @@ settings$max_tokens <- 24000L
 do.call(ContextPolicy, settings)
 #> <ContextPolicy>
 #>   compact at: 24000 tokens
+#>   in a run: 30000 tokens
 #>   compact to: 50%
 #>   estimator: auto
 #>   fallback: text

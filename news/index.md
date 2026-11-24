@@ -2,6 +2,45 @@
 
 ## deputy (development version)
 
+- Deputy temporarily uses development httr2 and its curl dependency so
+  `Agent$stream_async()` and `Agent$chat_async()` can keep the R event
+  loop responsive while waiting for a delayed response body. Waiting for
+  response headers can still block
+  ([\#200](https://github.com/JamesHWade/deputy/issues/200)).
+
+- `Agent` no longer compacts between a tool call and the request that
+  carries its result unless the estimated context has passed the new
+  `ContextPolicy(max_tokens_in_run =)`, which defaults to 1.25 times
+  `max_tokens`. Below it, compaction waits for the start of the next
+  run, so a run keeps the system prompt and turns the model was working
+  from and the provider’s prompt cache. Compaction at the start of a run
+  is unchanged.
+
+- `UsageLimits(on_exceed = "wrap_up")` is a new opt-in: when a
+  `max_requests` or `max_tool_calls` limit ends a run in the middle of
+  its work, the model gets one more request, without tools, to answer
+  with what it has and say what it could not check. With it a run may
+  make one request more than `max_requests`; the default, `"stop"`,
+  still treats the limit as a hard ceiling. The answer is the result’s
+  `response`, `stop_reason` is still the limit’s and
+  `RunEndingLimit$wrapped_up` is `TRUE`. Delegates inherit the choice.
+  Token and cost limits, structured runs and `on_exceed = "error"` never
+  get the request. The run records a `"limit_wrap_up"` event.
+
+- `AgentResult` has new `finish_reason` and `cut_off` properties, and
+  `DelegationOutcome` runtime fields `finish_reason` and `cut_off`, so a
+  caller or a lead agent can tell an answer the provider cut short (the
+  output token limit, the context window or a content filter) from a
+  finished one. `stop_reason` stays `"complete"` for these runs, and
+  [`result_is_success()`](https://jameshwade.github.io/deputy/reference/result_is_success.md)
+  stays `TRUE`. The run’s trace span now has `deputy.finish_reason` and
+  `deputy.cut_off` attributes; its status is unchanged.
+
+- The `deputy_read_tool_result` tool now says what to do when a
+  reference matches no saved tool result, and signals a
+  `deputy_tool_result_not_found` error, instead of reporting a missing
+  manifest.
+
 - `RSession` can store interactive htmlwidgets and rich tables as
   host-owned HTML artifacts. Tool results retain the artifact reference,
   text summary and any static preview. `$artifact_frame()` verifies and

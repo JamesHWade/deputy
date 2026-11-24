@@ -15,7 +15,11 @@ without reading the `stop_reason` string:
   `field`, `actual` and `limit` give the
   [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)
   field, the figure reached and the figure allowed, when the limit has
-  them.
+  them. `wrapped_up` is `TRUE` when the model was given one more
+  request, without tools, to answer with what it had (only with
+  `on_exceed = "wrap_up"`), and the result's `response` is that answer
+  (see
+  [UsageLimits](https://jameshwade.github.io/deputy/reference/UsageLimits.md)).
 
 - `RunEndingCutOff`: the provider cut the answer short. `finish_reason`
   says why. The result's `stop_reason` is still `"complete"`, since the
@@ -43,7 +47,13 @@ RunEndingAnswered()
 
 RunEndingStopped(by, reason = NULL)
 
-RunEndingLimit(reason, field = NULL, actual = NULL, limit = NULL)
+RunEndingLimit(
+  reason,
+  field = NULL,
+  actual = NULL,
+  limit = NULL,
+  wrapped_up = FALSE
+)
 
 RunEndingCutOff(finish_reason)
 
@@ -79,6 +89,12 @@ RunEndingFailed(reason = "error", error = NULL, phase = NULL)
 - limit:
 
   The figure the limit allowed, or `NULL`.
+
+- wrapped_up:
+
+  `TRUE` if the model answered in the extra request that a request or
+  tool-call limit allows when `on_exceed = "wrap_up"`, `FALSE` (the
+  default) otherwise.
 
 - finish_reason:
 
@@ -142,4 +158,5 @@ RunEndingLimit("request_limit", field = "max_requests", actual = 5, limit = 5)
 #>   field: max_requests
 #>   actual: 5
 #>   limit: 5
+#>   wrapped_up: FALSE
 ```

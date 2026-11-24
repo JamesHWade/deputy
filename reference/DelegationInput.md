@@ -79,7 +79,7 @@ DelegationInput("Review the contrast", evidence = list(
 #> <deputy::DelegationInput>
 #>  @ task           : chr "Review the contrast"
 #>  @ constraints    : chr(0) 
-#>  @ evidence       :List of 1
+#>  @ evidence       : List of 1
 #>  .. $ :List of 2
 #>  ..  ..$ source_id: chr "assay-17"
 #>  ..  ..$ revision : chr "r3"

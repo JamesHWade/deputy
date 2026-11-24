@@ -5,27 +5,13 @@ earlier turns in the conversation, or in a loaded session, don't count
 against it. A NULL field sets no limit.
 Request and tool-call limits are checked before each request or tool call.
 Token and cost limits can only be checked after a response arrives, so a run
-can go over them by one response.
-Limits passed to Agent$new() apply to every run. Limits passed to a single
-run take any NULL field from the agent's limits, so they can't remove a
-limit the agent sets. A single run keeps its own on_exceed and
-on_unknown_cost; the agent's values for those don't replace them. Subagent
-runs are also capped by what is left of the lead's budget.
-The object is read-only: read fields with $ and create a new one to change
-a limit."><meta property="og:description" content="UsageLimits() caps what one run of an Agent may use: model requests,
+can go over them by one response."><meta property="og:description" content="UsageLimits() caps what one run of an Agent may use: model requests,
 tool calls, tokens and estimated cost. Each run starts counting from zero, so
 earlier turns in the conversation, or in a loaded session, don't count
 against it. A NULL field sets no limit.
 Request and tool-call limits are checked before each request or tool call.
 Token and cost limits can only be checked after a response arrives, so a run
-can go over them by one response.
-Limits passed to Agent$new() apply to every run. Limits passed to a single
-run take any NULL field from the agent's limits, so they can't remove a
-limit the agent sets. A single run keeps its own on_exceed and
-on_unknown_cost; the agent's values for those don't replace them. Subagent
-runs are also capped by what is left of the lead's budget.
-The object is read-only: read fields with $ and create a new one to change
-a limit."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
+can go over them by one response."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -33,7 +19,7 @@ a limit."><meta property="og:image" content="https://jameshwade.github.io/deputy
 
     <a class="navbar-brand me-2" href="../index.html">deputy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9006</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9007</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -99,13 +85,6 @@ against it. A <code>NULL</code> field sets no limit.</p>
 <p>Request and tool-call limits are checked before each request or tool call.
 Token and cost limits can only be checked after a response arrives, so a run
 can go over them by one response.</p>
-<p>Limits passed to <code>Agent$new()</code> apply to every run. Limits passed to a single
-run take any <code>NULL</code> field from the agent's limits, so they can't remove a
-limit the agent sets. A single run keeps its own <code>on_exceed</code> and
-<code>on_unknown_cost</code>; the agent's values for those don't replace them. Subagent
-runs are also capped by what is left of the lead's budget.</p>
-<p>The object is read-only: read fields with <code>$</code> and create a new one to change
-a limit.</p>
     </div>
 
     <div class="section level2">
@@ -117,7 +96,7 @@ a limit.</p>
 <span>  max_output_tokens <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_total_tokens <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  max_cost_usd <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  on_exceed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stop"</span>, <span class="st">"error"</span><span class="op">)</span>,</span>
+<span>  on_exceed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stop"</span>, <span class="st">"error"</span>, <span class="st">"wrap_up"</span><span class="op">)</span>,</span>
 <span>  on_unknown_cost <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stop"</span>, <span class="st">"continue"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -162,7 +141,10 @@ default) ends the run and returns an <a href="AgentResult.html">AgentResult</a> 
 names the limit, such as <code>"request_limit"</code>, <code>"tool_call_limit"</code> or
 <code>"cost_limit"</code>. <code>"error"</code> ends the run the same way, then signals an error
 that inherits from <code>deputy_budget</code> (see <a href="deputy-errors.html">deputy-errors</a>). The result is
-still available from <code>$last_run()</code>.</p></dd>
+still available from <code>$last_run()</code>. <code>"wrap_up"</code> ends the run on the limit
+the same way as <code>"stop"</code>, but first makes one more request, without tools,
+so the model can answer with what it has; see the section above. Delegates
+inherit this choice.</p></dd>
 
 
 <dt id="arg-on-unknown-cost">on_unknown_cost<a class="anchor" aria-label="anchor" href="#arg-on-unknown-cost"></a></dt>
@@ -176,6 +158,42 @@ and a subagent's budget is what that leaves.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <code>UsageLimits</code> object.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="when-a-limit-ends-a-run">When a limit ends a run<a class="anchor" aria-label="anchor" href="#when-a-limit-ends-a-run"></a></h2>
+
+
+<p>By default a request or tool-call limit is a hard ceiling: the run stops
+and makes no further request. With <code>on_exceed = "wrap_up"</code>, a run that
+reaches <code>max_requests</code> or <code>max_tool_calls</code> before the model has
+answered gets one more request, with no tools, and a short instruction to
+answer now with what it has and say what it could not check. That request is
+made in addition to <code>max_requests</code>, so <strong>with <code>"wrap_up"</code> a run may make one
+request more than <code>max_requests</code></strong> (a run limited to 5 requests may make 6).
+It is counted in the run's usage, and its answer becomes the result's
+<code>response</code>. The <code>stop_reason</code> is still the limit's, and the result's
+<code>ending$wrapped_up</code> is <code>TRUE</code>. Token and cost limits never get this
+request: a run that has reached <code>max_input_tokens</code>, <code>max_output_tokens</code>,
+<code>max_total_tokens</code> or <code>max_cost_usd</code>, or that has less room left under
+<code>max_input_tokens</code> or <code>max_total_tokens</code> than its conversation is estimated
+to take, ends at once, because the extra request is what those limits
+exist to prevent. The same goes for a run
+inside a delegation graph or tree whose shared budget is spent, for
+structured-output runs, for a run that has answered, and for a run that was
+stopped for another reason. Subagents, specialists and background tasks
+inherit the lead's <code>on_exceed</code>. Setting <code>"wrap_up"</code> on a graph applies to its
+routes. A lead's request count includes its delegates' wrap-up requests
+and can exceed its own <code>max_requests</code> by at most one. An explicit
+hard request or tool-call limit on an agent, retained conversation or
+background task still applies. If the extra request fails, the run still
+ends on the limit.</p>
+<p>Limits passed to <code>Agent$new()</code> apply to every run. Limits passed to a single
+run take any <code>NULL</code> field from the agent's limits, so they can't remove a
+limit the agent sets. A single run keeps its own <code>on_exceed</code> and
+<code>on_unknown_cost</code>; the agent's values for those don't replace them. Subagent
+runs are also capped by what is left of the lead's budget.</p>
+<p>The object is read-only: read fields with <code>$</code> and create a new one to change
+a limit.</p>
     </div>
 
     <div class="section level2">

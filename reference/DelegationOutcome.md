@@ -3,7 +3,10 @@
 How one delegation ended. The runtime's record (IDs, `status`,
 `stop_reason`) is kept apart from what the subagent's model said
 (`answer` and `claims`). A `"completed"` status means the run ended
-normally, not that the task succeeded.
+normally, not that the task succeeded. `finish_reason` is the provider's
+finish reason for the subagent's final response, and `cut_off` is `TRUE`
+when the provider cut that response short, so a `"completed"` delegation
+can still carry a truncated `answer`.
 [LeadAgent](https://jameshwade.github.io/deputy/reference/LeadAgent.md)
 returns outcomes from `$parallel_delegate()` and, as JSON, from the
 `delegate_to_agent` tool. Fields are read with `$`.
@@ -18,8 +21,8 @@ DelegationOutcome(runtime, answer = "", references = list(), claims = list())
 
 - runtime:
 
-  List of IDs, `status`, `stop_reason` and other facts recorded by the
-  runtime.
+  List of IDs, `status`, `stop_reason`, `finish_reason`, `cut_off` and
+  other facts recorded by the runtime.
 
 - answer:
 
