@@ -2,7 +2,7 @@ test_that("S7 hook properties remain frozen when initialized with NULL", {
   hook <- HookMatcher("Stop", function(...) NULL)
   expect_s7_class(hook, HookMatcher)
   expect_null(hook@pattern)
-  expect_snapshot(error = TRUE, hook@pattern <- "^write")
+  expect_snapshot_s7_error(error = TRUE, hook@pattern <- "^write")
 })
 
 test_that("S7 event records freeze their envelope and payload", {
@@ -14,7 +14,7 @@ test_that("S7 event records freeze their envelope and payload", {
   payload <- event@data
   payload$text <- "copy"
   expect_identical(event$text, "original")
-  expect_snapshot(error = TRUE, event@data$text <- "replacement")
+  expect_snapshot_s7_error(error = TRUE, event@data$text <- "replacement")
 })
 
 test_that("S7 events validate their type and payload names", {

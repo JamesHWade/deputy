@@ -22,7 +22,7 @@ test_that("parallel budget allocation constructs independent S7 limits", {
   expect_identical(remaining$max_requests, 3L)
   expect_identical(remaining$max_tool_calls, 4L)
   expect_identical(remaining$on_exceed, "error")
-  expect_snapshot(error = TRUE, first@max_requests <- 2L)
+  expect_snapshot_s7_error(error = TRUE, first@max_requests <- 2L)
 })
 
 test_that("stateless responders overlap with isolated conversations and ordered results", {

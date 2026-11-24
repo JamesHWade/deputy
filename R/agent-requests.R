@@ -66,10 +66,15 @@ request_start_async <- coro::async(function(agent, private, turns) {
 
       # All tool results have settled; ellmer has not stored or dispatched
       # the pending user turn yet. Count its contents without appending it.
-      if (private$current_run_state$task_requests > 0L) {
+      # Compaction rewrites the system prompt and the turns the model is
+      # working from, so inside a run it waits for the next run unless the
+      # context has passed the policy's in-run ceiling.
+      state <- private$current_run_state
+      if (state$task_requests > 0L && !isTRUE(state$wrap_up_active)) {
         pending <- utils::tail(turns, 1L)[[1L]]
         coro::await(private$maybe_auto_compact(
-          messages = pending@contents
+          messages = pending@contents,
+          mid_run = TRUE
         ))
       }
       begin_model_request(agent)
@@ -152,21 +157,41 @@ begin_model_request <- function(agent) {
   if (is.null(state)) {
     return(invisible(NULL))
   }
-  status <- tree_usage_status(agent) %||%
-    background_limit_status(
-      private,
-      private$current_run_usage(),
-      state$limits,
-      require_followup = TRUE
-    )
-  if (!is.null(status)) {
-    private$mark_usage_limit(status)
+  if (isTRUE(state$wrap_up_active)) {
+    # The one request the limit leaves for an answer; it is not checked
+    # against the limit that allowed it. Recheck the shared budget now that
+    # any pending hooks have settled.
+    if (state$wrap_up_requests >= 1L || !is.null(tree_usage_status(agent))) {
+      cli_abort(
+        "The governed run has stopped",
+        class = c("deputy_run_stopped", "deputy_error")
+      )
+    }
+  } else {
+    status <- tree_usage_status(agent) %||%
+      background_limit_status(
+        private,
+        private$current_run_usage(),
+        state$limits,
+        require_followup = TRUE
+      )
+    if (!is.null(status)) {
+      private$mark_usage_limit(status)
+    }
   }
   if (isTRUE(private$should_stop)) {
     cli_abort(
       "The governed run has stopped",
       class = c("deputy_run_stopped", "deputy_error")
     )
+  }
+  if (isTRUE(state$wrap_up_active)) {
+    state$wrap_up_requests <- state$wrap_up_requests + 1L
+    private$record_run_event(private$agent_event(
+      "limit_wrap_up",
+      reason = state$wrap_up_reason,
+      request_number = state$request_number
+    ))
   }
   private$current_outer_requests <- private$current_outer_requests + 1L
   state$request_number <- state$request_number + 1L
@@ -190,6 +215,9 @@ end_model_request <- function(agent, turn) {
     return(invisible(NULL))
   }
   state$response_seen <- TRUE
+  if (isTRUE(state$wrap_up_active)) {
+    state$wrap_up_answered <- TRUE
+  }
   private$record_run_event(private$agent_event(
     "request_end",
     request_number = state$request_number,

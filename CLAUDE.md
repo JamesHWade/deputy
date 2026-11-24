@@ -141,7 +141,7 @@ The repository includes a SessionStart hook (`.claude/setup-r.sh`) that automati
 # Install dependencies
 Rscript -e "devtools::install_deps(dependencies = TRUE)"
 
-# Install the dependency set used by CI (includes GitHub coro via Remotes).
+# Install the dependency set used by CI, including development Remotes.
 Rscript -e "pak::pak()"
 
 # Load package for development
@@ -271,11 +271,13 @@ from CRAN; see `dev/adr/0004-track-upstream-development-versions.md`. Test
 upstream development versions in focused compatibility work before raising a
 minimum version or adopting an unreleased API.
 
-Temporary exception (2026-09-24, #192): coro is installed from its GitHub main
-branch through `Remotes: r-lib/coro` because CRAN coro 1.1.0 recompiles every
-generator instance. GitHub dependencies are not pinned to commits. Remove
-`Remotes:` and require the released version once coro ships the fix; CRAN
-submission is blocked until then.
+The package temporarily follows the GitHub development branches of coro
+(#192) and httr2 (#200). coro avoids recompiling its state machine on each
+generator instance. httr2 and its upstream curl dependency let Deputy's
+asynchronous streams stay responsive while waiting for the body after the
+response headers arrive. Requests can still block while waiting for headers.
+Use the corresponding CRAN releases once they include the fixes and both
+dependencies have been qualified.
 
 ## Code Conventions
 

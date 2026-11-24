@@ -1074,7 +1074,7 @@ test_that("saved records stay within what the lead's disclosure can replay", {
   ))
   private$.delegation_disclosure <- DelegationDisclosure(
     authorize = function(requester, scope) identical(requester, "viewer"),
-    max_bytes = scope + costs[[1L]] + costs[[2L]] / 2
+    max_bytes = scope + costs[[1L]] + floor(costs[[2L]] / 2)
   )
   record <- subagent_history_record(state, "conv-a")
   expect_length(record$history$children, 2L)

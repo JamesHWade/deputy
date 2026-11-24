@@ -125,14 +125,20 @@ test_that("intersecting limits stops on an unknown cost when either side does", 
 test_that("usage values freeze stored and initially unset properties", {
   usage <- AgentUsage(input_tokens = 10, output_tokens = 5, cost_usd = NA_real_)
   limits <- UsageLimits()
-  expect_snapshot(error = TRUE, usage@requests <- 2L)
-  expect_snapshot(error = TRUE, usage$total_tokens <- 999)
-  expect_snapshot(error = TRUE, usage@total_tokens <- 999)
-  expect_snapshot(error = TRUE, usage@cost_usd <- 0)
-  expect_snapshot(error = TRUE, limits@max_requests <- 2L)
-  expect_snapshot(error = TRUE, limits$on_exceed <- "error")
-  expect_snapshot(error = TRUE, S7::props(limits) <- list(max_cost_usd = 1))
-  expect_snapshot(error = TRUE, S7::props(usage) <- list(input_tokens = 999))
+  expect_snapshot_s7_error(error = TRUE, usage@requests <- 2L)
+  expect_snapshot_s7_error(error = TRUE, usage$total_tokens <- 999)
+  expect_snapshot_s7_error(error = TRUE, usage@total_tokens <- 999)
+  expect_snapshot_s7_error(error = TRUE, usage@cost_usd <- 0)
+  expect_snapshot_s7_error(error = TRUE, limits@max_requests <- 2L)
+  expect_snapshot_s7_error(error = TRUE, limits$on_exceed <- "error")
+  expect_snapshot_s7_error(
+    error = TRUE,
+    S7::props(limits) <- list(max_cost_usd = 1)
+  )
+  expect_snapshot_s7_error(
+    error = TRUE,
+    S7::props(usage) <- list(input_tokens = 999)
+  )
   expect_identical(usage$total_tokens, 15)
   expect_identical(usage$cost_usd, NA_real_)
   expect_identical(limits$max_requests, NULL)
@@ -173,7 +179,7 @@ test_that("runtime limits and results require genuine S7 values", {
   expect_snapshot(error = TRUE, normalize_usage_limits(fake_limits))
   expect_snapshot(error = TRUE, merge_usage_limits(fake_limits, UsageLimits()))
   expect_snapshot(error = TRUE, merge_usage_limits(UsageLimits(), fake_limits))
-  expect_snapshot(error = TRUE, AgentResult(usage = fake_usage))
+  expect_snapshot_s7_error(error = TRUE, AgentResult(usage = fake_usage))
 })
 
 test_that("AgentUsage reports total tokens without double counting cache", {

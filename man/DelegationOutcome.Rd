@@ -7,7 +7,8 @@
 DelegationOutcome(runtime, answer = "", references = list(), claims = list())
 }
 \arguments{
-\item{runtime}{List of IDs, \code{status}, \code{stop_reason} and other facts
+\item{runtime}{List of IDs, \code{status}, \code{stop_reason}, \code{finish_reason},
+\code{cut_off} and other facts
 recorded by the runtime.}
 
 \item{answer}{The subagent's final reply, cut to 8 KiB. A longer reply is
@@ -27,7 +28,10 @@ A \code{DelegationOutcome} object.
 How one delegation ended. The runtime's record (IDs, \code{status},
 \code{stop_reason}) is kept apart from what the subagent's model said (\code{answer}
 and \code{claims}). A \code{"completed"} status means the run ended normally, not
-that the task succeeded. \link{LeadAgent} returns outcomes from
+that the task succeeded. \code{finish_reason} is the provider's finish reason for
+the subagent's final response, and \code{cut_off} is \code{TRUE} when the provider cut
+that response short, so a \code{"completed"} delegation can still carry a
+truncated \code{answer}. \link{LeadAgent} returns outcomes from
 \verb{$parallel_delegate()} and, as JSON, from the \code{delegate_to_agent} tool.
 Fields are read with \code{$}.
 }

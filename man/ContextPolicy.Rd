@@ -13,7 +13,8 @@ ContextPolicy(
   summary_fallback_chats = list(),
   max_tool_result_image_bytes = 2 * 1024 * 1024,
   max_tool_result_images = 4L,
-  estimator = c("auto", "provider")
+  estimator = c("auto", "provider"),
+  max_tokens_in_run = NULL
 )
 }
 \arguments{
@@ -68,6 +69,16 @@ assume three bytes of text per token, a fixed amount per image and per
 document page, so they run high for typical text. \code{"provider"} uses only
 the provider's count, so automatic compaction doesn't run when the
 provider can't count.}
+
+\item{max_tokens_in_run}{Estimated context size, in tokens, above which a
+run compacts between a tool call and the request that carries its result.
+Below it, compaction waits for the start of the next run, so the
+conversation between a user message and a tool result stays as the model
+saw it and the provider's prompt cache is not lost. It must be at least
+\code{max_tokens}. \code{NULL} (the default) uses 1.25 times \code{max_tokens}. Ignored
+when \code{max_tokens} is \code{NULL}. Read the policy's \verb{$max_tokens_in_run} for the
+value in effect; the property itself keeps \code{NULL} so the default follows
+\code{max_tokens} when you change it.}
 }
 \value{
 A \code{ContextPolicy} object.
@@ -82,8 +93,11 @@ reference in the context. The model can read the rest with the
 \link{Agent}\verb{$resolve_tool_result()}.
 }
 \details{
-Automatic compaction runs at the start of a run and between rounds of tool
-calls. Summary requests count toward the run's \link{UsageLimits}. The summary is
+Automatic compaction runs at the start of a run. Within a run it runs
+between rounds of tool calls only when the estimated context has passed
+\code{max_tokens_in_run}; otherwise it waits for the start of the next run, since
+compaction rewrites the system prompt and drops the turns the model was
+working from. Summary requests count toward the run's \link{UsageLimits}. The summary is
 appended to the system prompt and the model context keeps only the recent
 turns; the removed turns stay available from \link{Agent}\verb{$get_turns()} and in
 saved sessions. If summarising fails or is cancelled, the conversation is

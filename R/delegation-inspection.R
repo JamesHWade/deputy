@@ -64,10 +64,14 @@ DelegationDisclosure <- S7::new_class(
 #' How one delegation ended. The runtime's record (IDs, `status`,
 #' `stop_reason`) is kept apart from what the subagent's model said (`answer`
 #' and `claims`). A `"completed"` status means the run ended normally, not
-#' that the task succeeded. [LeadAgent] returns outcomes from
+#' that the task succeeded. `finish_reason` is the provider's finish reason for
+#' the subagent's final response, and `cut_off` is `TRUE` when the provider cut
+#' that response short, so a `"completed"` delegation can still carry a
+#' truncated `answer`. [LeadAgent] returns outcomes from
 #' `$parallel_delegate()` and, as JSON, from the `delegate_to_agent` tool.
 #' Fields are read with `$`.
-#' @param runtime List of IDs, `status`, `stop_reason` and other facts
+#' @param runtime List of IDs, `status`, `stop_reason`, `finish_reason`,
+#'   `cut_off` and other facts
 #'   recorded by the runtime.
 #' @param answer The subagent's final reply, cut to 8 KiB. A longer reply is
 #'   saved in full in `references`.
@@ -516,7 +520,8 @@ delegation_outcome <- function(record, compact = FALSE) {
     "previous_delegation_id",
     "host_conversation_id",
     "status",
-    "stop_reason"
+    "stop_reason",
+    "finish_reason"
   )
   runtime <- stats::setNames(
     lapply(runtime_fields, function(field) record[[field]]),
@@ -535,6 +540,7 @@ delegation_outcome <- function(record, compact = FALSE) {
     fields[fields$omitted_fields] <- NULL
     fields
   }
+  runtime$cut_off <- isTRUE(record$cut_off)
   if (compact) {
     # Display labels may be shortened; opaque correlations must stay exact.
     runtime$agent_name <- inspection_text(runtime$agent_name, 512L)

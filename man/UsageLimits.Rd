@@ -11,7 +11,7 @@ UsageLimits(
   max_output_tokens = NULL,
   max_total_tokens = NULL,
   max_cost_usd = NULL,
-  on_exceed = c("stop", "error"),
+  on_exceed = c("stop", "error", "wrap_up"),
   on_unknown_cost = c("stop", "continue")
 )
 }
@@ -39,7 +39,10 @@ default) ends the run and returns an \link{AgentResult} whose \code{stop_reason}
 names the limit, such as \code{"request_limit"}, \code{"tool_call_limit"} or
 \code{"cost_limit"}. \code{"error"} ends the run the same way, then signals an error
 that inherits from \code{deputy_budget} (see \link{deputy-errors}). The result is
-still available from \verb{$last_run()}.}
+still available from \verb{$last_run()}. \code{"wrap_up"} ends the run on the limit
+the same way as \code{"stop"}, but first makes one more request, without tools,
+so the model can answer with what it has; see the section above. Delegates
+inherit this choice.}
 
 \item{on_unknown_cost}{What happens when \code{max_cost_usd} is set and the cost
 of a response is unknown. \code{"stop"} (the default) ends the run with
@@ -59,6 +62,33 @@ against it. A \code{NULL} field sets no limit.
 Request and tool-call limits are checked before each request or tool call.
 Token and cost limits can only be checked after a response arrives, so a run
 can go over them by one response.
+}
+\section{When a limit ends a run}{
+
+By default a request or tool-call limit is a hard ceiling: the run stops
+and makes no further request. With \code{on_exceed = "wrap_up"}, a run that
+reaches \code{max_requests} or \code{max_tool_calls} before the model has
+answered gets one more request, with no tools, and a short instruction to
+answer now with what it has and say what it could not check. That request is
+made in addition to \code{max_requests}, so \strong{with \code{"wrap_up"} a run may make one
+request more than \code{max_requests}} (a run limited to 5 requests may make 6).
+It is counted in the run's usage, and its answer becomes the result's
+\code{response}. The \code{stop_reason} is still the limit's, and the result's
+\code{ending$wrapped_up} is \code{TRUE}. Token and cost limits never get this
+request: a run that has reached \code{max_input_tokens}, \code{max_output_tokens},
+\code{max_total_tokens} or \code{max_cost_usd}, or that has less room left under
+\code{max_input_tokens} or \code{max_total_tokens} than its conversation is estimated
+to take, ends at once, because the extra request is what those limits
+exist to prevent. The same goes for a run
+inside a delegation graph or tree whose shared budget is spent, for
+structured-output runs, for a run that has answered, and for a run that was
+stopped for another reason. Subagents, specialists and background tasks
+inherit the lead's \code{on_exceed}. Setting \code{"wrap_up"} on a graph applies to its
+routes. A lead's request count includes its delegates' wrap-up requests
+and can exceed its own \code{max_requests} by at most one. An explicit
+hard request or tool-call limit on an agent, retained conversation or
+background task still applies. If the extra request fails, the run still
+ends on the limit.
 
 Limits passed to \code{Agent$new()} apply to every run. Limits passed to a single
 run take any \code{NULL} field from the agent's limits, so they can't remove a
@@ -69,6 +99,7 @@ runs are also capped by what is left of the lead's budget.
 The object is read-only: read fields with \code{$} and create a new one to change
 a limit.
 }
+
 \examples{
 UsageLimits(max_requests = 5, max_tool_calls = 10)
 UsageLimits(max_cost_usd = 0.25, on_exceed = "error")

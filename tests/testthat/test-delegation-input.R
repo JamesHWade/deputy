@@ -41,7 +41,7 @@ test_that("delegation values preserve text, copy references and round-trip porta
   view <- S7::props(input)
   view$evidence[[1L]]$revision <- "changed"
   expect_identical(input$evidence[[1L]]$revision, "r1")
-  expect_snapshot(error = TRUE, input@task <- "replacement")
+  expect_snapshot_s7_error(error = TRUE, input@task <- "replacement")
   json <- jsonlite::toJSON(S7::props(input), auto_unbox = TRUE, null = "null")
   restored <- do.call(
     DelegationInput,
@@ -107,7 +107,7 @@ test_that("ordinary and parallel preparation share input without importing paren
   expect_equal(second$sources, first$sources)
   expect_equal(second$input, first$input)
   expect_equal(lead$get_subagent_contexts()[[1L]], first)
-  expect_snapshot(error = TRUE, first@message <- "replacement")
+  expect_snapshot_s7_error(error = TRUE, first@message <- "replacement")
   props <- S7::props(first)
   props$sources[[1L]]$text <- "changed"
   expect_identical(first$sources[[1L]]$text, "Retain µmol/L")

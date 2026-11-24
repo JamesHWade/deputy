@@ -1164,3 +1164,149 @@ test_that("PostModelRequest fires for a compaction summary that is rejected as e
   expect_identical(result$usage$requests, 2L)
   expect_identical(seen, c(1L, 2L))
 })
+
+# A token count that is over the threshold but under the ceiling for the
+# request that carries a tool result, and over the threshold when a run starts.
+mid_run_chat <- function(server, tokens, ...) {
+  chat <- runtime_compaction_chat(server, name = "OpenAI", ...)
+  chat$token_count <- function(...) tokens
+  chat
+}
+
+export_tool <- function(counter) {
+  ellmer::tool(
+    function() {
+      counter$effects <- counter$effects + 1L
+      "export-0042"
+    },
+    name = "export_findings",
+    description = "Export the findings"
+  )
+}
+
+test_that("a run does not compact between a tool call and its result under the ceiling", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "export_findings"),
+    runtime_reply("Review complete."),
+    runtime_reply("Use assay-C-r3 and preserve export-0042."),
+    runtime_reply("Next answer.")
+  ))
+  counter <- new.env()
+  counter$effects <- 0L
+  counter$next_run <- FALSE
+  chat <- runtime_compaction_chat(server, name = "OpenAI")
+  # Over the 50-token threshold, under the 63-token ceiling, once the request
+  # carries a tool result; under the threshold when the first run starts.
+  chat$token_count <- function(...) {
+    pending <- vapply(
+      list(...),
+      inherits,
+      logical(1),
+      what = "ellmer::ContentToolResult"
+    )
+    if (any(pending) || counter$next_run) 55 else 10
+  }
+  agent <- Agent$new(
+    chat,
+    tools = list(export_tool(counter)),
+    permissions = permissions_full(),
+    context_policy = ContextPolicy(max_tokens = 50)
+  )
+
+  result <- agent$run_sync("Perform the approved export")
+
+  expect_identical(trimws(result$response), "Review complete.")
+  expect_identical(result$usage$requests, 2L)
+  expect_length(runtime_events(agent, "compaction"), 0L)
+  expect_length(server$requests(), 2L)
+  expect_identical(counter$effects, 1L)
+
+  # The deferred compaction happens when the next run starts.
+  counter$next_run <- TRUE
+  second <- agent$run_sync("Continue")
+  expect_identical(second$usage$requests, 2L)
+  expect_length(runtime_events(agent, "compaction"), 1L)
+  expect_identical(agent$last_compaction()$run_id, second$run_id)
+})
+
+test_that("a run compacts at its start and past the ceiling mid-run", {
+  server <- local_runtime_server(list(
+    runtime_reply("Use assay-C-r3 and preserve export-0042."),
+    runtime_reply(tool = "export_findings"),
+    runtime_reply("Review complete.")
+  ))
+  counter <- new.env()
+  counter$effects <- 0L
+  agent <- Agent$new(
+    mid_run_chat(server, tokens = 55),
+    tools = list(export_tool(counter)),
+    permissions = permissions_full(),
+    context_policy = ContextPolicy(max_tokens = 50)
+  )
+
+  result <- agent$run_sync("Perform the approved export")
+
+  # The start of the run compacted (summary request first); the next request,
+  # which carries the tool result, did not.
+  expect_identical(result$usage$requests, 3L)
+  expect_length(runtime_events(agent, "compaction"), 1L)
+  requests <- lapply(server$requests(), `[[`, "body")
+  expect_null(requests[[1]]$tools)
+  expect_false(is.null(requests[[2]]$tools))
+  expect_false(is.null(requests[[3]]$tools))
+  expect_identical(counter$effects, 1L)
+})
+
+test_that("a run compacts between a tool call and its result once past the ceiling", {
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "export_findings"),
+    runtime_reply("export-0042 completed. Do not repeat the export."),
+    runtime_reply("Review complete.")
+  ))
+  counter <- new.env()
+  counter$effects <- 0L
+  chat <- runtime_compaction_chat(server, name = "OpenAI")
+  chat$token_count <- function(...) {
+    pending <- vapply(
+      list(...),
+      inherits,
+      logical(1),
+      what = "ellmer::ContentToolResult"
+    )
+    if (any(pending)) 64 else 10
+  }
+  agent <- Agent$new(
+    chat,
+    tools = list(export_tool(counter)),
+    permissions = permissions_full(),
+    context_policy = ContextPolicy(max_tokens = 50)
+  )
+  result <- agent$run_sync("Perform the approved export")
+  expect_identical(result$usage$requests, 3L)
+  expect_length(runtime_events(agent, "compaction"), 1L)
+
+  # An explicit ceiling moves the line.
+  server <- local_runtime_server(list(
+    runtime_reply(tool = "export_findings"),
+    runtime_reply("Review complete.")
+  ))
+  chat <- runtime_compaction_chat(server, name = "OpenAI")
+  chat$token_count <- function(...) {
+    pending <- vapply(
+      list(...),
+      inherits,
+      logical(1),
+      what = "ellmer::ContentToolResult"
+    )
+    if (any(pending)) 64 else 10
+  }
+  agent <- Agent$new(
+    chat,
+    tools = list(export_tool(counter)),
+    permissions = permissions_full(),
+    context_policy = ContextPolicy(max_tokens = 50, max_tokens_in_run = 70)
+  )
+  result <- agent$run_sync("Perform the approved export")
+  expect_identical(result$usage$requests, 2L)
+  expect_length(runtime_events(agent, "compaction"), 0L)
+})

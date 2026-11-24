@@ -26,6 +26,15 @@ NULL
 #'   document page, so they run high for typical text. `"provider"` uses only
 #'   the provider's count, so automatic compaction doesn't run when the
 #'   provider can't count.
+#' @param max_tokens_in_run Estimated context size, in tokens, above which a
+#'   run compacts between a tool call and the request that carries its result.
+#'   Below it, compaction waits for the start of the next run, so the
+#'   conversation between a user message and a tool result stays as the model
+#'   saw it and the provider's prompt cache is not lost. It must be at least
+#'   `max_tokens`. `NULL` (the default) uses 1.25 times `max_tokens`. Ignored
+#'   when `max_tokens` is `NULL`. Read the policy's `$max_tokens_in_run` for the
+#'   value in effect; the property itself keeps `NULL` so the default follows
+#'   `max_tokens` when you change it.
 #' @param compact_to After compaction, the recent turns that are kept take up
 #'   about this fraction of `max_tokens`. Must be between 0 and 1.
 #' @param fallback What to do if the model can't write the summary. `"error"`
@@ -58,8 +67,11 @@ NULL
 #'   They are only used for summaries and don't change the agent's Chat;
 #'   manual `$compact()` doesn't use them.
 #' @details
-#' Automatic compaction runs at the start of a run and between rounds of tool
-#' calls. Summary requests count toward the run's [UsageLimits]. The summary is
+#' Automatic compaction runs at the start of a run. Within a run it runs
+#' between rounds of tool calls only when the estimated context has passed
+#' `max_tokens_in_run`; otherwise it waits for the start of the next run, since
+#' compaction rewrites the system prompt and drops the turns the model was
+#' working from. Summary requests count toward the run's [UsageLimits]. The summary is
 #' appended to the system prompt and the model context keeps only the recent
 #' turns; the removed turns stay available from [Agent]`$get_turns()` and in
 #' saved sessions. If summarising fails or is cancelled, the conversation is
@@ -91,6 +103,10 @@ ContextPolicy <- S7::new_class(
   properties = list(
     max_tokens = readonly_property(
       "max_tokens",
+      S7::new_union(NULL, S7::class_integer)
+    ),
+    max_tokens_in_run = readonly_property(
+      "max_tokens_in_run",
       S7::new_union(NULL, S7::class_integer)
     ),
     compact_to = readonly_property("compact_to", S7::class_double),
@@ -126,7 +142,8 @@ ContextPolicy <- S7::new_class(
     summary_fallback_chats = list(),
     max_tool_result_image_bytes = 2 * 1024 * 1024,
     max_tool_result_images = 4L,
-    estimator = c("auto", "provider")
+    estimator = c("auto", "provider"),
+    max_tokens_in_run = NULL
   ) {
     fallback <- match.arg(fallback)
     estimator <- match.arg(estimator)
@@ -136,6 +153,19 @@ ContextPolicy <- S7::new_class(
       argument = "summary_fallback_chats"
     )
     max_tokens <- context_policy_whole_number(max_tokens, "max_tokens")
+    max_tokens_in_run <- context_policy_whole_number(
+      max_tokens_in_run,
+      "max_tokens_in_run"
+    )
+    if (
+      !is.null(max_tokens_in_run) &&
+        !is.null(max_tokens) &&
+        max_tokens_in_run < max_tokens
+    ) {
+      cli_abort(
+        "{.arg max_tokens_in_run} must be at least {.arg max_tokens} ({max_tokens})"
+      )
+    }
     max_tool_result_bytes <- context_policy_whole_number(
       max_tool_result_bytes,
       "max_tool_result_bytes"
@@ -185,6 +215,7 @@ ContextPolicy <- S7::new_class(
     value <- S7::new_object(
       S7::S7_object(),
       max_tokens = max_tokens,
+      max_tokens_in_run = max_tokens_in_run,
       compact_to = as.numeric(compact_to),
       fallback = fallback,
       max_tool_result_bytes = max_tool_result_bytes,
@@ -199,8 +230,27 @@ ContextPolicy <- S7::new_class(
 )
 
 local({
-  S7::method(`$`, ContextPolicy) <- function(x, name) S7::prop(x, name)
+  S7::method(`$`, ContextPolicy) <- function(x, name) {
+    if (identical(name, "max_tokens_in_run")) {
+      return(context_policy_run_ceiling(x))
+    }
+    S7::prop(x, name)
+  }
 })
+
+# The estimated context size above which a run compacts mid-run: the policy's
+# `max_tokens_in_run`, or 1.25 times `max_tokens`. NULL when compaction is off.
+context_policy_run_ceiling <- function(policy) {
+  max_tokens <- S7::prop(policy, "max_tokens")
+  if (is.null(max_tokens)) {
+    return(NULL)
+  }
+  explicit <- S7::prop(policy, "max_tokens_in_run")
+  if (!is.null(explicit)) {
+    return(explicit)
+  }
+  as.integer(min(ceiling(max_tokens * 1.25), .Machine$integer.max))
+}
 
 context_policy_whole_number <- function(value, argument) {
   if (is.null(value)) {
@@ -250,6 +300,9 @@ S7::method(print, ContextPolicy) <- function(x, ...) {
     cli::cli_text("<ContextPolicy>")
     cli::cli_div(theme = list(div = list("margin-left" = 2)))
     cli::cli_text("compact at: {x$max_tokens %||% 'disabled'} tokens")
+    if (!is.null(x$max_tokens_in_run)) {
+      cli::cli_text("in a run: {x$max_tokens_in_run} tokens")
+    }
     cli::cli_text("compact to: {format(x$compact_to * 100)}%")
     cli::cli_text("estimator: {x$estimator}")
     cli::cli_text("fallback: {x$fallback}")

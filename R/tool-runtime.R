@@ -329,7 +329,10 @@ read_tool_result_manifest <- function(reference, policy, session_id) {
   directory <- tool_result_offload_dir(policy, session_id)
   path <- tool_result_manifest_path(directory, result_id)
   if (!file.exists(path)) {
-    cli_abort("Offloaded tool-result manifest not found: {.val {result_id}}")
+    cli_abort(
+      "Offloaded tool-result manifest not found: {.val {result_id}}",
+      class = "deputy_tool_result_not_found"
+    )
   }
   manifest <- validate_tool_result_manifest(
     readRDS(path),
@@ -890,6 +893,22 @@ read_tool_result_envelope <- function(reference, policy, session_id) {
   )
 }
 
+# What the reader says when a well-formed reference matches nothing saved:
+# the model learns where references come from instead of guessing again.
+tool_result_not_found <- function(parent) {
+  cli_abort(
+    c(
+      "No saved tool result matches that reference.",
+      "i" = paste0(
+        "Use a {.code deputy://tool-result/...} reference exactly as a tool ",
+        "result gave it."
+      )
+    ),
+    parent = parent,
+    class = "deputy_tool_result_not_found"
+  )
+}
+
 read_tool_result_chunk <- function(
   reference,
   offset,
@@ -903,7 +922,12 @@ read_tool_result_chunk <- function(
     cli_abort("{.arg max_chars} must not exceed 16384")
   }
 
-  artifact <- read_tool_result_manifest(reference, policy, session_id)
+  artifact <- tryCatch(
+    read_tool_result_manifest(reference, policy, session_id),
+    deputy_tool_result_not_found = function(error) {
+      tool_result_not_found(error)
+    }
+  )
   manifest <- artifact$manifest
   text_path <- artifact$text_path
   total_chars <- manifest$text_chars

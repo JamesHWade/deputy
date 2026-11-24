@@ -374,3 +374,36 @@ test_that("the stop event carries the run's ending", {
   expect_s7_class(stops[[1]]$ending, RunEndingAnswered)
   expect_identical(stops[[1]]$ending, result$ending)
 })
+
+test_that("a result carries the finish reason of its final response", {
+  server <- local_runtime_server(list(
+    runtime_reply(text = "partial", finish = "length"),
+    runtime_reply(text = "whole")
+  ))
+  agent <- Agent$new(runtime_chat(server))
+
+  cut <- NULL
+  expect_warning(cut <- agent$run_sync("Write a long answer"), "truncated")
+  whole <- agent$run_sync("Say it briefly")
+
+  expect_identical(cut$finish_reason, "max_tokens")
+  expect_true(cut$cut_off)
+  # The stop reason keeps its meaning for callers that switch on it.
+  expect_identical(cut$stop_reason, "complete")
+  expect_identical(whole$finish_reason, "success")
+  expect_false(whole$cut_off)
+})
+
+test_that("a result built by hand derives cut_off from its ending", {
+  expect_null(AgentResult()$finish_reason)
+  expect_false(AgentResult()$cut_off)
+  built <- AgentResult(
+    ending = RunEndingCutOff("content_filter"),
+    finish_reason = "content_filter"
+  )
+  expect_true(built$cut_off)
+  expect_identical(built$finish_reason, "content_filter")
+  expect_error(AgentResult(finish_reason = c("a", "b")), "finish_reason")
+  limited <- AgentResult(stop_reason = "request_limit")
+  expect_false(limited$cut_off)
+})

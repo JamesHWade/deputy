@@ -4,11 +4,14 @@ test_that("Skill configuration is frozen and revised values retain defaults", {
   expect_identical(skill$name, " Mixed Case ")
   expect_identical(skill$version, "0.0.0")
   expect_identical(skill_create("short")$version, "1.0.0")
-  expect_snapshot(error = TRUE, skill@name <- "changed")
-  expect_snapshot(error = TRUE, skill@prompt <- "changed")
-  expect_snapshot(error = TRUE, skill@path <- "elsewhere")
-  expect_snapshot(error = TRUE, S7::props(skill) <- list(version = "2.0.0"))
-  expect_snapshot(error = TRUE, skill$requires$providers <- "openai")
+  expect_snapshot_s7_error(error = TRUE, skill@name <- "changed")
+  expect_snapshot_s7_error(error = TRUE, skill@prompt <- "changed")
+  expect_snapshot_s7_error(error = TRUE, skill@path <- "elsewhere")
+  expect_snapshot_s7_error(
+    error = TRUE,
+    S7::props(skill) <- list(version = "2.0.0")
+  )
+  expect_snapshot_s7_error(error = TRUE, skill$requires$providers <- "openai")
 
   fields <- S7::props(skill)
   fields$prompt <- "Use one sentence."
@@ -76,8 +79,8 @@ test_that("Skill keeps executable state caller-owned across runtime consumers", 
   agent$load_skill(skill)
   loaded <- agent$skills()
   expect_identical(loaded$counter, skill)
-  expect_snapshot(error = TRUE, loaded$counter@name <- "changed")
-  expect_snapshot(error = TRUE, loaded$counter@prompt <- "changed")
+  expect_snapshot_s7_error(error = TRUE, loaded$counter@name <- "changed")
+  expect_snapshot_s7_error(error = TRUE, loaded$counter@prompt <- "changed")
   loaded$counter <- Skill("replacement")
   expect_identical(agent$skills()$counter$name, "counter")
   expect_identical(agent$skills()$counter$prompt, "Count carefully.")
