@@ -268,8 +268,8 @@ lists the skills in a directory.
 
 - [Running R
   code](https://jameshwade.github.io/deputy/articles/code-execution.md):
-  trusted R execution, persistent R sessions, and sandboxed interpreters
-  through mcp-repl and MCP Console.
+  trusted R execution, persistent R sessions, and sandboxed R, Python
+  and SQL execution through MCP Console.
 - [MCP servers](https://jameshwade.github.io/deputy/articles/mcp.md):
   tools, resources and prompts from Model Context Protocol servers.
 - [Human input and

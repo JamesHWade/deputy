@@ -96,12 +96,6 @@ Persistent R sessions and OS-sandboxed interpreters.
 
 - [`RSession`](https://jameshwade.github.io/deputy/reference/RSession.md)
   : Persistent R session for a conversation
-- [`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md)
-  : Load sandboxed R tools from mcp-repl
-- [`mcp_repl_connection()`](https://jameshwade.github.io/deputy/reference/mcp_repl_connection.md)
-  : Connect an agent to a sandboxed mcp-repl session
-- [`mcp_repl_control()`](https://jameshwade.github.io/deputy/reference/mcp_repl_control.md)
-  : Interrupt or reset an mcp-repl session
 - [`mcp_console_connection()`](https://jameshwade.github.io/deputy/reference/mcp_console_connection.md)
   : Connect an agent to a sandboxed MCP Console session
 - [`mcp_console_control()`](https://jameshwade.github.io/deputy/reference/mcp_console_control.md)

@@ -114,9 +114,10 @@ with
 [`tools_mcp()`](https://jameshwade.github.io/deputy/reference/tools_mcp.md)
 stop that server on the first lost reply.
 
-## Sandboxed interpreters
+## Sandboxed interpreter
 
-mcp-repl and MCP Console are MCP servers that run R (and, for MCP
-Console, Python and SQL) inside an OS sandbox. Deputy has dedicated
-helpers for them that check the sandbox is really on: see [Running R
+MCP Console is an MCP server that runs R, Python and DuckDB SQL inside
+an OS sandbox. Deputy has a dedicated helper
+([`mcp_console_connection()`](https://jameshwade.github.io/deputy/reference/mcp_console_connection.md))
+that checks the sandbox is really on: see [Running R
 code](https://jameshwade.github.io/deputy/articles/code-execution.md).

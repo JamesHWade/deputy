@@ -7,7 +7,7 @@ is not a sandbox.
 denies both tools; allow them with `r_code = TRUE` and `bash = TRUE` in
 [`Permissions()`](https://jameshwade.github.io/deputy/reference/Permissions.md).
 For an OS sandbox, use
-[`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md).
+[`mcp_console_connection()`](https://jameshwade.github.io/deputy/reference/mcp_console_connection.md).
 
 The processes don't inherit your environment variables, and R there
 doesn't read `.Renviron`. They get the variables that locate programs,

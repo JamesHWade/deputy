@@ -90,8 +90,6 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/load_skill_tools.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/mcp_console_connection.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/mcp_console_control.html</loc></url>
-<url><loc>https://jameshwade.github.io/deputy/reference/mcp_repl_connection.html</loc></url>
-<url><loc>https://jameshwade.github.io/deputy/reference/mcp_repl_control.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/normalize_provider_name.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/parse_markdown_frontmatter.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/parse_user_response.html</loc></url>
@@ -139,7 +137,6 @@
 <url><loc>https://jameshwade.github.io/deputy/reference/tools_file.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tools_interactive.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tools_mcp.html</loc></url>
-<url><loc>https://jameshwade.github.io/deputy/reference/tools_mcp_repl.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tools_preset.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/tools_web.html</loc></url>
 <url><loc>https://jameshwade.github.io/deputy/reference/validate_questions.html</loc></url>

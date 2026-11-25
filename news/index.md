@@ -2,6 +2,19 @@
 
 ## deputy (development version)
 
+- [`mcp_console_connection()`](https://jameshwade.github.io/deputy/reference/mcp_console_connection.md)
+  now targets
+  [posit-dev/mcp-console](https://github.com/posit-dev/mcp-console)
+  0.4.0, accepting its `session` and `note` fields,
+  `sandbox.profile=workspace|read_only` overrides, `--no-project-config`
+  isolation, resolver-sandbox dependency controls, and updated recording
+  paths;
+  [`mcp_console_control()`](https://jameshwade.github.io/deputy/reference/mcp_console_control.md)
+  accepts an optional `session` argument. The superseded `mcp-repl`
+  functions (`mcp_repl_connection()`, `mcp_repl_control()`, and
+  `tools_mcp_repl()`) have been removed
+  ([\#267](https://github.com/JamesHWade/deputy/issues/267)).
+
 - Deputy now requires `ellmer` (\>= 0.5.2). Examples and documentation
   have been refreshed for current Anthropic (`claude-sonnet-5-5`,
   `claude-opus-5-5`), OpenAI (`gpt-6.2-sol`), and Google Gemini
@@ -727,20 +740,16 @@
   `deputy_mcp_desynchronized` error;
   [`tools_mcp()`](https://jameshwade.github.io/deputy/reference/tools_mcp.md)
   tools, which can’t see reply ids, stop the server on the first lost
-  reply.
-  [`mcp_repl_connection()`](https://jameshwade.github.io/deputy/reference/mcp_repl_connection.md)
-  and
-  [`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md)
-  cap mcp-repl’s `timeout_ms` at 3000 ms, also when it is omitted, so
-  long cells return a busy result and the model polls
+  reply. `mcp_repl_connection()` and `tools_mcp_repl()` cap mcp-repl’s
+  `timeout_ms` at 3000 ms, also when it is omitted, so long cells return
+  a busy result and the model polls
   ([\#196](https://github.com/JamesHWade/deputy/issues/196)).
 
 - `McpConnection`,
   [`tools_mcp()`](https://jameshwade.github.io/deputy/reference/tools_mcp.md)
-  and
-  [`mcp_repl_connection()`](https://jameshwade.github.io/deputy/reference/mcp_repl_connection.md)
-  now support CRAN mcptools 1.0.3 as well as 1.0.2. Other versions are
-  refused with an error that lists the supported ones
+  and `mcp_repl_connection()` now support CRAN mcptools 1.0.3 as well as
+  1.0.2. Other versions are refused with an error that lists the
+  supported ones
   ([\#195](https://github.com/JamesHWade/deputy/issues/195)).
 
 - Model requests and tool calls use less CPU
@@ -899,13 +908,10 @@
   stays available for display
   ([\#143](https://github.com/JamesHWade/deputy/issues/143)).
 
-- New
-  [`mcp_repl_connection()`](https://jameshwade.github.io/deputy/reference/mcp_repl_connection.md)
-  gives an agent its own sandboxed mcp-repl session;
-  [`mcp_repl_control()`](https://jameshwade.github.io/deputy/reference/mcp_repl_control.md)
-  interrupts or resets it and reports the outcome. Interrupting the
-  agent cancels its active MCP connections. Plots and output previews
-  come back as ellmer content
+- New `mcp_repl_connection()` gives an agent its own sandboxed mcp-repl
+  session; `mcp_repl_control()` interrupts or resets it and reports the
+  outcome. Interrupting the agent cancels its active MCP connections.
+  Plots and output previews come back as ellmer content
   ([\#69](https://github.com/JamesHWade/deputy/issues/69)).
 
 - New `McpConnection` connects one agent to an MCP server through a
@@ -1240,11 +1246,10 @@
   policies that don’t set `r_code`, no longer allow running R code, and
   `tools_preset("standard")` no longer includes `run_r_code`. The
   built-in R and shell tools run code with your account’s access and are
-  not sandboxed. For sandboxed R, new
-  [`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md)
-  loads mcp-repl only with the `read-only` or `workspace-write` sandbox,
-  and refuses missing, inherited, external or unrestricted sandbox
-  settings ([\#32](https://github.com/JamesHWade/deputy/issues/32)).
+  not sandboxed. For sandboxed R, new `tools_mcp_repl()` loads mcp-repl
+  only with the `read-only` or `workspace-write` sandbox, and refuses
+  missing, inherited, external or unrestricted sandbox settings
+  ([\#32](https://github.com/JamesHWade/deputy/issues/32)).
 
 - [`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md)
   now behaves as documented. Provider-run web search and fetch tools are

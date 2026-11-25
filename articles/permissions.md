@@ -247,7 +247,7 @@ A permission decides whether the model may call a tool. It can’t limit
 what a tool does once it runs. `run_r_code` gets a separate process and
 a timeout, but that process can read and write anything your user
 account can. For model-written code that should only touch part of the
-system, use an OS sandbox such as mcp-repl; see [Running R
+system, use an OS sandbox such as MCP Console; see [Running R
 code](https://jameshwade.github.io/deputy/articles/code-execution.md).
 
 Reading works the same way. `file_read = TRUE` lets the file tools read

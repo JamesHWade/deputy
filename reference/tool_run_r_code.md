@@ -12,7 +12,7 @@ sandbox. The default permissions deny this tool; allow it with
 `r_code = TRUE` in
 [`Permissions()`](https://jameshwade.github.io/deputy/reference/Permissions.md).
 For an OS sandbox, use
-[`tools_mcp_repl()`](https://jameshwade.github.io/deputy/reference/tools_mcp_repl.md).
+[`mcp_console_connection()`](https://jameshwade.github.io/deputy/reference/mcp_console_connection.md).
 
 The process doesn't inherit your environment variables, and R there
 doesn't read `.Renviron`; a project `.Rprofile` still runs. It gets the

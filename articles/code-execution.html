@@ -98,8 +98,8 @@
     
     
 <p>Letting the model write and run R code is the most flexible tool you
-can give an agent, and the most dangerous. Deputy offers four ways to do
-it, which differ in two respects: whether R state survives between
+can give an agent, and the most dangerous. Deputy offers three ways to
+do it, which differ in two respects: whether R state survives between
 calls, and whether the code is confined by an OS sandbox.</p>
 <table class="table">
 <colgroup>
@@ -124,13 +124,6 @@ calls, and whether the code is confined by an OS sandbox.</p>
 <td>your user account’s access</td>
 </tr>
 <tr class="odd">
-<td>mcp-repl, through <code><a href="../reference/mcp_repl_connection.html">mcp_repl_connection()</a></code> or
-<code><a href="../reference/tools_mcp_repl.html">tools_mcp_repl()</a></code>
-</td>
-<td>persists</td>
-<td>OS sandbox</td>
-</tr>
-<tr class="even">
 <td>MCP Console, through <code><a href="../reference/mcp_console_connection.html">mcp_console_connection()</a></code>
 </td>
 <td>persists; R, Python and SQL share data</td>
@@ -328,66 +321,15 @@ approval.</p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="sandboxed-r-with-mcp-repl">Sandboxed R with mcp-repl<a class="anchor" aria-label="anchor" href="#sandboxed-r-with-mcp-repl"></a>
+<h2 id="sandboxed-r-python-and-sql-with-mcp-console">Sandboxed R, Python and SQL with MCP Console<a class="anchor" aria-label="anchor" href="#sandboxed-r-python-and-sql-with-mcp-console"></a>
 </h2>
-<p><a href="https://github.com/posit-dev/mcp-repl" class="external-link">mcp-repl</a> runs an
-R interpreter as an MCP server inside an OS sandbox, so model-written
-code can only read and write what the sandbox allows. Configure the
-server in your mcptools config with an explicit <code>--sandbox</code>
-mode:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode json"><code class="sourceCode json"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="dt">"mcpServers"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    <span class="dt">"r"</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>      <span class="dt">"command"</span><span class="fu">:</span> <span class="st">"/absolute/path/to/mcp-repl"</span><span class="fu">,</span></span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>      <span class="dt">"args"</span><span class="fu">:</span> <span class="ot">[</span><span class="st">"--sandbox"</span><span class="ot">,</span> <span class="st">"workspace-write"</span><span class="ot">,</span> <span class="st">"--interpreter"</span><span class="ot">,</span> <span class="st">"r"</span><span class="ot">]</span></span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    <span class="fu">}</span></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>  <span class="fu">}</span></span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
-<p>Then connect an agent to its own REPL:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
-<span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>web <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">repl</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mcp_repl_connection.html">mcp_repl_connection</a></span><span class="op">(</span></span>
-<span>  config <span class="op">=</span> <span class="st">"~/.config/mcptools/config.json"</span>,</span>
-<span>  agent <span class="op">=</span> <span class="va">agent</span>,</span>
-<span>  server <span class="op">=</span> <span class="st">"r"</span>,</span>
-<span>  sandbox <span class="op">=</span> <span class="st">"workspace-write"</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">agent</span><span class="op">$</span><span class="fu">register_tools</span><span class="op">(</span><span class="va">repl</span><span class="op">$</span><span class="fu">tools</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co"># ...</span></span>
-<span><span class="va">repl</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Deputy checks that the server’s final <code>--sandbox</code> argument
-matches the mode you ask for, and refuses to start otherwise. It accepts
-<code>"read-only"</code> and <code>"workspace-write"</code>; a
-configuration that leaves the mode out or uses any other mode is
-rejected. mcp-repl enforces the sandbox and refuses to start on a system
-where it can’t. Its <a href="https://github.com/posit-dev/mcp-repl/blob/main/docs/sandbox.md" class="external-link">sandbox
-documentation</a> describes what each mode allows on each platform.</p>
-<p>Each connection has its own REPL and belongs to one agent. Long
-computations return a “busy” result after about three seconds; the model
-then polls with an empty call to collect the output.
-<code>mcp_repl_control(repl, "interrupt")</code> interrupts the running
-code, and <code>mcp_repl_control(repl, "reset")</code> starts a fresh
-interpreter. Both return promises; check the result to see whether the
-REPL accepted the request.</p>
-<p><code><a href="../reference/tools_mcp_repl.html">tools_mcp_repl()</a></code> loads the same tools without a
-connection object, for simple scripts:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">register_tools</span><span class="op">(</span><span class="fu"><a href="../reference/tools_mcp_repl.html">tools_mcp_repl</a></span><span class="op">(</span>server <span class="op">=</span> <span class="st">"r"</span>, sandbox <span class="op">=</span> <span class="st">"workspace-write"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>Deputy works with mcptools 1.0.2 and 1.0.3 and refuses other versions
-until they have been tested. It has been tested with mcp-repl 0.3.0.</p>
-</div>
-<div class="section level2">
-<h2 id="r-python-and-sql-with-mcp-console">R, Python and SQL with MCP Console<a class="anchor" aria-label="anchor" href="#r-python-and-sql-with-mcp-console"></a>
-</h2>
-<p><a href="https://github.com/t-kalinowski/mcp-console" class="external-link">MCP Console</a>
-is a sandboxed workbench that grew out of mcp-repl. Its single
-<code>send</code> tool runs R, Python and DuckDB SQL cells in one
-worker, so a data frame made in R can be queried in SQL and read from
-Python in the same conversation.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<p><a href="https://github.com/posit-dev/mcp-console" class="external-link">MCP Console</a> is
+an OS-sandboxed workbench. Its single <code>send</code> tool runs R,
+Python and DuckDB SQL cells in one worker, so a data frame made in R can
+be queried in SQL and read from Python in the same conversation, with
+optional named sessions (<code>session</code>) and journal notes
+(<code>note</code>).</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>bash <span class="op">=</span> <span class="cn">TRUE</span>, web <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -400,50 +342,69 @@ Python in the same conversation.</p>
 <span><span class="va">agent</span><span class="op">$</span><span class="fu">register_tools</span><span class="op">(</span><span class="va">console</span><span class="op">$</span><span class="fu">tools</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co"># ...</span></span>
 <span><span class="va">console</span><span class="op">$</span><span class="fu">close</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>Install MCP Console 0.0.4 yourself (for example with
-<code>uv tool install mcp-console==0.0.4</code>) and pass the path to
-the executable. Deputy checks the version before starting it.</p>
+<p>Install MCP Console 0.4.0 yourself (for example with
+<code>uv tool install mcp-console==0.4.0</code>) and pass the path to
+the executable. Deputy checks the version before starting it, and works
+with mcptools 1.0.2 and 1.0.3.</p>
 <p>In its sandbox, code can read files but can’t reach the network, and
 it can write only to private temporary storage and to paths you allow.
 Deputy keeps it that way: it refuses options that would turn the sandbox
-off, widen file access, add a proxy, or run the code somewhere else. It
-accepts <code>--writable-root PATH</code> and the
-<code>-c extends=:workspace</code> (write in the agent’s working
-directory), <code>-c extends=:read-only</code> and
-<code>-c sandbox.network=restricted</code> presets. A project config
-file, <code>.agents/console/config.yaml</code>, can change the sandbox
-policy, so Deputy won’t start when one exists unless you have reviewed
-it and pass <code>project_config = TRUE</code>. After starting, Deputy
-checks the sandbox the server reports and disconnects unless it is the
-native sandbox with restricted networking.</p>
+off, widen file access, add a proxy, override
+<code>tool.description</code>, or run code somewhere else. It accepts
+<code>--writable-root PATH</code> and safe <code>-c</code> overrides
+including <code>-c sandbox.profile=workspace</code> (write in the
+agent’s working directory), <code>-c sandbox.profile=read_only</code>,
+<code>-c sandbox.network=restricted</code>,
+<code>-c r.resolution=disabled|fixed|explicit</code>,
+<code>-c python.resolution=fixed|explicit</code>,
+<code>-c tool.parameters.requirements.enabled=false</code>, and
+<code>-c sessions.max=N</code>. A project config file,
+<code>.agents/console/config.yaml</code>, can change the sandbox policy,
+so Deputy refuses to start when one exists and passes
+<code>--no-project-config</code> unless you have reviewed it and pass
+<code>project_config = TRUE</code>. After starting, Deputy checks the
+sandbox the server reports and disconnects unless it is the native
+sandbox with restricted networking.</p>
 <p><code>send</code> runs code, so Deputy treats it like a shell
 command: the agent needs <code>bash = TRUE</code>, plus
 <code>web = TRUE</code> because the server doesn’t annotate its tools.
 Read-only and plan modes deny it.</p>
-<p>MCP Console can also install the packages that code asks for, and
-that happens outside the sandbox. It does this when a call lists
-<code>requirements</code>, and also on its own when code loads a missing
-package. Since Deputy can’t switch the second case off, the default
-<code>dependencies = "deny"</code> refuses to connect to a server that
-offers installation. With <code>dependencies = "allow"</code>, a call
-that lists <code>requirements</code> also needs
-<code>install_packages = TRUE</code> in the agent’s permissions.
-Installers use their usual caches in your home directory; set variables
-such as <code>UV_CACHE_DIR</code> through <code>env</code> to move
-them.</p>
+<p>MCP Console can also install the packages that code asks for using
+its separate resolver sandbox (which has network access to package
+repositories and cache writes). It does this when a call lists
+<code>requirements</code>, and by default R also resolves missing
+packages automatically on <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> or <code>::</code>,
+while managed Python and DuckDB prepare runtimes and extensions. With
+the default <code>dependencies = "deny"</code>, Deputy launches Console
+with non-preparing R-only overrides
+(<code>-c r.resolution=disabled</code>, <code>-c r.packages=[]</code>,
+<code>-c languages=[r]</code>,
+<code>-c tool.parameters.requirements.enabled=false</code>) and verifies
+that <code>requirements</code>, <code>python</code>, and
+<code>sql</code> are not exposed, so missing packages fail without
+downloading anything. Pass <code>dependencies = "allow"</code> for the
+full R, Python and SQL workbench; a call that lists
+<code>requirements</code> also needs
+<code>install_packages = TRUE</code> in the agent’s permissions. Set
+variables such as <code>UV_CACHE_DIR</code> or
+<code>MCP_CONSOLE_HOME</code> through <code>env</code> to control cache
+and recording locations.</p>
 <p>Calls wait up to 2.5 seconds. Longer work keeps running and returns
 <code>[running; poll with an empty send]</code>, and the model collects
 the output with an empty <code>send</code>.
 <code>mcp_console_control(console, "interrupt")</code> interrupts a cell
 and keeps the session’s state;
 <code>mcp_console_control(console, "restart")</code> discards all R,
-Python and SQL state. If the restarted worker isn’t ready within 2.5
-seconds, Deputy closes the connection and you need to start a new
-one.</p>
-<p>MCP Console records every call, with its output and plots, under
-<code>.agents/console/sessions/</code> in the agent’s working directory.
-Recordings aren’t redacted and aren’t deleted automatically;
-<code>console$status()$execution</code> gives the path.</p>
+Python and SQL state (pass <code>session = "name"</code> to target a
+named session). If the restarted worker isn’t ready within 2.5 seconds,
+Deputy closes the connection and you need to start a new one.</p>
+<p>MCP Console records every call, note, output and plot under
+<code>.agents/console/sessions/</code> when <code>.agents/console</code>
+already exists in the agent’s working directory, or otherwise under
+<code>$MCP_CONSOLE_HOME/sessions/</code>
+(<code>~/.agents/console/sessions/</code> by default). Recordings aren’t
+redacted and aren’t deleted automatically;
+<code>console$status()$execution$recordings</code> gives the path.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

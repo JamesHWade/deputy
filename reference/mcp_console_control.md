@@ -4,12 +4,16 @@
 keeps the session's state. The code may not stop, so check the returned
 output: it can still end in `[running; poll with an empty send]`.
 `"restart"` replaces the worker and discards all R, Python and DuckDB
-state.
+state in the selected session.
 
 ## Usage
 
 ``` r
-mcp_console_control(connection, action = c("interrupt", "restart"))
+mcp_console_control(
+  connection,
+  action = c("interrupt", "restart"),
+  session = NULL
+)
 ```
 
 ## Arguments
@@ -22,6 +26,11 @@ mcp_console_control(connection, action = c("interrupt", "restart"))
 - action:
 
   `"interrupt"` or `"restart"`.
+
+- session:
+
+  Optional named session to target (defaults to `NULL`, which targets
+  MCP Console's `"default"` session).
 
 ## Value
 

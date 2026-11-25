@@ -3,7 +3,7 @@
 user account's access. Each call runs in a separate process, which is not a
 sandbox. permissions_standard() denies both tools; allow them with
 r_code = TRUE and bash = TRUE in Permissions(). For an OS sandbox, use
-tools_mcp_repl().
+mcp_console_connection().
 The processes don't inherit your environment variables, and R there
 doesn't read .Renviron. They get the variables that locate programs,
 libraries, locales and temporary files, such as PATH, HOME, LANG and
@@ -16,7 +16,7 @@ account that can't read them, or in a sandbox."><meta property="og:description" 
 user account's access. Each call runs in a separate process, which is not a
 sandbox. permissions_standard() denies both tools; allow them with
 r_code = TRUE and bash = TRUE in Permissions(). For an OS sandbox, use
-tools_mcp_repl().
+mcp_console_connection().
 The processes don't inherit your environment variables, and R there
 doesn't read .Renviron. They get the variables that locate programs,
 libraries, locales and temporary files, such as PATH, HOME, LANG and
@@ -96,7 +96,7 @@ account that can't read them, or in a sandbox."><meta property="og:image" conten
 user account's access. Each call runs in a separate process, which is not a
 sandbox. <code><a href="permissions_standard.html">permissions_standard()</a></code> denies both tools; allow them with
 <code>r_code = TRUE</code> and <code>bash = TRUE</code> in <code><a href="Permissions.html">Permissions()</a></code>. For an OS sandbox, use
-<code><a href="tools_mcp_repl.html">tools_mcp_repl()</a></code>.</p>
+<code><a href="mcp_console_connection.html">mcp_console_connection()</a></code>.</p>
 <p>The processes don't inherit your environment variables, and R there
 doesn't read <code>.Renviron</code>. They get the variables that locate programs,
 libraries, locales and temporary files, such as <code>PATH</code>, <code>HOME</code>, <code>LANG</code> and

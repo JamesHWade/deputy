@@ -95,7 +95,7 @@ file and shows how to undo what it wrote.
   that let a lead keep working while its specialists run.
 - [Sandboxed code
   execution](https://jameshwade.github.io/deputy/articles/code-execution.html)
-  through mcp-repl and MCP Console, and tools from any [MCP
+  through MCP Console, and tools from any [MCP
   server](https://jameshwade.github.io/deputy/articles/mcp.html).
 - [Trusted
   results](https://jameshwade.github.io/deputy/articles/trusted-mini-agents.html):
