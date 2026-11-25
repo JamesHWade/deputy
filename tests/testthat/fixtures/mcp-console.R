@@ -1,10 +1,10 @@
-# Stdio MCP server that emulates MCP Console 0.0.4's `send` tool.
-# `mcp-console-tools.json` is the tools/list result of the released 0.0.4
+# Stdio MCP server that emulates MCP Console 0.4.0's `send` tool.
+# `mcp-console-tools.json` is the tools/list result of the released 0.4.0
 # server (MIT licensed), so the schema and description are the real contract.
 # Arguments: a log path, followed by the launch arguments Deputy passes.
 # Environment:
-#   DEPUTY_CONSOLE_FIXTURE_BOUNDARY  default, workspace, unsandboxed or proxy
-#   DEPUTY_CONSOLE_FIXTURE_BARE      "1" omits `requirements` (bare runtime)
+#   DEPUTY_CONSOLE_FIXTURE_BOUNDARY  default, workspace, unsandboxed, proxy, or inherit_codex
+#   DEPUTY_CONSOLE_FIXTURE_BARE      "1" omits `requirements` (disabled requirements)
 #   DEPUTY_CONSOLE_FIXTURE_RESTART   seconds a restart takes
 `%||%` <- function(x, y) if (is.null(x)) y else x
 input <- file("stdin", open = "r")
@@ -40,20 +40,26 @@ security <- switch(
   boundary,
   default = NULL,
   workspace = paste(
-    "Evaluated code uses the native \":workspace\" profile: it can edit files",
-    "beneath the fixed launch workspace, write in the worker's private",
-    "temporary directory and to explicitly allowed paths, and cannot directly",
-    "access the network. The workspace's .git, .agents, .codex, and .claude",
-    "paths are readable and protected from writes by default."
+    "Evaluated code can read host files subject to configured restrictions and",
+    "cannot directly access the network. Writable locations: private `TMPDIR`,",
+    "workspace; subject to more specific read/deny rules. Package preparation",
+    "may execute installation or build code with separate filesystem and",
+    "network permissions; use only trusted dependencies."
   ),
   unsandboxed = paste(
     "Evaluated code runs without a sandbox, with the server's permissions,",
-    "including filesystem and network access."
+    "including filesystem and network access. Package preparation may execute",
+    "installation or build code; use only trusted dependencies."
   ),
   proxy = paste(
-    "Evaluated code can read host files, can access the network subject to",
-    "the launcher's proxy settings, and can write in the worker's private",
-    "temporary directory and to paths explicitly allowed by the launcher."
+    "Evaluated code can read host files subject to configured restrictions and",
+    "can access the network subject to the launcher's proxy settings. Writable",
+    "locations: private `TMPDIR`; subject to more specific read/deny rules."
+  ),
+  inherit_codex = paste(
+    "The sandbox base comes from Codex metadata on the first send, or the",
+    "configured fallback (default: read_only). Full access disables Console's",
+    "sandbox."
   )
 )
 if (!is.null(security)) {
@@ -184,7 +190,7 @@ repeat {
     initialize = list(
       protocolVersion = request$params$protocolVersion,
       capabilities = list(tools = object),
-      serverInfo = list(name = "mcp-console", version = "0.0.4")
+      serverInfo = list(name = "mcp-console", version = "0.4.0")
     ),
     `tools/list` = list(tools = tools),
     `tools/call` = call_send(arguments),

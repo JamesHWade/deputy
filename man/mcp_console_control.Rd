@@ -4,12 +4,19 @@
 \alias{mcp_console_control}
 \title{Interrupt or restart an MCP Console session}
 \usage{
-mcp_console_control(connection, action = c("interrupt", "restart"))
+mcp_console_control(
+  connection,
+  action = c("interrupt", "restart"),
+  session = NULL
+)
 }
 \arguments{
 \item{connection}{A connection created by \code{\link[=mcp_console_connection]{mcp_console_connection()}}.}
 
 \item{action}{\code{"interrupt"} or \code{"restart"}.}
+
+\item{session}{Optional named session to target (defaults to \code{NULL}, which
+targets MCP Console's \code{"default"} session).}
 }
 \value{
 A promise for MCP Console's reply. The call goes straight to the
@@ -20,7 +27,8 @@ handling a request.
 \code{"interrupt"} sends SIGINT to the running code or dependency install and
 keeps the session's state. The code may not stop, so check the returned
 output: it can still end in \verb{[running; poll with an empty send]}.
-\code{"restart"} replaces the worker and discards all R, Python and DuckDB state.
+\code{"restart"} replaces the worker and discards all R, Python and DuckDB state
+in the selected session.
 }
 \details{
 If a restart takes longer than about 4 seconds, the connection closes with a

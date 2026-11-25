@@ -117,7 +117,7 @@ new_tool_run_r_code <- function(env = NULL) {
 #' The code runs with your user account's access to files and the network. The
 #' separate process protects your R session from crashes; it is not a sandbox.
 #' The default permissions deny this tool; allow it with `r_code = TRUE` in
-#' [Permissions()]. For an OS sandbox, use [tools_mcp_repl()].
+#' [Permissions()]. For an OS sandbox, use [mcp_console_connection()].
 #'
 #' The process doesn't inherit your environment variables, and R there doesn't
 #' read `.Renviron`; a project `.Rprofile` still runs. It gets the variables

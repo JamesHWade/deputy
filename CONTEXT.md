@@ -117,7 +117,7 @@ _Avoid_: answer, model result, summary
 
 **OS sandbox**:
 A platform-enforced boundary that constrains an already authorized process.
-Deputy delegates this boundary to mcp-repl and verifies the requested policy;
+Deputy delegates this boundary to MCP Console and verifies the requested policy;
 permission modes do not substitute for it.
 _Avoid_: permission mode, subprocess isolation
 

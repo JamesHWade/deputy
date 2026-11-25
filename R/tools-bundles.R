@@ -37,7 +37,7 @@ tools_file <- function() {
 #' user account's access. Each call runs in a separate process, which is not a
 #' sandbox. [permissions_standard()] denies both tools; allow them with
 #' `r_code = TRUE` and `bash = TRUE` in [Permissions()]. For an OS sandbox, use
-#' [tools_mcp_repl()].
+#' [mcp_console_connection()].
 #'
 #' The processes don't inherit your environment variables, and R there
 #' doesn't read `.Renviron`. They get the variables that locate programs,

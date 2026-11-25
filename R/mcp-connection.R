@@ -290,7 +290,7 @@ McpConnection <- R6::R6Class(
       private$check_current()
       result <- lapply(private$allowed$tools, function(name) {
         descriptor <- private$descriptors[[name]]
-        # A producer adapter (mcp-repl, MCP Console) governs its one tool's
+        # A producer adapter (MCP Console) governs its one tool's
         # arguments and description; other tools pass through unchanged.
         adapter <- attr(self, "deputy_mcp_adapter", exact = TRUE)
         if (!identical(adapter$tool, name)) {

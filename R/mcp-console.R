@@ -1,37 +1,42 @@
 #' Connect an agent to a sandboxed MCP Console session
 #'
 #' @description
-#' Starts an [MCP Console](https://github.com/t-kalinowski/mcp-console) server
+#' Starts an [MCP Console](https://github.com/posit-dev/mcp-console) server
 #' for one agent and connects to it. MCP Console runs R, Python and DuckDB SQL
-#' in an OS sandbox and keeps their state for the conversation. Each connection
-#' starts its own server. Register `connection$tools()` on the agent so that
-#' the `send` tool goes through its permissions, hooks and limits.
+#' in an OS sandbox and keeps their state for the conversation, with optional
+#' named `session`s and recording `note`s. Each connection starts its own
+#' server. Register `connection$tools()` on the agent so that the `send` tool
+#' goes through its permissions, hooks and limits.
 #'
 #' @param agent The agent that owns the connection. Its working directory
 #'   becomes the Console workspace, where the server starts, the sandbox's
-#'   workspace is rooted, and MCP Console reads its project configuration and
-#'   writes recordings.
-#' @param command Path to an `mcp-console` executable, version 0.0.4. Defaults
+#'   workspace is rooted, and MCP Console checks for project configuration.
+#' @param command Path to an `mcp-console` executable, version 0.4.0. Defaults
 #'   to the `DEPUTY_MCP_CONSOLE_BIN` environment variable. Deputy doesn't
 #'   install the executable or search for it.
 #' @param args Extra arguments for `mcp-console serve`. Only
-#'   `--writable-root PATH` and the overrides `-c extends=:workspace`,
-#'   `-c extends=:read-only` and `-c sandbox.network=restricted` are accepted.
-#'   Anything else, including `--no-sandbox`, is an error.
+#'   `--writable-root PATH` and sandbox-preserving `-c` overrides
+#'   (`sandbox.profile=workspace`, `sandbox.profile=read_only`,
+#'   `sandbox.network=restricted` / `false`, `r.resolution=disabled` / `fixed` /
+#'   `explicit`, `python.resolution=fixed` / `explicit`,
+#'   `tool.parameters.requirements.enabled=false`, and positive integer
+#'   `sessions.max`) are accepted. Anything else, including `--no-sandbox` and
+#'   `tool.description`, is an error.
 #' @param env Optional named character vector of environment variables for the
 #'   server. The server inherits only a few variables (such as `HOME`, `PATH`
-#'   and the `R_LIBS` family), so set others here, for example `UV_CACHE_DIR`
-#'   or `XDG_CACHE_HOME`. Without them, dependency installs write to caches
-#'   under `HOME`.
+#'   and the `R_LIBS` family), so set others here, for example `UV_CACHE_DIR`,
+#'   `XDG_CACHE_HOME`, or `MCP_CONSOLE_HOME`. Without them, dependency installs
+#'   and fallback recordings write under `HOME`.
 #' @param dependencies `"deny"` (the default) or `"allow"`. MCP Console can
-#'   install packages that code needs, and it does so outside its sandbox,
-#'   with the server's permissions. With `"deny"`, the connection errors if the
-#'   server offers this, and calls that declare `requirements` are refused.
-#'   See Details.
+#'   prepare packages that code needs using its separate resolver sandbox
+#'   (which downloads packages from registries and writes caches). With
+#'   `"deny"`, the connection errors if the server exposes `requirements`, and
+#'   calls that declare `requirements` are refused. See Details.
 #' @param project_config Set to `TRUE` to start even though the workspace
 #'   contains `.agents/console/config.yaml`. That file can widen the sandbox,
-#'   so by default the connection refuses to start when it exists. Review the
-#'   file before you opt in.
+#'   so by default the connection refuses to start when it exists and passes
+#'   `--no-project-config` to `mcp-console serve`. Review the file before you
+#'   opt in.
 #' @param timeout Maximum seconds for one MCP request.
 #' @param startup_timeout Maximum seconds for the client and server to start.
 #' @return A [McpConnection]. Call its `$close()` method when the conversation
@@ -40,12 +45,12 @@
 #' @details
 #' ## Supported versions
 #'
-#' Requires MCP Console 0.0.4 and mcptools 1.0.2 or 1.0.3. The connection
+#' Requires MCP Console 0.4.0 and mcptools 1.0.2 or 1.0.3. The connection
 #' checks the version with `command --version` before starting the server.
 #' After starting, it checks the arguments of `send` and the sandbox
 #' description MCP Console adds to it, and closes the connection unless the
-#' server uses its native sandbox with restricted networking (the default
-#' policy, or the `:workspace` or `:read-only` profile).
+#' server uses its native sandbox with restricted networking (`read_only` or
+#' `workspace` profile with private temporary storage).
 #'
 #' ## Permissions
 #'
@@ -56,12 +61,13 @@
 #' `requirements` also needs `install_packages = TRUE` and a connection created
 #' with `dependencies = "allow"`.
 #'
-#' With `dependencies = "allow"`, the server can also install packages on its
-#' own, outside the sandbox, when code calls `library()` for a missing package
-#' or imports a missing Python module. These installs can't be checked call by
-#' call. MCP Console offers dependency installs when `ir`, `uv` or a recent
-#' reticulate is available to it. The server's environment decides where they
-#' are written.
+#' By default in MCP Console 0.4.0, `requirements` is exposed and R resolves
+#' missing packages automatically on `library()` / `::` using its separate
+#' resolver sandbox. With `dependencies = "deny"`, either pass
+#' `dependencies = "allow"` or disable preparation explicitly (for example
+#' `args = c("-c", "r.resolution=disabled", "-c", "python.resolution=fixed", "-c", "tool.parameters.requirements.enabled=false")`).
+#' With `dependencies = "allow"`, automatic resolution remains part of the
+#' host's connection-level decision and cannot be checked call by call.
 #'
 #' ## Long-running calls
 #'
@@ -73,8 +79,8 @@
 #' sent to a stopped worker have no time limit in MCP Console. If one takes
 #' longer than the reply window, the connection closes with a
 #' `deputy_mcp_desynchronized` error and the session is lost. That is why only
-#' you can restart the session, with [mcp_console_control()]; the model's
-#' `send` refuses it.
+#' you can restart a session, with [mcp_console_control()]; the model's `send`
+#' refuses it.
 #'
 #' ## Closing and recordings
 #'
@@ -83,10 +89,11 @@
 #' server without asking; MCP Console's sandbox runner then stops its worker.
 #' Processes that escape the runner are outside Deputy's control.
 #'
-#' MCP Console records every call, result and plot, without redaction, under
-#' `.agents/console/sessions/<run-id>/` in the workspace. Version 0.0.4 can't
-#' change that location or how long recordings are kept. The path is reported
-#' in `$status()$execution$recordings`; deleting old recordings is up to you.
+#' MCP Console records every call, note, result and plot, without redaction,
+#' under `.agents/console/sessions/<run-id>/` when `.agents/console` already
+#' exists in the workspace, or otherwise under `$MCP_CONSOLE_HOME/sessions/`
+#' (`~/.agents/console/sessions/` by default). The directory is reported in
+#' `$status()$execution$recordings`; deleting old recordings is up to you.
 #'
 #' @export
 #' @examples
@@ -95,7 +102,11 @@
 #'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   permissions = Permissions(bash = TRUE, web = TRUE)
 #' )
-#' console <- mcp_console_connection(agent, command = "/path/to/mcp-console")
+#' console <- mcp_console_connection(
+#'   agent,
+#'   command = "/path/to/mcp-console",
+#'   dependencies = "allow"
+#' )
 #' agent$register_tools(console$tools())
 #' # In a Shiny app: session$onSessionEnded(function() console$close())
 #' console$close()
@@ -135,7 +146,12 @@ mcp_console_connection <- function(
   }
   version <- mcp_console_version(command, env)
 
-  server <- list(command = command, args = c("serve", args))
+  launch_args <- c(
+    "serve",
+    if (!project_config) "--no-project-config",
+    args
+  )
+  server <- list(command = command, args = launch_args)
   if (length(env)) {
     server$env <- as.list(env)
   }
@@ -175,9 +191,9 @@ mcp_console_connection <- function(
   if (offers_dependencies && identical(dependencies, "deny")) {
     abort_deputy(
       c(
-        "This MCP Console server prepares dependencies outside its sandbox.",
+        "This MCP Console server prepares dependencies in its resolver sandbox.",
         "i" = "It installs packages for {.field requirements} and when code loads a missing package.",
-        "i" = "Pass {.code dependencies = \"allow\"} to accept this, or launch a bare runtime."
+        "i" = "Pass {.code dependencies = \"allow\"} to accept this, or disable requirements with {.code -c tool.parameters.requirements.enabled=false}."
       ),
       class = "mcp_console"
     )
@@ -192,7 +208,7 @@ mcp_console_connection <- function(
       sandbox = sandbox,
       dependencies = if (offers_dependencies) dependencies else "unavailable",
       workspace = workspace,
-      recordings = file.path(workspace, ".agents", "console", "sessions")
+      recordings = mcp_console_recordings_dir(workspace, env)
     ),
     arguments = function(arguments) {
       mcp_console_bound_arguments(arguments, dependencies, state$host_control)
@@ -210,7 +226,8 @@ mcp_console_connection <- function(
 #' `"interrupt"` sends SIGINT to the running code or dependency install and
 #' keeps the session's state. The code may not stop, so check the returned
 #' output: it can still end in `[running; poll with an empty send]`.
-#' `"restart"` replaces the worker and discards all R, Python and DuckDB state.
+#' `"restart"` replaces the worker and discards all R, Python and DuckDB state
+#' in the selected session.
 #'
 #' If a restart takes longer than about 4 seconds, the connection closes with a
 #' `deputy_mcp_console_restart` error and the server stops. Create a new
@@ -218,15 +235,24 @@ mcp_console_connection <- function(
 #'
 #' @param connection A connection created by [mcp_console_connection()].
 #' @param action `"interrupt"` or `"restart"`.
+#' @param session Optional named session to target (defaults to `NULL`, which
+#'   targets MCP Console's `"default"` session).
 #' @return A promise for MCP Console's reply. The call goes straight to the
 #'   server, not through the agent, and errors if the connection is already
 #'   handling a request.
 #' @export
 mcp_console_control <- function(
   connection,
-  action = c("interrupt", "restart")
+  action = c("interrupt", "restart"),
+  session = NULL
 ) {
   action <- match.arg(action)
+  if (!is.null(session) && !is_nonempty_string(session)) {
+    abort_deputy(
+      "{.arg session} must be a single non-empty string or NULL.",
+      class = "mcp_console"
+    )
+  }
   adapter <- if (inherits(connection, "McpConnection")) {
     attr(connection, "deputy_mcp_adapter", exact = TRUE)
   }
@@ -237,12 +263,16 @@ mcp_console_control <- function(
     )
   }
   send <- connection$tools()$send
+  call_args <- list(control = action)
+  if (!is.null(session)) {
+    call_args$session <- session
+  }
   if (identical(action, "interrupt")) {
-    return(send(control = "interrupt"))
+    return(do.call(send, call_args))
   }
   adapter$state$host_control <- TRUE
   on.exit(assign("host_control", FALSE, envir = adapter$state), add = TRUE)
-  promises::catch(send(control = "restart"), function(error) {
+  promises::catch(do.call(send, call_args), function(error) {
     if (mcp_connection_desynchronized(error)) {
       abort_deputy(
         c(
@@ -258,12 +288,14 @@ mcp_console_control <- function(
   })
 }
 
-mcp_console_qualified_versions <- "0.0.4"
+mcp_console_qualified_versions <- "0.4.0"
 
 mcp_console_fields <- c(
   "r",
   "python",
   "sql",
+  "note",
+  "session",
   "control",
   "requirements",
   "stdin",
@@ -277,6 +309,29 @@ mcp_console_timeout_ms_max <- 2500L
 
 # Seconds to wait after closing the server's input before stopping it.
 mcp_console_close_grace <- 2
+
+mcp_console_recordings_dir <- function(workspace, env) {
+  project_dir <- file.path(workspace, ".agents", "console")
+  if (dir.exists(project_dir)) {
+    return(file.path(project_dir, "sessions"))
+  }
+  console_home <- if (
+    "MCP_CONSOLE_HOME" %in% names(env) && nzchar(env[["MCP_CONSOLE_HOME"]])
+  ) {
+    env[["MCP_CONSOLE_HOME"]]
+  } else {
+    Sys.getenv("MCP_CONSOLE_HOME", unset = "")
+  }
+  if (nzchar(console_home)) {
+    return(file.path(path.expand(console_home), "sessions"))
+  }
+  user_home <- if ("HOME" %in% names(env) && nzchar(env[["HOME"]])) {
+    env[["HOME"]]
+  } else {
+    "~"
+  }
+  file.path(path.expand(user_home), ".agents", "console", "sessions")
+}
 
 mcp_console_executable <- function(command) {
   if (!is_nonempty_string(command)) {
@@ -421,10 +476,34 @@ validate_mcp_console_override <- function(override, refuse) {
   key <- trimws(sub("=.*$", "", override))
   value <- trimws(sub("^[^=]*=", "", override))
   value <- gsub("^[\"']|[\"']$", "", value)
-  if (identical(key, "extends") && value %in% c(":workspace", ":read-only")) {
+  if (
+    identical(key, "sandbox.profile") && value %in% c("workspace", "read_only")
+  ) {
     return(invisible(TRUE))
   }
-  if (identical(key, "sandbox.network") && identical(value, "restricted")) {
+  if (
+    identical(key, "sandbox.network") && value %in% c("restricted", "false")
+  ) {
+    return(invisible(TRUE))
+  }
+  if (
+    identical(key, "r.resolution") &&
+      value %in% c("disabled", "fixed", "explicit")
+  ) {
+    return(invisible(TRUE))
+  }
+  if (
+    identical(key, "python.resolution") && value %in% c("fixed", "explicit")
+  ) {
+    return(invisible(TRUE))
+  }
+  if (
+    identical(key, "tool.parameters.requirements.enabled") &&
+      identical(value, "false")
+  ) {
+    return(invisible(TRUE))
+  }
+  if (identical(key, "sessions.max") && grepl("^[1-9][0-9]*$", value)) {
     return(invisible(TRUE))
   }
   if (grepl("proxy", override, fixed = TRUE)) {
@@ -435,12 +514,24 @@ validate_mcp_console_override <- function(override, refuse) {
   }
   if (
     key %in%
-      c("sandbox", "sandbox.filesystem") ||
+      c("sandbox", "sandbox.filesystem", "sandbox.tempdir") ||
       startsWith(key, "sandbox.filesystem.")
   ) {
     refuse(
       "MCP Console filesystem overrides are refused.",
-      "i" = "They can select unrestricted or external-sandbox enforcement."
+      "i" = "They can widen filesystem or temporary-directory access."
+    )
+  }
+  if (identical(key, "resolver") || startsWith(key, "resolver.")) {
+    refuse(
+      "MCP Console resolver overrides are refused.",
+      "i" = "They can widen dependency-preparation permissions."
+    )
+  }
+  if (identical(key, "tool.description")) {
+    refuse(
+      "MCP Console {.code tool.description} overrides are refused.",
+      "i" = "Deputy verifies the server-generated sandbox summary in the tool description."
     )
   }
   if (identical(key, "target") || startsWith(key, "target.")) {
@@ -451,49 +542,50 @@ validate_mcp_console_override <- function(override, refuse) {
   }
   refuse(
     "Unsupported MCP Console override {.val {key}}.",
-    "i" = "Deputy admits {.code extends=:workspace}, {.code extends=:read-only} and {.code sandbox.network=restricted}."
+    "i" = paste(
+      "Deputy admits {.code sandbox.profile=workspace|read_only},",
+      "{.code sandbox.network=restricted|false},",
+      "{.code r.resolution=disabled|fixed|explicit},",
+      "{.code python.resolution=fixed|explicit},",
+      "{.code tool.parameters.requirements.enabled=false}, and",
+      "{.code sessions.max=<n>}."
+    )
   )
 }
 
-# MCP Console 0.0.4 appends a security sentence derived from its effective
-# policy to the `send` description. Accept only native restricted enforcement
-# with restricted networking; anything else, including unknown prose, fails.
+# MCP Console 0.4.0 appends a security paragraph derived from its effective
+# launch policy to the `send` description. Accept only native sandbox
+# enforcement with restricted networking and private/no tempdir; anything else,
+# including client-inherited profiles or unknown prose, fails closed.
 mcp_console_sandbox_profile <- function(description) {
   text <- gsub("\\s+", " ", paste(description %||% "", collapse = " "))
-  boundaries <- c(
-    default = paste(
-      "Evaluated code can read host files, cannot directly access the",
-      "network, and can write in the worker's private temporary directory",
-      "and to paths explicitly allowed by the launcher."
-    ),
-    workspace = paste(
-      "Evaluated code uses the native \":workspace\" profile: it can edit",
-      "files beneath the fixed launch workspace, write in the worker's",
-      "private temporary directory and to explicitly allowed paths, and",
-      "cannot directly access the network."
-    ),
-    `read-only` = paste(
-      "Evaluated code uses the native \":read-only\" profile: it can read",
-      "host files subject to configured read restrictions, write in the",
-      "worker's private temporary directory and to explicitly allowed",
-      "paths, and cannot directly access the network."
-    )
-  )
   widened <- c(
     "without a sandbox",
     "without an inner native sandbox",
+    "Codex metadata",
+    "Full access disables",
     "unrestricted filesystem access",
-    "governed by the launcher's sandbox settings",
+    "host temporary directories",
     "can directly access the network",
     "proxy settings",
     "Execution target:",
     "Docker"
   )
-  found <- vapply(boundaries, grepl, logical(1), x = text, fixed = TRUE)
-  if (
-    sum(found) != 1L ||
-      any(vapply(widened, grepl, logical(1), x = text, fixed = TRUE))
-  ) {
+  prefix <- paste(
+    "Evaluated code can read host files subject to configured restrictions",
+    "and cannot directly access the network. Writable locations: "
+  )
+  suffix <- "; subject to more specific read/deny rules."
+  pattern <- paste0(
+    "\\Q",
+    prefix,
+    "\\E([^;]+)\\Q",
+    suffix,
+    "\\E"
+  )
+  match <- regexec(pattern, text, perl = TRUE)
+  captures <- regmatches(text, match)[[1L]]
+  fail <- function() {
     abort_deputy(
       c(
         "MCP Console did not report an active native sandbox with restricted networking.",
@@ -502,7 +594,29 @@ mcp_console_sandbox_profile <- function(description) {
       class = "mcp_console"
     )
   }
-  names(boundaries)[found]
+  if (
+    length(captures) != 2L ||
+      any(vapply(widened, grepl, logical(1), x = text, fixed = TRUE))
+  ) {
+    fail()
+  }
+  locations <- trimws(strsplit(captures[[2L]], ", ", fixed = TRUE)[[1L]])
+  if (!length(locations)) {
+    fail()
+  }
+  allowed_fixed <- c(
+    "private `TMPDIR`",
+    "private `TMPDIR` (also `TEMP` and `TMP`)",
+    "workspace",
+    "none"
+  )
+  valid_location <- function(item) {
+    item %in% allowed_fixed || grepl("^`[^`]+`$", item)
+  }
+  if (!all(vapply(locations, valid_location, logical(1)))) {
+    fail()
+  }
+  if ("workspace" %in% locations) "workspace" else "read_only"
 }
 
 mcp_console_has_requirements <- function(arguments) {
@@ -526,7 +640,7 @@ mcp_console_bound_arguments <- function(arguments, dependencies, host_control) {
     abort_permission_denied(
       c(
         "MCP Console dependency preparation is not enabled for this connection.",
-        "i" = "Preparation runs outside the sandbox with the server's permissions."
+        "i" = "Preparation downloads packages and runs in MCP Console's separate resolver sandbox."
       ),
       tool_name = "send"
     )

@@ -99,10 +99,9 @@ deputy/
 │   ├── subprocess-env.R    # Allow-listed environment for model-code subprocesses
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)
 │   ├── tools-interactive.R # tool_ask_user for human-in-the-loop
-│   ├── tools-mcp.R         # MCP discovery and sandboxed mcp-repl boundary
+│   ├── tools-mcp.R         # MCP tool discovery through mcptools
 │   ├── mcp-connection.R    # Host-owned MCP connection and immutable admission lists
 │   ├── mcp-worker.R        # Qualified mcptools worker boundary and owner validation
-│   ├── mcp-repl.R          # Sandboxed mcp-repl connection and control input
 │   ├── mcp-console.R       # Sandboxed MCP Console workbench connection
 │   ├── tool-registration.R # Batch validation and annotation defaults
 │   ├── tool-metadata.R     # Origin and annotation coverage inspection
@@ -452,12 +451,12 @@ Admission lists and Agent/session/run-context ownership are fixed. Discovery
 does not authorize access. Read `dev/mcp-client-contract.md` before changing the
 bridge or making lifecycle claims. #99 remains the public-API replacement work.
 The worker verifies every stdio reply's JSON-RPC id and fails closed with
-`deputy_mcp_desynchronized` when mcptools drops a slow reply (#196); mcp-repl
-`timeout_ms` is capped at 3000 ms to stay inside that window.
-`mcp_repl_connection()` uses that owner boundary for persistent execution.
-Set `DEPUTY_MCP_REPL_BIN` to a qualified mcp-repl 0.3.0 executable to run the
-real lifecycle test. Agent interruption closes active owned MCP connections;
-the explicit upstream control helper reports the actual interrupt/reset result.
+`deputy_mcp_desynchronized` when mcptools drops a slow reply (#196);
+`mcp_console_connection()` caps `timeout_ms` at 2500 ms to stay inside that
+window. Set `DEPUTY_MCP_CONSOLE_BIN` to a qualified `posit-dev/mcp-console`
+0.4.0 executable to run the real lifecycle test. Agent interruption closes
+active owned MCP connections; `mcp_console_control()` reports the actual
+interrupt/restart result.
 
 ### Core Flow
 
@@ -887,11 +886,12 @@ server selection happens before connection. Reconnecting invalidates old
 tool handles. MCP names never acquire native file or approval-tool privileges;
 nor do host, skill or package tools. Only tools marked by `mark_native_tool()`
 (Deputy's own) get native-name grants; name restrictions apply to all (#216).
-`mcp_console_connection()` adapts MCP Console 0.0.4 through the same
-`McpConnection`: an explicit, version-checked executable, sandbox-widening
-arguments and unreviewed project config refused, `send` governed as
-shell-class execution, dependency preparation (outside the sandbox) opt-in,
-and restart as a host control (ADR-0029).
+`mcp_console_connection()` adapts `posit-dev/mcp-console` 0.4.0 through the
+same `McpConnection`: an explicit, version-checked executable, sandbox-widening
+arguments (including `tool.description`) and unreviewed project config refused
+with `--no-project-config`, `send` governed as shell-class execution,
+dependency preparation (in Console's separate resolver sandbox) opt-in, and
+restart as a host control with optional `session` targeting (ADR-0029).
 Inherited child Chats retain provider configuration but clear parent tools;
 the AgentDefinition supplies the child's executable registry.
 
@@ -935,8 +935,9 @@ the AgentDefinition supplies the child's executable registry.
 - `evaluate` - Ordered R output, conditions, and graphics capture
 - `grDevices` - Graphics devices and static plot capture
 - `htmltools` - Escaped HTML for portable host display evidence
-- `mcp-repl` (optional, through mcptools) - OS-sandboxed model-generated R;
-  `tools_mcp_repl()` verifies an explicit fail-closed policy before loading it
+- `mcp-console` (optional, through mcptools) - OS-sandboxed R, Python and SQL
+  workbench; `mcp_console_connection()` verifies version 0.4.0 and an active
+  native restricted-network sandbox before exposing `send`
 
 **Development** (in Suggests):
 - `testthat` (>= 3.0.0) - Testing

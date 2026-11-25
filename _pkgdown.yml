@@ -145,9 +145,6 @@ reference:
   desc: Persistent R sessions and OS-sandboxed interpreters.
   contents:
   - RSession
-  - tools_mcp_repl
-  - mcp_repl_connection
-  - mcp_repl_control
   - mcp_console_connection
   - mcp_console_control
 

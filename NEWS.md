@@ -1,5 +1,14 @@
 # deputy (development version)
 
+* `mcp_console_connection()` now targets
+  [posit-dev/mcp-console](https://github.com/posit-dev/mcp-console) 0.4.0,
+  accepting its `session` and `note` fields, `sandbox.profile=workspace|read_only`
+  overrides, `--no-project-config` isolation, resolver-sandbox dependency
+  controls, and updated recording paths; `mcp_console_control()` accepts an
+  optional `session` argument. The superseded `mcp-repl` functions
+  (`mcp_repl_connection()`, `mcp_repl_control()`, and `tools_mcp_repl()`) have
+  been removed (#267).
+
 * Deputy now requires `ellmer` (>= 0.5.2). Examples and documentation have been
   refreshed for current Anthropic (`claude-sonnet-5-5`, `claude-opus-5-5`),
   OpenAI (`gpt-6.2-sol`), and Google Gemini (`gemini-4-neon`) models, and the

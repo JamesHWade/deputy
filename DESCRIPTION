@@ -130,7 +130,6 @@ Collate:
     'mcp-connection.R'
     'mcp-console.R'
     'mcp-metadata.R'
-    'mcp-repl.R'
     'mcp-worker.R'
     'owned-conversations.R'
     'parallel-delegate.R'
