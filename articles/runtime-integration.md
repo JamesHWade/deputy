@@ -14,8 +14,11 @@ before the model has sent anything back:
 ``` r
 
 agent <- Agent$new(
-  ellmer::chat("openai/gpt-6-luna"),
-  fallback_chats = list(ellmer::chat("anthropic/claude-sonnet-5")),
+  ellmer::chat("openai/gpt-6.2-sol"),
+  fallback_chats = list(
+    ellmer::chat("anthropic/claude-sonnet-5-5"),
+    ellmer::chat("google_gemini/gemini-4-neon")
+  ),
   permissions = permissions_readonly(),
   usage_limits = UsageLimits(max_requests = 5)
 )
@@ -78,7 +81,7 @@ try it without an exporter, record spans in memory with otelsdk:
 # In a fresh R session:
 record <- otelsdk::with_otel_record({
   library(deputy)
-  agent <- Agent$new(ellmer::chat("openai/gpt-6-luna"))
+  agent <- Agent$new(ellmer::chat("openai/gpt-6.2-sol"))
   agent$run_sync("Summarise this text in one sentence: ...")
 })
 record$value$run_id

@@ -34,7 +34,7 @@ results are in.
 library(deputy)
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_file(),
   context_policy = ContextPolicy(max_tokens = 64000)
 )
@@ -62,7 +62,7 @@ first is down, list it in `summary_fallback_chats`:
 
 policy <- ContextPolicy(
   max_tokens = 64000,
-  summary_fallback_chats = list(ellmer::chat("anthropic/claude-sonnet-5"))
+  summary_fallback_chats = list(ellmer::chat("anthropic/claude-sonnet-5-5"))
 )
 ```
 
@@ -178,7 +178,7 @@ for (turn in agent$get_turns()) {
 agent$save_session("review.rds")
 
 later <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_file(),
   permissions = permissions_readonly()
 )

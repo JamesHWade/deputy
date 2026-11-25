@@ -22,7 +22,7 @@ guidance. The skill needs dplyr and ggplot2.
 library(deputy)
 
 agent <- Agent$new(
-  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  chat = ellmer::chat("anthropic/claude-sonnet-5-5"),
   tools = c(tools_data(), list(tool_run_r_code)),
   permissions = Permissions(r_code = TRUE, file_write = FALSE),
   usage_limits = UsageLimits(max_requests = 15, max_cost_usd = 0.50),

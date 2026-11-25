@@ -75,7 +75,7 @@ if (FALSE) { # \dontrun{
 agent_id <- "agent-review"
 session_id <- "session-review"
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = c(
     tools_file(),
     tools_interactive(

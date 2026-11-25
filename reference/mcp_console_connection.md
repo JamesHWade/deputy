@@ -142,7 +142,7 @@ recordings is up to you.
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   permissions = Permissions(bash = TRUE, web = TRUE)
 )
 console <- mcp_console_connection(agent, command = "/path/to/mcp-console")

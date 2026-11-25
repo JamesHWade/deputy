@@ -72,7 +72,7 @@ mcp_tools <- tools_mcp()
 
 # Create an agent with MCP tools
 agent <- Agent$new(
-  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  chat = ellmer::chat("anthropic/claude-sonnet-5-5"),
   tools = c(tools_file(), mcp_tools),
   permissions = Permissions(web = TRUE)
 )

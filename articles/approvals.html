@@ -118,7 +118,7 @@ text to the chosen label:</p>
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>    <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>    <span class="fu"><a href="../reference/tools_interactive.html">tools_interactive</a></span><span class="op">(</span></span>
@@ -267,7 +267,7 @@ arguments, so the tool must validate its own inputs.</li>
 <span></span>
 <span><span class="va">make_agent</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>    chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>    chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>    tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">export_report</span><span class="op">)</span>,</span>
 <span>    permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
 <span>      can_use_tool <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">tool_name</span>, <span class="va">tool_input</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>

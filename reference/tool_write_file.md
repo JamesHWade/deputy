@@ -37,7 +37,7 @@ A status message with the number of characters written.
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = list(tool_write_file)
 )
 } # }

@@ -22,7 +22,7 @@ maps each question’s text to the chosen label:
 library(deputy)
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = c(
     tools_file(),
     tools_interactive(
@@ -192,7 +192,7 @@ export_report <- ellmer::tool(
 
 make_agent <- function() {
   Agent$new(
-    chat = ellmer::chat("openai/gpt-6-luna"),
+    chat = ellmer::chat("openai/gpt-6.2-sol"),
     tools = list(export_report),
     permissions = Permissions(
       can_use_tool = function(tool_name, tool_input, context) {

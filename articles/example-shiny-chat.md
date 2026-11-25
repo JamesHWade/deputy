@@ -24,7 +24,7 @@ ui <- bslib::page_fluid(
 server <- function(input, output, session) {
   agent <- Agent$new(
     chat = ellmer::chat(
-      "openai/gpt-6-luna",
+      "openai/gpt-6.2-sol",
       system_prompt = "You are a concise data assistant."
     ),
     tools = tools_data(),
@@ -105,7 +105,7 @@ and tell the agent how to recognize them:
 SourceCheck <- S7::new_class("SourceCheck", parent = ellmer::ContentText)
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   notes = function(content) S7::S7_inherits(content, SourceCheck)
 )
 

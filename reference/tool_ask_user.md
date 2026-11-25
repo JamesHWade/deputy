@@ -67,7 +67,7 @@ to give each agent its own handler.
 if (FALSE) { # \dontrun{
 # Add to agent's tools
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = c(tools_file(), tool_ask_user)
 )
 

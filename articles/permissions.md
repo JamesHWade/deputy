@@ -21,7 +21,7 @@ Pass one to `Agent$new()`:
 ``` r
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_file(),
   permissions = permissions_readonly()
 )
@@ -188,7 +188,7 @@ them for a single run:
 ``` r
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_file(),
   usage_limits = UsageLimits(max_requests = 10, max_tool_calls = 20)
 )
@@ -216,13 +216,16 @@ Request and tool-call limits are checked before each request or call.
 Token and cost limits can only be checked once a response reports its
 usage, so a run can overshoot them by one response.
 
-Cost comes from ellmer’s price table. If you set `max_cost_usd` and
-ellmer can’t price the model, for example because the model is newer
-than your version of ellmer, the run stops with `"cost_unavailable"`
-rather than guess. Set `UsageLimits(on_unknown_cost = "continue")` to
-let such a run go on: the limit is then checked against the cost that is
-known. Likewise, `result$cost$total` is `NA` whenever any response
-couldn’t be priced, and `result$cost$missing` counts those responses;
+Cost comes from ellmer’s price table. For models newer than your
+installed ellmer’s bundled table (such as `gpt-6.2-sol` or
+`gemini-4-neon` on ellmer 0.5.2), run
+[`ellmer::models_update_prices()`](https://ellmer.tidyverse.org/reference/models_update_prices.html)
+once to fetch current prices. If you set `max_cost_usd` and ellmer still
+can’t price the model, the run stops with `"cost_unavailable"` rather
+than guess. Set `UsageLimits(on_unknown_cost = "continue")` to let such
+a run go on: the limit is then checked against the cost that is known.
+Likewise, `result$cost$total` is `NA` whenever any response couldn’t be
+priced, and `result$cost$missing` counts those responses;
 `result$usage$known_cost_usd` is the cost of the ones that could.
 
 By default a limit returns an `AgentResult` with the reason in

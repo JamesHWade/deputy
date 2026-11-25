@@ -59,20 +59,20 @@ A list of tools.
 if (FALSE) { # \dontrun{
 # Read-only exploration
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_preset("minimal"),
   permissions = permissions_readonly()
 )
 
 # Reading and writing files
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_preset("standard")
 )
 
 # Data analysis with R code
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_preset("data"),
   permissions = Permissions(r_code = TRUE)
 )

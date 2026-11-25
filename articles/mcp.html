@@ -118,7 +118,7 @@ their tools:</p>
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5-5"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/tools_mcp.html">tools_mcp</a></span><span class="op">(</span>servers <span class="op">=</span> <span class="st">"github"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Name servers exactly as they appear in the config file. If mcptools
@@ -151,7 +151,7 @@ use <code>McpConnection</code>. It belongs to one agent, and you choose
 exactly which tools, resources and prompts it exposes:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>web <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>

@@ -27,7 +27,7 @@ chat](https://ellmer.tidyverse.org/reference/index.html).
 library(deputy)
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_preset("minimal"),
   permissions = permissions_readonly(),
   usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8)
@@ -122,8 +122,12 @@ ir tool install github::JamesHWade/deputy
 deputy --tools minimal
 ```
 
-The app uses OpenAI’s `gpt-5.6-luna` unless you pass `--model`, or
-`--provider` to switch provider (for example `--provider anthropic`).
+The app uses OpenAI’s `gpt-6.2-sol` unless you pass `--model`, or
+`--provider` to switch provider (for example `--provider anthropic`). If
+you set `--max-cost` with a model newer than ellmer’s bundled price
+table, run
+[`ellmer::models_update_prices()`](https://ellmer.tidyverse.org/reference/models_update_prices.html)
+first.
 
 ## Status
 

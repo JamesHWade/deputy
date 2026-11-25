@@ -66,9 +66,9 @@ agent_definition(
 - model:
 
   Model to use. `"inherit"` (the default) uses a copy of the lead's
-  chat. A bare model id such as `"gpt-6-luna"` keeps the lead's provider
-  and credentials but switches the model. A `"provider/model"` string
-  such as `"anthropic/claude-sonnet-5"` creates a new chat with
+  chat. A bare model id such as `"gpt-6.2-sol"` keeps the lead's
+  provider and credentials but switches the model. A `"provider/model"`
+  string such as `"anthropic/claude-sonnet-5-5"` creates a new chat with
   [`ellmer::chat()`](https://ellmer.tidyverse.org/reference/chat-any.html).
 
 - skills:
@@ -166,7 +166,7 @@ do.call(agent_definition, fields)
 if (FALSE) { # \dontrun{
 # Use with a lead agent
 lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   sub_agents = list(code_reviewer)
 )
 } # }

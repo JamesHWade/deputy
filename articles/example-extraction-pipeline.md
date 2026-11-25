@@ -48,7 +48,7 @@ The extractor can read files but not change them:
 ``` r
 
 extractor <- Agent$new(
-  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  chat = ellmer::chat("anthropic/claude-sonnet-5-5"),
   tools = tools_preset("minimal"),
   permissions = permissions_readonly(),
   system_prompt = "You extract package metadata. Read DESCRIPTION, and find
@@ -96,7 +96,7 @@ summary_type <- ellmer::type_object(
 )
 
 categoriser <- Agent$new(
-  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  chat = ellmer::chat("anthropic/claude-sonnet-5-5"),
   tools = tools_preset("minimal"),
   permissions = permissions_readonly(),
   system_prompt = "You categorise R packages and summarise their functions.
@@ -127,7 +127,7 @@ The last step needs no tools and returns text:
 ``` r
 
 reporter <- Agent$new(
-  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  chat = ellmer::chat("anthropic/claude-sonnet-5-5"),
   system_prompt = "You write short, plain package summaries in Markdown, with
     sections for overview, key functions and dependencies."
 )
@@ -152,7 +152,7 @@ cat(step3$response)
 summarise_package <- function(package_dir = ".") {
   run_step <- function(system_prompt, task, type = NULL, tools = list()) {
     agent <- Agent$new(
-      chat = ellmer::chat("anthropic/claude-sonnet-5"),
+      chat = ellmer::chat("anthropic/claude-sonnet-5-5"),
       tools = tools,
       permissions = permissions_readonly(),
       working_dir = package_dir,

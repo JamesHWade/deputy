@@ -121,7 +121,7 @@ dir.create(approval_dir)
 
 agent <- Agent$new(
   chat = ellmer::chat_openai(
-    model = "gpt-6-luna",
+    model = "gpt-6.2-sol",
     credentials = function() "not used in this article"
   ),
   tools = list(get_forecast),
@@ -257,7 +257,7 @@ server <- function(input, output, session) {
   approval_dir <- tempfile("approvals-")
   dir.create(approval_dir)
   agent <- Agent$new(
-    chat = ellmer::chat("openai/gpt-6-luna"),
+    chat = ellmer::chat("openai/gpt-6.2-sol"),
     tools = list(get_forecast),
     approval_dir = approval_dir,
     permissions = Permissions(
@@ -311,7 +311,7 @@ A `LeadAgent` can hold the policy for its whole delegation tree:
 ``` r
 
 lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   sub_agents = list(agent_definition(
     "forecaster",
     "Produce forecasts",
@@ -347,14 +347,14 @@ wherever it is registered:
 ``` r
 
 root <- Agent$new(
-  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  chat = ellmer::chat("anthropic/claude-sonnet-5-5"),
   trusted_results = TrustedResults(
     forecast = get_forecast,
     on_result = function(event) print(event$value)
   )
 )
 forecaster <- Agent$new(
-  ellmer::chat("openai/gpt-6-luna"),
+  ellmer::chat("openai/gpt-6.2-sol"),
   tools = list(get_forecast, list_cities),
   agent_name = "forecaster"
 )

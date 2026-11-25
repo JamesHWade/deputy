@@ -54,7 +54,7 @@ Combine them with [`c()`](https://rdrr.io/r/base/c.html):
 ``` r
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = c(tools_file(), tools_web()),
   permissions = Permissions(web = TRUE)
 )
@@ -105,7 +105,7 @@ Pass it to the agent like any other tool:
 ``` r
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = list(uppercase)
 )
 agent$run_sync("Use the uppercase tool to shout 'hello'.")$response
@@ -201,7 +201,7 @@ instead, where there are any (Anthropic, Google, and OpenAI search):
 
 ``` r
 
-chat <- ellmer::chat("anthropic/claude-sonnet-5")
+chat <- ellmer::chat("anthropic/claude-sonnet-5-5")
 agent <- Agent$new(
   chat = chat,
   tools = tools_web(chat),

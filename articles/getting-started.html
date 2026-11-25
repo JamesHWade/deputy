@@ -107,12 +107,16 @@ a second agent permission to write a file, and undo what it wrote.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"JamesHWade/deputy"</span><span class="op">)</span></span></code></pre></div>
-<p>The examples use OpenAI’s <code>gpt-6-luna</code>, so they need
+<p>The examples use OpenAI’s <code>gpt-6.2-sol</code>, so they need
 <code>OPENAI_API_KEY</code>. Put it in your <code>.Renviron</code> file
 (<code>usethis::edit_r_environ()</code> opens it) and restart R. Keep
-keys out of scripts and version control.</p>
-<p>To use another provider, pass a different <a href="https://ellmer.tidyverse.org/reference/index.html" class="external-link">ellmer
-chat</a>. Deputy uses whatever model and settings that chat has.</p>
+keys out of scripts and version control. If you enforce
+<code>max_cost_usd</code> with a model newer than ellmer’s bundled price
+table, run <code><a href="https://ellmer.tidyverse.org/reference/models_update_prices.html" class="external-link">ellmer::models_update_prices()</a></code> first.</p>
+<p>To use another provider, pass a different <a href="https://ellmer.tidyverse.org/reference/index.html" class="external-link">ellmer chat</a>
+such as <code>ellmer::chat("anthropic/claude-sonnet-5-5")</code> or
+<code>ellmer::chat("google_gemini/gemini-4-neon")</code>. Deputy uses
+whatever model and settings that chat has.</p>
 </div>
 <div class="section level2">
 <h2 id="create-an-agent">Create an agent<a class="anchor" aria-label="anchor" href="#create-an-agent"></a>
@@ -124,7 +128,7 @@ chat</a>. Deputy uses whatever model and settings that chat has.</p>
 <span><span class="va">workspace</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/normalizePath.html" class="external-link">normalizePath</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd</a></span><span class="op">(</span><span class="op">)</span>, winslash <span class="op">=</span> <span class="st">"/"</span>, mustWork <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span>, max_tool_calls <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span>
@@ -243,7 +247,7 @@ widened, so writing needs a new agent. This one may write inside
 or install packages.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">write_agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span>file_write <span class="op">=</span> <span class="va">workspace</span><span class="op">)</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span>, max_tool_calls <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span>

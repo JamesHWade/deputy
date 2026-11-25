@@ -128,7 +128,7 @@ ID, a revision, the owner and conversation it belongs to, and optionally
 the subagents allowed to see it:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>    <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"reviewer"</span>, <span class="st">"Reviews evidence"</span>, <span class="st">"Keep units explicit."</span><span class="op">)</span></span>
 <span>  <span class="op">)</span>,</span>
@@ -207,7 +207,7 @@ factory function, and cleans them up afterwards.</li>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_full.html">permissions_full</a></span><span class="op">(</span><span class="op">)</span>, <span class="co"># the R session runs with your account's access</span></span>
 <span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>    <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"analyst"</span>, <span class="st">"Analyses data"</span>, <span class="st">"Check the data before modelling."</span><span class="op">)</span></span>
@@ -238,7 +238,7 @@ effort than the lead:</p>
 <code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/DelegationPolicy.html">DelegationPolicy</a></span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">definition</span>, <span class="va">context</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span></span>
-<span>      <span class="st">"openai/gpt-6-luna"</span>,</span>
+<span>      <span class="st">"openai/gpt-6.2-sol"</span>,</span>
 <span>      params <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/params.html" class="external-link">params</a></span><span class="op">(</span></span>
 <span>        reasoning_effort <span class="op">=</span> <span class="va">definition</span><span class="op">$</span><span class="va">params</span><span class="op">$</span><span class="va">reasoning_effort</span></span>
 <span>      <span class="op">)</span></span>
@@ -312,7 +312,7 @@ who may see what:</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  sub_agents <span class="op">=</span> <span class="va">definitions</span>,</span>
 <span>  delegation_scope <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>owner_id <span class="op">=</span> <span class="st">"user-1"</span>, conversation_id <span class="op">=</span> <span class="st">"chat-1"</span><span class="op">)</span>,</span>
 <span>  delegation_disclosure <span class="op">=</span> <span class="va">disclosure</span></span>

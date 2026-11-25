@@ -118,7 +118,7 @@ permissions, hooks and limits to every message.</p>
 <span><span class="va">server</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">input</span>, <span class="va">output</span>, <span class="va">session</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>    chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span></span>
-<span>      <span class="st">"openai/gpt-6-luna"</span>,</span>
+<span>      <span class="st">"openai/gpt-6.2-sol"</span>,</span>
 <span>      system_prompt <span class="op">=</span> <span class="st">"You are a concise data assistant."</span></span>
 <span>    <span class="op">)</span>,</span>
 <span>    tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -195,7 +195,7 @@ agent how to recognize them:</p>
 <code class="sourceCode R"><span><span class="va">SourceCheck</span> <span class="op">&lt;-</span> <span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/new_class.html" class="external-link">new_class</a></span><span class="op">(</span><span class="st">"SourceCheck"</span>, parent <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="va"><a href="https://ellmer.tidyverse.org/reference/Content.html" class="external-link">ContentText</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  notes <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">content</span><span class="op">)</span> <span class="fu">S7</span><span class="fu">::</span><span class="fu"><a href="https://rconsortium.github.io/S7/reference/S7_inherits.html" class="external-link">S7_inherits</a></span><span class="op">(</span><span class="va">content</span>, <span class="va">SourceCheck</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>

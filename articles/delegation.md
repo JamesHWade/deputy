@@ -37,7 +37,7 @@ and optionally the subagents allowed to see it:
 ``` r
 
 lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   sub_agents = list(
     agent_definition("reviewer", "Reviews evidence", "Keep units explicit.")
   ),
@@ -118,7 +118,7 @@ policy <- DelegationPolicy(
 )
 
 lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   permissions = permissions_full(), # the R session runs with your account's access
   sub_agents = list(
     agent_definition("analyst", "Analyses data", "Check the data before modelling.")
@@ -153,7 +153,7 @@ effort than the lead:
 policy <- DelegationPolicy(
   chat = function(definition, context) {
     ellmer::chat(
-      "openai/gpt-6-luna",
+      "openai/gpt-6.2-sol",
       params = ellmer::params(
         reasoning_effort = definition$params$reasoning_effort
       )
@@ -231,7 +231,7 @@ disclosure <- DelegationDisclosure(
 )
 
 lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   sub_agents = definitions,
   delegation_scope = list(owner_id = "user-1", conversation_id = "chat-1"),
   delegation_disclosure = disclosure

@@ -2840,7 +2840,7 @@ The objects of this class are cloneable with this method.
 if (FALSE) { # \dontrun{
 # Create an agent with file tools
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_file()
 )
 

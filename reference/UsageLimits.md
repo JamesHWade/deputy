@@ -52,9 +52,13 @@ UsageLimits(
 
 - max_cost_usd:
 
-  Maximum estimated cost in US dollars. If the cost of a response is
-  unknown, the run stops with `"cost_unavailable"` rather than guessing,
-  unless `on_unknown_cost = "continue"`.
+  Maximum estimated cost in US dollars. Cost comes from ellmer's price
+  table; for models newer than your installed ellmer's bundled table
+  (such as `gpt-6.2-sol` or `gemini-4-neon` on ellmer 0.5.2), run
+  [`ellmer::models_update_prices()`](https://ellmer.tidyverse.org/reference/models_update_prices.html)
+  first. If the cost of a response is unknown, the run stops with
+  `"cost_unavailable"` rather than guessing, unless
+  `on_unknown_cost = "continue"`.
 
 - on_exceed:
 

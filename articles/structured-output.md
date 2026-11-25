@@ -11,7 +11,7 @@ the given type, without calling tools, and returns the R value.
 
 ``` r
 
-agent <- Agent$new(ellmer::chat("openai/gpt-6-luna"))
+agent <- Agent$new(ellmer::chat("openai/gpt-6.2-sol"))
 
 review_type <- ellmer::type_object(
   status = ellmer::type_enum(c("ok", "needs_review")),
@@ -54,7 +54,7 @@ twice.
 ``` r
 
 agent <- Agent$new(
-  ellmer::chat("openai/gpt-6-luna"),
+  ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_file(),
   permissions = permissions_readonly(),
   usage_limits = UsageLimits(max_requests = 8)

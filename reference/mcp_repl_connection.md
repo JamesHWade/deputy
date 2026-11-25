@@ -80,7 +80,7 @@ Interrupting the agent also cancels its active MCP connections.
 
 ``` r
 if (FALSE) { # \dontrun{
-agent <- Agent$new(chat = ellmer::chat("openai/gpt-6-luna"))
+agent <- Agent$new(chat = ellmer::chat("openai/gpt-6.2-sol"))
 connection <- mcp_repl_connection(agent = agent)
 agent$register_tools(connection$tools())
 # In a Shiny app: session$onSessionEnded(function() connection$close())

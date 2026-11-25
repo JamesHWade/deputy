@@ -44,7 +44,7 @@ to the model as a failed tool call, with its status and output.
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = list(tool_run_bash),
   permissions = Permissions(bash = TRUE)
 )

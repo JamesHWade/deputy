@@ -120,19 +120,19 @@ work that should outlive the R process, see <a href="background-jobs.html">Backg
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-opus-5-5"</span><span class="op">)</span>,</span>
 <span>  system_prompt <span class="op">=</span> <span class="st">"You write batch reports with help from two specialists."</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">30</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">analyst</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_data.html">tools_data</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  system_prompt <span class="op">=</span> <span class="st">"You analyse measurement files and explain your reasoning."</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">reviewer</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"google_gemini/gemini-4-neon"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  system_prompt <span class="op">=</span> <span class="st">"You review draft reports against the style guide."</span></span>

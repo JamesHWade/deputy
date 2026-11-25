@@ -243,7 +243,7 @@ every forecast for review:</p>
 <span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
 <span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat_openai.html" class="external-link">chat_openai</a></span><span class="op">(</span></span>
-<span>    model <span class="op">=</span> <span class="st">"gpt-6-luna"</span>,</span>
+<span>    model <span class="op">=</span> <span class="st">"gpt-6.2-sol"</span>,</span>
 <span>    credentials <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="op">)</span> <span class="st">"not used in this article"</span></span>
 <span>  <span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">get_forecast</span><span class="op">)</span>,</span>
@@ -361,7 +361,7 @@ trusted tool writes to the results area.</p>
 <span>  <span class="va">approval_dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"approvals-"</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">approval_dir</span><span class="op">)</span></span>
 <span>  <span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>    chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>    chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>    tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">get_forecast</span><span class="op">)</span>,</span>
 <span>    approval_dir <span class="op">=</span> <span class="va">approval_dir</span>,</span>
 <span>    permissions <span class="op">=</span> <span class="fu"><a href="../reference/Permissions.html">Permissions</a></span><span class="op">(</span></span>
@@ -408,7 +408,7 @@ model, so they need no API key:</p>
 tree:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span></span>
 <span>    <span class="st">"forecaster"</span>,</span>
 <span>    <span class="st">"Produce forecasts"</span>,</span>
@@ -438,14 +438,14 @@ trusted tool itself rather than its name, so that only that exact tool
 object counts as the producer, wherever it is registered:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">root</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5-5"</span><span class="op">)</span>,</span>
 <span>  trusted_results <span class="op">=</span> <span class="fu"><a href="../reference/TrustedResults.html">TrustedResults</a></span><span class="op">(</span></span>
 <span>    forecast <span class="op">=</span> <span class="va">get_forecast</span>,</span>
 <span>    on_result <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">event</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">event</span><span class="op">$</span><span class="va">value</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="va">forecaster</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">get_forecast</span>, <span class="va">list_cities</span><span class="op">)</span>,</span>
 <span>  agent_name <span class="op">=</span> <span class="st">"forecaster"</span></span>
 <span><span class="op">)</span></span>

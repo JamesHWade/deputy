@@ -134,7 +134,7 @@ after all pending tool results are in.</p>
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  context_policy <span class="op">=</span> <span class="fu"><a href="../reference/ContextPolicy.html">ContextPolicy</a></span><span class="op">(</span>max_tokens <span class="op">=</span> <span class="fl">64000</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -158,7 +158,7 @@ send summaries to a second provider when the first is down, list it in
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">policy</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ContextPolicy.html">ContextPolicy</a></span><span class="op">(</span></span>
 <span>  max_tokens <span class="op">=</span> <span class="fl">64000</span>,</span>
-<span>  summary_fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span><span class="op">)</span></span>
+<span>  summary_fallback_chats <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5-5"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Summary fallbacks never take over the task itself, and they receive
 only the turns to summarise, without tools. <a href="runtime-integration.html">Fallbacks, tracing and evaluation</a>
@@ -256,7 +256,7 @@ and <code>load_session()</code> restores it into an agent:</p>
 <code class="sourceCode R"><span><span class="va">agent</span><span class="op">$</span><span class="fu">save_session</span><span class="op">(</span><span class="st">"review.rds"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">later</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>

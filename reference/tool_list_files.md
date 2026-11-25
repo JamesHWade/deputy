@@ -45,7 +45,7 @@ A text listing of names and sizes.
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = list(tool_list_files)
 )
 } # }

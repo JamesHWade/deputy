@@ -18,10 +18,10 @@ owner then runs it, keeping its conversation between tasks:
 
 library(deputy)
 
-owner <- Agent$new(ellmer::chat("openai/gpt-6-luna"))
+owner <- Agent$new(ellmer::chat("openai/gpt-6.2-sol"))
 
 analyst <- Agent$new(
-  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  chat = ellmer::chat("anthropic/claude-sonnet-5-5"),
   tools = tools_data(),
   permissions = permissions_readonly(),
   system_prompt = "You analyse data files and explain your reasoning."

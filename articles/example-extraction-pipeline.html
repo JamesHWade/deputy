@@ -140,7 +140,7 @@ as a data frame:</p>
 <p>The extractor can read files but not change them:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">extractor</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5-5"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  system_prompt <span class="op">=</span> <span class="st">"You extract package metadata. Read DESCRIPTION, and find</span></span>
@@ -185,7 +185,7 @@ and may read source files to understand what each function does:</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">categoriser</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5-5"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  system_prompt <span class="op">=</span> <span class="st">"You categorise R packages and summarise their functions.</span></span>
@@ -214,7 +214,7 @@ and may read source files to understand what each function does:</p>
 <p>The last step needs no tools and returns text:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">reporter</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5-5"</span><span class="op">)</span>,</span>
 <span>  system_prompt <span class="op">=</span> <span class="st">"You write short, plain package summaries in Markdown, with</span></span>
 <span><span class="st">    sections for overview, key functions and dependencies."</span></span>
 <span><span class="op">)</span></span>
@@ -238,7 +238,7 @@ and may read source files to understand what each function does:</p>
 <code class="sourceCode R"><span><span class="va">summarise_package</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">package_dir</span> <span class="op">=</span> <span class="st">"."</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">run_step</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">system_prompt</span>, <span class="va">task</span>, <span class="va">type</span> <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">tools</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>    <span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>      chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span>,</span>
+<span>      chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5-5"</span><span class="op">)</span>,</span>
 <span>      tools <span class="op">=</span> <span class="va">tools</span>,</span>
 <span>      permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>      working_dir <span class="op">=</span> <span class="va">package_dir</span>,</span>

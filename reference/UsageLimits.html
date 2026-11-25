@@ -130,9 +130,12 @@ tokens are reported separately and aren't added again.</p></dd>
 
 
 <dt id="arg-max-cost-usd">max_cost_usd<a class="anchor" aria-label="anchor" href="#arg-max-cost-usd"></a></dt>
-<dd><p>Maximum estimated cost in US dollars. If the cost of a
-response is unknown, the run stops with <code>"cost_unavailable"</code> rather than
-guessing, unless <code>on_unknown_cost = "continue"</code>.</p></dd>
+<dd><p>Maximum estimated cost in US dollars. Cost comes from
+ellmer's price table; for models newer than your installed ellmer's
+bundled table (such as <code>gpt-6.2-sol</code> or <code>gemini-4-neon</code> on ellmer 0.5.2),
+run <code><a href="https://ellmer.tidyverse.org/reference/models_update_prices.html" class="external-link">ellmer::models_update_prices()</a></code> first. If the cost of a response is
+unknown, the run stops with <code>"cost_unavailable"</code> rather than guessing,
+unless <code>on_unknown_cost = "continue"</code>.</p></dd>
 
 
 <dt id="arg-on-exceed">on_exceed<a class="anchor" aria-label="anchor" href="#arg-on-exceed"></a></dt>

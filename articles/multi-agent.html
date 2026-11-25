@@ -215,7 +215,7 @@ and inspecting subagents</a>)</td>
 choose from:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-sonnet-5"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"anthropic/claude-opus-5-5"</span><span class="op">)</span>,</span>
 <span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">code_reviewer</span>, <span class="va">data_analyst</span><span class="op">)</span>,</span>
 <span>  system_prompt <span class="op">=</span> <span class="st">"You coordinate analysis tasks. Delegate to the right</span></span>
 <span><span class="st">    specialist, then combine their findings."</span></span>
@@ -249,12 +249,13 @@ tasks</a>.</p>
 <code>"inherit"</code>, the default, uses a copy of the lead’s chat:
 same provider, model and settings, without the lead’s conversation or
 tools.</li>
-<li>A bare model id such as <code>"gpt-6-luna"</code> uses the lead’s
-provider, endpoint and credentials with a different model, for example a
-cheaper one for simple work.</li>
+<li>A bare model id such as <code>"claude-sonnet-5-5"</code> uses the
+lead’s provider, endpoint and credentials with a different model, for
+example a cheaper one for simple work.</li>
 <li>
 <code>"provider/model"</code>, such as
-<code>"anthropic/claude-sonnet-5"</code>, creates a new chat with
+<code>"openai/gpt-6.2-sol"</code> or
+<code>"google_gemini/gemini-4-neon"</code>, creates a new chat with
 <code><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">ellmer::chat()</a></code>. Use this form for model ids that contain
 <code>/</code>.</li>
 </ul>
@@ -265,7 +266,7 @@ its reasoning effort, with <code><a href="https://ellmer.tidyverse.org/reference
 <span>  name <span class="op">=</span> <span class="st">"researcher"</span>,</span>
 <span>  description <span class="op">=</span> <span class="st">"Searches the literature"</span>,</span>
 <span>  prompt <span class="op">=</span> <span class="st">"Find and summarise relevant papers."</span>,</span>
-<span>  model <span class="op">=</span> <span class="st">"openai/gpt-6-luna"</span>,</span>
+<span>  model <span class="op">=</span> <span class="st">"openai/gpt-6.2-sol"</span>,</span>
 <span>  params <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/params.html" class="external-link">params</a></span><span class="op">(</span>reasoning_effort <span class="op">=</span> <span class="st">"low"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p><code>params</code> applies to a <code>"provider/model"</code> model.
@@ -348,7 +349,7 @@ conversation and answers with a single model request. The lead makes no
 request of its own, and its conversation is unchanged.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lead</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/LeadAgent.html">LeadAgent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  sub_agents <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>    <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"benefits"</span>, <span class="st">"Finds benefits"</span>, <span class="st">"Make the strongest case for."</span><span class="op">)</span>,</span>
 <span>    <span class="fu"><a href="../reference/agent_definition.html">agent_definition</a></span><span class="op">(</span><span class="st">"risks"</span>, <span class="st">"Finds risks"</span>, <span class="st">"Make the strongest case against."</span><span class="op">)</span></span>

@@ -25,7 +25,7 @@ connects to the servers you name and returns their tools:
 library(deputy)
 
 agent <- Agent$new(
-  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  chat = ellmer::chat("anthropic/claude-sonnet-5-5"),
   tools = c(tools_file(), tools_mcp(servers = "github"))
 )
 ```
@@ -64,7 +64,7 @@ tools, resources and prompts it exposes:
 ``` r
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   permissions = Permissions(web = TRUE)
 )
 

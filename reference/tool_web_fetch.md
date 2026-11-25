@@ -42,7 +42,7 @@ is returned as is.
 ``` r
 if (FALSE) { # \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = list(tool_web_fetch),
   permissions = Permissions(web = TRUE)
 )

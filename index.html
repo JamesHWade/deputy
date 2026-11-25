@@ -111,7 +111,7 @@
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/JamesHWade/deputy" class="external-link">deputy</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="reference/tools_preset.html">tools_preset</a></span><span class="op">(</span><span class="st">"minimal"</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">6</span>, max_tool_calls <span class="op">=</span> <span class="fl">8</span><span class="op">)</span></span>
@@ -167,7 +167,7 @@
 <span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a></span>
 <span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="ex">ir</span> tool install github::JamesHWade/deputy</span>
 <span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="ex">deputy</span> <span class="at">--tools</span> minimal</span></code></pre></div>
-<p>The app uses OpenAI’s <code>gpt-5.6-luna</code> unless you pass <code>--model</code>, or <code>--provider</code> to switch provider (for example <code>--provider anthropic</code>).</p>
+<p>The app uses OpenAI’s <code>gpt-6.2-sol</code> unless you pass <code>--model</code>, or <code>--provider</code> to switch provider (for example <code>--provider anthropic</code>). If you set <code>--max-cost</code> with a model newer than ellmer’s bundled price table, run <code><a href="https://ellmer.tidyverse.org/reference/models_update_prices.html" class="external-link">ellmer::models_update_prices()</a></code> first.</p>
 </div>
 <div class="section level2">
 <h2 id="status">Status<a class="anchor" aria-label="anchor" href="#status"></a>

@@ -155,7 +155,7 @@ them afterwards, but you can’t loosen them.</p>
 <p>Pass one to <code>Agent$new()</code>:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  permissions <span class="op">=</span> <span class="fu"><a href="../reference/permissions_readonly.html">permissions_readonly</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -405,7 +405,7 @@ approvals</a> explains how to set that up.</p>
 on the agent, and override them for a single run:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">agent</span> <span class="op">&lt;-</span> <span class="va"><a href="../reference/Agent.html">Agent</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6-luna"</span><span class="op">)</span>,</span>
+<span>  chat <span class="op">=</span> <span class="fu">ellmer</span><span class="fu">::</span><span class="fu"><a href="https://ellmer.tidyverse.org/reference/chat-any.html" class="external-link">chat</a></span><span class="op">(</span><span class="st">"openai/gpt-6.2-sol"</span><span class="op">)</span>,</span>
 <span>  tools <span class="op">=</span> <span class="fu"><a href="../reference/tools_file.html">tools_file</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  usage_limits <span class="op">=</span> <span class="fu"><a href="../reference/UsageLimits.html">UsageLimits</a></span><span class="op">(</span>max_requests <span class="op">=</span> <span class="fl">10</span>, max_tool_calls <span class="op">=</span> <span class="fl">20</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
@@ -452,10 +452,13 @@ run, so a restored conversation starts with a fresh budget.</p>
 <p>Request and tool-call limits are checked before each request or call.
 Token and cost limits can only be checked once a response reports its
 usage, so a run can overshoot them by one response.</p>
-<p>Cost comes from ellmer’s price table. If you set
-<code>max_cost_usd</code> and ellmer can’t price the model, for example
-because the model is newer than your version of ellmer, the run stops
-with <code>"cost_unavailable"</code> rather than guess. Set
+<p>Cost comes from ellmer’s price table. For models newer than your
+installed ellmer’s bundled table (such as <code>gpt-6.2-sol</code> or
+<code>gemini-4-neon</code> on ellmer 0.5.2), run
+<code><a href="https://ellmer.tidyverse.org/reference/models_update_prices.html" class="external-link">ellmer::models_update_prices()</a></code> once to fetch current
+prices. If you set <code>max_cost_usd</code> and ellmer still can’t
+price the model, the run stops with <code>"cost_unavailable"</code>
+rather than guess. Set
 <code>UsageLimits(on_unknown_cost = "continue")</code> to let such a run
 go on: the limit is then checked against the cost that is known.
 Likewise, <code>result$cost$total</code> is <code>NA</code> whenever any

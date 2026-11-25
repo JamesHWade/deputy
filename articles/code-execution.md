@@ -47,7 +47,7 @@ result. Enable it with `r_code = TRUE`:
 library(deputy)
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = c(tools_data(), list(tool_run_r_code)),
   permissions = Permissions(r_code = TRUE, file_write = FALSE)
 )
@@ -68,7 +68,7 @@ images.
 ``` r
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   permissions = Permissions(r_code = TRUE, file_write = FALSE)
 )
 worker <- RSession$new(agent)
@@ -155,7 +155,7 @@ dir.create(directory, mode = "0700")
 
 open_worker <- function() {
   agent <- Agent$new(
-    chat = ellmer::chat("openai/gpt-6-luna"),
+    chat = ellmer::chat("openai/gpt-6.2-sol"),
     agent_id = "analysis",
     session_id = "analysis-17"
   )
@@ -239,7 +239,7 @@ Then connect an agent to its own REPL:
 ``` r
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   permissions = Permissions(web = FALSE)
 )
 repl <- mcp_repl_connection(
@@ -291,7 +291,7 @@ conversation.
 ``` r
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   permissions = Permissions(bash = TRUE, web = TRUE)
 )
 console <- mcp_console_connection(
