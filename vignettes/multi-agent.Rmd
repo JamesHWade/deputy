@@ -87,7 +87,7 @@ of subagents the model can choose from:
 
 ```{r}
 lead <- LeadAgent$new(
-  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  chat = ellmer::chat("anthropic/claude-opus-5-5"),
   sub_agents = list(code_reviewer, data_analyst),
   system_prompt = "You coordinate analysis tasks. Delegate to the right
     specialist, then combine their findings."
@@ -119,11 +119,12 @@ way; to let its model keep working while a specialist runs, see
 
 - `"inherit"`, the default, uses a copy of the lead's chat: same provider,
   model and settings, without the lead's conversation or tools.
-- A bare model id such as `"gpt-6-luna"` uses the lead's provider, endpoint
+- A bare model id such as `"claude-sonnet-5-5"` uses the lead's provider, endpoint
   and credentials with a different model, for example a cheaper one for simple
   work.
-- `"provider/model"`, such as `"anthropic/claude-sonnet-5"`, creates a new
-  chat with `ellmer::chat()`. Use this form for model ids that contain `/`.
+- `"provider/model"`, such as `"openai/gpt-6.2-sol"` or
+  `"google_gemini/gemini-4-neon"`, creates a new chat with `ellmer::chat()`.
+  Use this form for model ids that contain `/`.
 
 `params` sets the subagent's request parameters, such as its reasoning
 effort, with `ellmer::params()`:
@@ -133,7 +134,7 @@ researcher <- agent_definition(
   name = "researcher",
   description = "Searches the literature",
   prompt = "Find and summarise relevant papers.",
-  model = "openai/gpt-6-luna",
+  model = "openai/gpt-6.2-sol",
   params = ellmer::params(reasoning_effort = "low")
 )
 ```
@@ -190,7 +191,7 @@ The lead makes no request of its own, and its conversation is unchanged.
 
 ```{r}
 lead <- LeadAgent$new(
-  ellmer::chat("openai/gpt-6-luna"),
+  ellmer::chat("openai/gpt-6.2-sol"),
   sub_agents = list(
     agent_definition("benefits", "Finds benefits", "Make the strongest case for."),
     agent_definition("risks", "Finds risks", "Make the strongest case against.")

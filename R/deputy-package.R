@@ -25,7 +25,7 @@ NULL
 #' library(deputy)
 #'
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   tools = tools_preset("minimal"),
 #'   permissions = permissions_readonly(),
 #'   usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),

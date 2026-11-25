@@ -6,11 +6,12 @@ doesn't depend on the working directory or the other scripts.
 
 You need Deputy and an OpenAI API key in `OPENAI_API_KEY`. `08-skills.R` and
 `09-debate.R` also need the yaml package. The scripts make real, billable
-requests to `gpt-6-luna`; set `DEPUTY_EXAMPLE_MODEL` to use another OpenAI
-model.
+requests to `gpt-6.2-sol`; set `DEPUTY_EXAMPLE_MODEL` to use another OpenAI
+model. Run `ellmer::models_update_prices()` once if you want cost reporting
+for models newer than your installed ellmer's bundled price table.
 
 ```bash
-DEPUTY_EXAMPLE_MODEL=gpt-6-luna Rscript inst/examples/standalone/01-basic.R
+DEPUTY_EXAMPLE_MODEL=gpt-6.2-sol Rscript inst/examples/standalone/01-basic.R
 ```
 
 ```r

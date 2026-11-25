@@ -26,7 +26,7 @@ column types and the first few rows.
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = list(tool_read_csv)
 )
 }

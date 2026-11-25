@@ -7,7 +7,7 @@
 #| short: 'p'
 provider <- "openai"
 
-#| description: "Model to use (OpenAI default: gpt-5.6-luna; otherwise provider-specific)"
+#| description: "Model to use (OpenAI default: gpt-6.2-sol; otherwise provider-specific)"
 #| short: 'm'
 model <- NA_character_
 
@@ -23,7 +23,7 @@ permissions <- "standard"
 #| short: 'n'
 max_requests <- 25L
 
-#| description: "Maximum cost in USD before stopping"
+#| description: "Maximum cost in USD before stopping (run ellmer::models_update_prices() if a model is not in ellmer's bundled price table)"
 #| short: 'c'
 max_cost <- NA_real_
 

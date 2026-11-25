@@ -116,7 +116,7 @@ deputy/
 ├── tests/testthat/         # Unit tests (testthat edition 3)
 ├── inst/skills/            # Built-in skills with YAML metadata
 ├── inst/examples/          # Runnable recipes, standalone scripts, and Shiny app
-├── exec/deputy.R           # Terminal CLI using Rapp (OpenAI / gpt-5.6-luna default)
+├── exec/deputy.R           # Terminal CLI using Rapp (OpenAI / gpt-6.2-sol default)
 ├── vignettes/              # User documentation (R Markdown)
 ├── man/                    # Auto-generated roxygen2 docs
 ├── dev/agents/             # Agent skill configuration (issue tracker, labels, domain)
@@ -430,8 +430,9 @@ references, no test files, no "previously" (that belongs in NEWS.md), and none
 of the internal vocabulary used in this file and `dev/` ("governed",
 "host-owned", "authority ceiling", "fail closed", "admission", "settlement",
 "canonical", "qualified"). Use the `CONTEXT.md` terms, such as "subagent".
-Examples use `ellmer::chat("openai/gpt-6-luna")` and
-`ellmer::chat("anthropic/claude-sonnet-5")`. The pkgdown navbar menu is built
+Examples use `ellmer::chat("openai/gpt-6.2-sol")`,
+`ellmer::chat("anthropic/claude-sonnet-5-5")` (or `claude-opus-5-5`), and
+`ellmer::chat("google_gemini/gemini-4-neon")`. The pkgdown navbar menu is built
 from the `articles:` sections in `_pkgdown.yml`, so a new article only needs to
 be listed there.
 
@@ -917,7 +918,7 @@ the AgentDefinition supplies the child's executable registry.
 ## Dependencies
 
 **Core** (in Imports):
-- `ellmer` (>= 0.5.0) - LLM abstraction layer
+- `ellmer` (>= 0.5.2) - LLM abstraction layer
 - `S7` - Public type and content property access
 - `R6` - Object-oriented programming
 - `cli` - CLI formatting

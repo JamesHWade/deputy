@@ -154,9 +154,9 @@ normalize_agent_definitions <- function(definitions, arg = "sub_agents") {
 #' @param tools List of tools for the subagent. It doesn't inherit the lead's
 #'   tools.
 #' @param model Model to use. `"inherit"` (the default) uses a copy of the
-#'   lead's chat. A bare model id such as `"gpt-6-luna"` keeps the lead's
+#'   lead's chat. A bare model id such as `"gpt-6.2-sol"` keeps the lead's
 #'   provider and credentials but switches the model. A `"provider/model"`
-#'   string such as `"anthropic/claude-sonnet-5"` creates a new chat with
+#'   string such as `"anthropic/claude-sonnet-5-5"` creates a new chat with
 #'   [ellmer::chat()].
 #' @param skills List of [Skill] objects or skill directory paths to load.
 #' @param disallowed_tools Names of tools to remove from the subagent,
@@ -211,7 +211,7 @@ normalize_agent_definitions <- function(definitions, arg = "sub_agents") {
 #' \dontrun{
 #' # Use with a lead agent
 #' lead <- LeadAgent$new(
-#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   sub_agents = list(code_reviewer)
 #' )
 #' }

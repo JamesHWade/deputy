@@ -27,7 +27,7 @@ directories.
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = list(tool_write_file)
 )
 }

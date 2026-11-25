@@ -13,7 +13,7 @@
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   tools = tools_file()
 #' )
 #' }
@@ -60,7 +60,7 @@ tools_file <- function() {
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   tools = tools_code(),
 #'   permissions = Permissions(r_code = TRUE, bash = TRUE)
 #' )
@@ -89,7 +89,7 @@ tools_code <- function(env = NULL) {
 #' @examples
 #' \dontrun{
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   tools = tools_data()
 #' )
 #' }
@@ -133,13 +133,13 @@ tools_data <- function() {
 #' \dontrun{
 #' # Default tools, for any provider
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   tools = tools_web(),
 #'   permissions = Permissions(web = TRUE)
 #' )
 #'
 #' # Anthropic's own web tools
-#' chat <- ellmer::chat("anthropic/claude-sonnet-5")
+#' chat <- ellmer::chat("anthropic/claude-sonnet-5-5")
 #' agent <- Agent$new(
 #'   chat = chat,
 #'   tools = tools_web(chat),
@@ -243,7 +243,7 @@ get_provider_name <- function(chat) {
 #' \dontrun{
 #' # Allow every tool
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   tools = tools_all(),
 #'   permissions = permissions_full()
 #' )
@@ -298,20 +298,20 @@ ToolPresets <- c("minimal", "standard", "dev", "data", "full")
 #' \dontrun{
 #' # Read-only exploration
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   tools = tools_preset("minimal"),
 #'   permissions = permissions_readonly()
 #' )
 #'
 #' # Reading and writing files
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   tools = tools_preset("standard")
 #' )
 #'
 #' # Data analysis with R code
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   tools = tools_preset("data"),
 #'   permissions = Permissions(r_code = TRUE)
 #' )

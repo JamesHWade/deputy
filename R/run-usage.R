@@ -59,9 +59,12 @@ NULL
 #' @param max_output_tokens Maximum output tokens.
 #' @param max_total_tokens Maximum input plus output tokens. Cached input
 #'   tokens are reported separately and aren't added again.
-#' @param max_cost_usd Maximum estimated cost in US dollars. If the cost of a
-#'   response is unknown, the run stops with `"cost_unavailable"` rather than
-#'   guessing, unless `on_unknown_cost = "continue"`.
+#' @param max_cost_usd Maximum estimated cost in US dollars. Cost comes from
+#'   ellmer's price table; for models newer than your installed ellmer's
+#'   bundled table (such as `gpt-6.2-sol` or `gemini-4-neon` on ellmer 0.5.2),
+#'   run [ellmer::models_update_prices()] first. If the cost of a response is
+#'   unknown, the run stops with `"cost_unavailable"` rather than guessing,
+#'   unless `on_unknown_cost = "continue"`.
 #' @param on_exceed What happens when a limit is reached. `"stop"` (the
 #'   default) ends the run and returns an [AgentResult] whose `stop_reason`
 #'   names the limit, such as `"request_limit"`, `"tool_call_limit"` or
@@ -884,7 +887,8 @@ usage_limit_message <- function(status) {
   if (identical(status$reason, "cost_unavailable")) {
     return(paste0(
       "Run cost limit cannot be enforced because the provider did not ",
-      "report complete cost information."
+      "report complete cost information. Run `ellmer::models_update_prices()` ",
+      "if the model is newer than your installed ellmer price table."
     ))
   }
   paste0(

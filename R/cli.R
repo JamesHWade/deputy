@@ -149,7 +149,7 @@ cli_create_chat <- function(provider, model) {
     } else {
       ellmer::chat_anthropic(model = model)
     },
-    openai = ellmer::chat_openai(model = model %||% "gpt-5.6-luna"),
+    openai = ellmer::chat_openai(model = model %||% "gpt-6.2-sol"),
     google = if (is.null(model)) {
       ellmer::chat_google_gemini()
     } else {

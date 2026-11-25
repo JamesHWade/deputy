@@ -39,7 +39,7 @@ account that can't read them, or in a sandbox.
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = list(tool_run_r_code),
   permissions = Permissions(r_code = TRUE)
 )

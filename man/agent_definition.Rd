@@ -51,9 +51,9 @@ choosing where to delegate.}
 tools.}
 
 \item{model}{Model to use. \code{"inherit"} (the default) uses a copy of the
-lead's chat. A bare model id such as \code{"gpt-6-luna"} keeps the lead's
+lead's chat. A bare model id such as \code{"gpt-6.2-sol"} keeps the lead's
 provider and credentials but switches the model. A \code{"provider/model"}
-string such as \code{"anthropic/claude-sonnet-5"} creates a new chat with
+string such as \code{"anthropic/claude-sonnet-5-5"} creates a new chat with
 \code{\link[ellmer:chat]{ellmer::chat()}}.}
 
 \item{skills}{List of \link{Skill} objects or skill directory paths to load.}
@@ -123,7 +123,7 @@ do.call(agent_definition, fields)
 \dontrun{
 # Use with a lead agent
 lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   sub_agents = list(code_reviewer)
 )
 }

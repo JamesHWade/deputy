@@ -615,3 +615,80 @@ test_that("UsageLimits keeps on_exceed as its seventh argument", {
   expect_identical(limits$on_exceed, "error")
   expect_identical(limits$on_unknown_cost, "stop")
 })
+
+test_that("ellmer bundled pricing enforces max_cost_usd and unpriced models fail closed", {
+  skip_if_not_installed("httpuv")
+
+  server <- local_runtime_server(list(
+    runtime_reply("priced ok"),
+    runtime_reply("over budget"),
+    runtime_reply("unpriced stop"),
+    runtime_reply("unpriced continue")
+  ))
+
+  priced_chat <- ellmer::chat_openai_compatible(
+    name = "OpenAI",
+    base_url = server$url,
+    credentials = function() "fixture",
+    model = "gpt-6-luna",
+    echo = "none"
+  )
+  priced_agent <- Agent$new(
+    chat = priced_chat,
+    usage_limits = UsageLimits(max_cost_usd = 1)
+  )
+  ok <- priced_agent$run_sync("hello")
+  expect_identical(ok$stop_reason, "complete")
+  expect_true(is.numeric(ok$usage$cost_usd) && !is.na(ok$usage$cost_usd))
+  expect_gt(ok$usage$cost_usd, 0)
+
+  capped_agent <- Agent$new(
+    chat = ellmer::chat_openai_compatible(
+      name = "OpenAI",
+      base_url = server$url,
+      credentials = function() "fixture",
+      model = "gpt-6-luna",
+      echo = "none"
+    ),
+    usage_limits = UsageLimits(max_cost_usd = 1e-12)
+  )
+  capped <- capped_agent$run_sync("hello")
+  expect_identical(capped$stop_reason, "cost_limit")
+  expect_gt(capped$usage$cost_usd, 0)
+
+  unpriced_agent <- Agent$new(
+    chat = ellmer::chat_openai_compatible(
+      name = "OpenAI",
+      base_url = server$url,
+      credentials = function() "fixture",
+      model = "deputy-unpriced-fixture-model",
+      echo = "none"
+    ),
+    usage_limits = UsageLimits(max_cost_usd = 1)
+  )
+  stopped <- unpriced_agent$run_sync("hello")
+  expect_identical(stopped$stop_reason, "cost_unavailable")
+  expect_true(is.na(stopped$usage$cost_usd))
+  expect_match(
+    usage_limit_message(usage_limit_status(
+      stopped$usage,
+      UsageLimits(max_cost_usd = 1)
+    )),
+    "models_update_prices",
+    fixed = TRUE
+  )
+
+  continuing_agent <- Agent$new(
+    chat = ellmer::chat_openai_compatible(
+      name = "OpenAI",
+      base_url = server$url,
+      credentials = function() "fixture",
+      model = "deputy-unpriced-fixture-model",
+      echo = "none"
+    ),
+    usage_limits = UsageLimits(max_cost_usd = 1, on_unknown_cost = "continue")
+  )
+  continued <- continuing_agent$run_sync("hello")
+  expect_identical(continued$stop_reason, "complete")
+  expect_true(is.na(continued$usage$cost_usd))
+})

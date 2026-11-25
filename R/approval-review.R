@@ -52,7 +52,7 @@
 #'     approval_dir <- tempfile("approvals-")
 #'     dir.create(approval_dir)
 #'     agent <- Agent$new(
-#'       ellmer::chat("openai/gpt-6-luna"),
+#'       ellmer::chat("openai/gpt-6.2-sol"),
 #'       approval_dir = approval_dir
 #'     )
 #'     approval_review_server("review", agent)
