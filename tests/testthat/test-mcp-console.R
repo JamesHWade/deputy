@@ -71,7 +71,7 @@ test_that("MCP Console requires an explicit, qualified executable", {
   expect_identical(execution$backend, "mcp-console")
   expect_identical(execution$version, "0.4.0")
   expect_identical(execution$sandbox, "read_only")
-  expect_identical(execution$dependencies, "unavailable")
+  expect_identical(execution$dependencies, "deny")
   expect_identical(execution$workspace, agent$working_dir)
   expect_identical(execution$recordings, file.path(console_home, "sessions"))
   expect_true(endsWith(
@@ -79,7 +79,8 @@ test_that("MCP Console requires an explicit, qualified executable", {
     paste0(
       "wd=",
       normalizePath(fixture$workspace),
-      " args=serve --no-project-config"
+      " args=serve --no-project-config ",
+      paste(mcp_console_deny_dependencies_args, collapse = " ")
     )
   ))
   expect_identical(
@@ -188,10 +189,13 @@ test_that("launch arguments cannot widen the Console sandbox", {
     env = c(console_bare, DEPUTY_CONSOLE_FIXTURE_BOUNDARY = "workspace")
   )
   withr::defer(connection$close())
-  expect_console(
+  expect_true(endsWith(
     mcp_console_log(fixture, "start "),
-    "args=serve --no-project-config -c sandbox.profile=workspace$"
-  )
+    paste0(
+      "args=serve --no-project-config -c sandbox.profile=workspace ",
+      paste(mcp_console_deny_dependencies_args, collapse = " ")
+    )
+  ))
   expect_identical(connection$status()$execution$sandbox, "workspace")
 })
 
@@ -288,15 +292,52 @@ test_that("only an advertised native sandbox with restricted networking is used"
 test_that("dependency preparation needs both host and Agent permission", {
   fixture <- mcp_console_fixture()
   agent <- console_agent(fixture)
+  # Conflicting resolution overrides are rejected before launch when denied.
+  for (bad_args in list(
+    c("-c", "r.resolution=explicit"),
+    c("-c", "r.resolution=fixed"),
+    c("-c", "python.resolution=fixed"),
+    c("-c", "python.resolution=explicit")
+  )) {
+    expect_error(
+      mcp_console_connection(agent, fixture$command, args = bad_args),
+      "conflicts with",
+      class = "deputy_mcp_console"
+    )
+  }
+  expect_length(mcp_console_log(fixture, "start "), 0L)
+
+  # If a server ignores the non-preparing overrides and still exposes
+  # requirements, python, or sql, Deputy fails closed and stops it.
   expect_error(
-    mcp_console_connection(agent, fixture$command),
-    "prepares dependencies in its resolver sandbox",
+    mcp_console_connection(
+      agent,
+      fixture$command,
+      env = c(DEPUTY_CONSOLE_FIXTURE_IGNORE_DENY = "1")
+    ),
+    "did not disable dependency preparation",
     class = "deputy_mcp_console"
   )
-  bare <- mcp_console_connection(agent, fixture$command, env = console_bare)
-  withr::defer(bare$close())
-  expect_false("requirements" %in% names(formals(bare$tools()$send)))
-  bare$close()
+  expect_false(console_pid_alive(console_pid(fixture)))
+  expect_error(
+    mcp_console_connection(
+      agent,
+      fixture$command,
+      env = c(console_bare, DEPUTY_CONSOLE_FIXTURE_IGNORE_DENY = "1")
+    ),
+    "did not disable dependency preparation",
+    class = "deputy_mcp_console"
+  )
+  expect_false(console_pid_alive(console_pid(fixture)))
+
+  # Default dependencies = "deny" enforces non-preparing settings on launch.
+  denied <- mcp_console_connection(agent, fixture$command)
+  withr::defer(denied$close())
+  expect_identical(denied$status()$execution$dependencies, "deny")
+  expect_false("requirements" %in% names(formals(denied$tools()$send)))
+  expect_false("python" %in% names(formals(denied$tools()$send)))
+  expect_false("sql" %in% names(formals(denied$tools()$send)))
+  denied$close()
 
   calls <- function() length(mcp_console_log(fixture, "call "))
   for (grant in c(FALSE, TRUE)) {
@@ -783,4 +824,28 @@ test_that("released MCP Console keeps governed state across R, SQL and Python", 
   expect_true(dir.exists(a$status()$execution$recordings))
   expect_console(cell(send_b, r = "1 + 1"), "[1] 2", fixed = TRUE)
   b$close()
+
+  # Default dependencies = "deny" enforces non-preparing R-only mode: no
+  # requirements/python/sql fields and missing packages fail without installing.
+  denied <- mcp_console_connection(
+    agent_a,
+    command,
+    env = c(MCP_CONSOLE_HOME = console_home)
+  )
+  withr::defer(denied$close())
+  expect_identical(denied$status()$execution$dependencies, "deny")
+  denied_send <- denied$tools()$send
+  expect_false("requirements" %in% names(formals(denied_send)))
+  expect_false("python" %in% names(formals(denied_send)))
+  expect_false("sql" %in% names(formals(denied_send)))
+  expect_console(cell(denied_send, r = "2 + 2"), "[1] 4", fixed = TRUE)
+  expect_console(
+    cell(
+      denied_send,
+      r = "tryCatch(library(fortunes), error = function(e) conditionMessage(e))"
+    ),
+    "there is no package called",
+    fixed = TRUE
+  )
+  denied$close()
 })

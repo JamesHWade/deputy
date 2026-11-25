@@ -30,8 +30,12 @@
 #' @param dependencies `"deny"` (the default) or `"allow"`. MCP Console can
 #'   prepare packages that code needs using its separate resolver sandbox
 #'   (which downloads packages from registries and writes caches). With
-#'   `"deny"`, the connection errors if the server exposes `requirements`, and
-#'   calls that declare `requirements` are refused. See Details.
+#'   `"deny"`, Deputy enforces non-preparing settings on launch
+#'   (`r.resolution=disabled`, `r.packages=[]`, `languages=[r]`, and
+#'   `tool.parameters.requirements.enabled=false`), verifies that `requirements`,
+#'   `python`, and `sql` are not exposed, and refuses any `requirements` call.
+#'   Pass `"allow"` to use the full R, Python and SQL workbench with managed
+#'   dependency preparation. See Details.
 #' @param project_config Set to `TRUE` to start even though the workspace
 #'   contains `.agents/console/config.yaml`. That file can widen the sandbox,
 #'   so by default the connection refuses to start when it exists and passes
@@ -61,13 +65,17 @@
 #' `requirements` also needs `install_packages = TRUE` and a connection created
 #' with `dependencies = "allow"`.
 #'
-#' By default in MCP Console 0.4.0, `requirements` is exposed and R resolves
-#' missing packages automatically on `library()` / `::` using its separate
-#' resolver sandbox. With `dependencies = "deny"`, either pass
-#' `dependencies = "allow"` or disable preparation explicitly (for example
-#' `args = c("-c", "r.resolution=disabled", "-c", "python.resolution=fixed", "-c", "tool.parameters.requirements.enabled=false")`).
-#' With `dependencies = "allow"`, automatic resolution remains part of the
-#' host's connection-level decision and cannot be checked call by call.
+#' By default in MCP Console 0.4.0, `requirements` is exposed, R resolves
+#' missing packages automatically on `library()` / `::`, and managed Python and
+#' DuckDB prepare runtimes and extensions in Console's separate resolver
+#' sandbox. With `dependencies = "deny"` (the default), Deputy passes trailing
+#' `-c` overrides (`r.resolution=disabled`, `r.packages=[]`, `languages=[r]`,
+#' `tool.parameters.requirements.enabled=false`) so neither automatic
+#' resolution nor managed Python/SQL preparation can run, and closes the
+#' connection if `requirements`, `python`, or `sql` remain exposed. Pass
+#' `dependencies = "allow"` to enable the full R, Python and SQL workbench;
+#' automatic resolution then remains part of the host's connection-level
+#' decision and cannot be checked call by call.
 #'
 #' ## Long-running calls
 #'
@@ -130,7 +138,7 @@ mcp_console_connection <- function(
   }
   mcp_connection_owner(agent)
   command <- mcp_console_executable(command)
-  args <- validate_mcp_console_args(args)
+  args <- validate_mcp_console_args(args, dependencies = dependencies)
   env <- validate_mcp_console_env(env)
   workspace <- agent$working_dir
   project <- file.path(workspace, ".agents", "console", "config.yaml")
@@ -149,7 +157,8 @@ mcp_console_connection <- function(
   launch_args <- c(
     "serve",
     if (!project_config) "--no-project-config",
-    args
+    args,
+    if (identical(dependencies, "deny")) mcp_console_deny_dependencies_args
   )
   server <- list(command = command, args = launch_args)
   if (length(env)) {
@@ -188,12 +197,15 @@ mcp_console_connection <- function(
   }
   sandbox <- mcp_console_sandbox_profile(tool@description)
   offers_dependencies <- "requirements" %in% fields
-  if (offers_dependencies && identical(dependencies, "deny")) {
+  if (
+    identical(dependencies, "deny") &&
+      (offers_dependencies || any(c("python", "sql") %in% fields))
+  ) {
     abort_deputy(
       c(
-        "This MCP Console server prepares dependencies in its resolver sandbox.",
-        "i" = "It installs packages for {.field requirements} and when code loads a missing package.",
-        "i" = "Pass {.code dependencies = \"allow\"} to accept this, or disable requirements with {.code -c tool.parameters.requirements.enabled=false}."
+        "This MCP Console server did not disable dependency preparation.",
+        "i" = "Deputy refuses to keep a {.code dependencies = \"deny\"} connection when {.field requirements}, {.field python}, or {.field sql} remain exposed.",
+        "i" = "Pass {.code dependencies = \"allow\"} to enable managed dependency preparation and Python/SQL runtimes."
       ),
       class = "mcp_console"
     )
@@ -206,7 +218,13 @@ mcp_console_connection <- function(
       backend = "mcp-console",
       version = version,
       sandbox = sandbox,
-      dependencies = if (offers_dependencies) dependencies else "unavailable",
+      dependencies = if (identical(dependencies, "deny")) {
+        "deny"
+      } else if (offers_dependencies) {
+        "allow"
+      } else {
+        "unavailable"
+      },
       workspace = workspace,
       recordings = mcp_console_recordings_dir(workspace, env)
     ),
@@ -289,6 +307,20 @@ mcp_console_control <- function(
 }
 
 mcp_console_qualified_versions <- "0.4.0"
+
+# Trailing `-c` overrides enforced when `dependencies = "deny"` so neither
+# automatic R resolution nor managed Python/SQL preparation can run, even if a
+# global or project config file enables them.
+mcp_console_deny_dependencies_args <- c(
+  "-c",
+  "r.resolution=disabled",
+  "-c",
+  "r.packages=[]",
+  "-c",
+  "languages=[r]",
+  "-c",
+  "tool.parameters.requirements.enabled=false"
+)
 
 mcp_console_fields <- c(
   "r",
@@ -412,7 +444,7 @@ validate_mcp_console_env <- function(env) {
 
 # Deputy builds `serve` itself and admits only arguments that keep the native
 # sandbox with restricted networking. Everything else fails closed.
-validate_mcp_console_args <- function(args) {
+validate_mcp_console_args <- function(args, dependencies = "allow") {
   if (is.null(args) || length(args) == 0L) {
     return(character())
   }
@@ -457,7 +489,7 @@ validate_mcp_console_args <- function(args) {
         refuse("MCP Console {.code --writable-root} requires a path.")
       }
     } else if (argument %in% c("-c", "--config")) {
-      validate_mcp_console_override(value, refuse)
+      validate_mcp_console_override(value, refuse, dependencies = dependencies)
     } else {
       refuse(
         "Unsupported MCP Console launch argument {.val {argument}}.",
@@ -469,7 +501,11 @@ validate_mcp_console_args <- function(args) {
   args
 }
 
-validate_mcp_console_override <- function(override, refuse) {
+validate_mcp_console_override <- function(
+  override,
+  refuse,
+  dependencies = "allow"
+) {
   if (!grepl("=", override, fixed = TRUE)) {
     refuse("MCP Console overrides must be {.code KEY=VALUE}.")
   }
@@ -490,11 +526,23 @@ validate_mcp_console_override <- function(override, refuse) {
     identical(key, "r.resolution") &&
       value %in% c("disabled", "fixed", "explicit")
   ) {
+    if (identical(dependencies, "deny") && !identical(value, "disabled")) {
+      refuse(
+        "MCP Console {.code r.resolution={value}} conflicts with {.code dependencies = \"deny\"}.",
+        "i" = "Pass {.code dependencies = \"allow\"} to enable R dependency preparation."
+      )
+    }
     return(invisible(TRUE))
   }
   if (
     identical(key, "python.resolution") && value %in% c("fixed", "explicit")
   ) {
+    if (identical(dependencies, "deny")) {
+      refuse(
+        "MCP Console {.code python.resolution={value}} conflicts with {.code dependencies = \"deny\"}.",
+        "i" = "Pass {.code dependencies = \"allow\"} to enable managed Python and dependency preparation."
+      )
+    }
     return(invisible(TRUE))
   }
   if (

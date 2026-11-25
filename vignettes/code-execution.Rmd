@@ -267,13 +267,14 @@ Read-only and plan modes deny it.
 MCP Console can also install the packages that code asks for using its separate
 resolver sandbox (which has network access to package repositories and cache
 writes). It does this when a call lists `requirements`, and by default R also
-resolves missing packages automatically on `library()` or `::`. With the
-default `dependencies = "deny"`, Deputy refuses to connect while `requirements`
-is exposed; either pass `dependencies = "allow"` or disable preparation
-explicitly (for example with `-c r.resolution=disabled`,
-`-c python.resolution=fixed`, and
-`-c tool.parameters.requirements.enabled=false`). With
-`dependencies = "allow"`, a call that lists `requirements` also needs
+resolves missing packages automatically on `library()` or `::`, while managed
+Python and DuckDB prepare runtimes and extensions. With the default
+`dependencies = "deny"`, Deputy launches Console with non-preparing R-only
+overrides (`-c r.resolution=disabled`, `-c r.packages=[]`, `-c languages=[r]`,
+`-c tool.parameters.requirements.enabled=false`) and verifies that
+`requirements`, `python`, and `sql` are not exposed, so missing packages fail
+without downloading anything. Pass `dependencies = "allow"` for the full R,
+Python and SQL workbench; a call that lists `requirements` also needs
 `install_packages = TRUE` in the agent's permissions. Set variables such as
 `UV_CACHE_DIR` or `MCP_CONSOLE_HOME` through `env` to control cache and
 recording locations.

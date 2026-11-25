@@ -70,6 +70,15 @@ if (!is.null(security)) {
 if (identical(Sys.getenv("DEPUTY_CONSOLE_FIXTURE_BARE"), "1")) {
   tools[[1L]]$inputSchema$properties$requirements <- NULL
 }
+if (!identical(Sys.getenv("DEPUTY_CONSOLE_FIXTURE_IGNORE_DENY"), "1")) {
+  if (any(grepl("tool\\.parameters\\.requirements\\.enabled=false", args))) {
+    tools[[1L]]$inputSchema$properties$requirements <- NULL
+  }
+  if (any(grepl("languages=\\[r\\]", args))) {
+    tools[[1L]]$inputSchema$properties$python <- NULL
+    tools[[1L]]$inputSchema$properties$sql <- NULL
+  }
+}
 restart_seconds <- as.numeric(Sys.getenv("DEPUTY_CONSOLE_FIXTURE_RESTART", "0"))
 png <- paste0(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAC",

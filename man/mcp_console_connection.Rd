@@ -42,8 +42,12 @@ and fallback recordings write under \code{HOME}.}
 \item{dependencies}{\code{"deny"} (the default) or \code{"allow"}. MCP Console can
 prepare packages that code needs using its separate resolver sandbox
 (which downloads packages from registries and writes caches). With
-\code{"deny"}, the connection errors if the server exposes \code{requirements}, and
-calls that declare \code{requirements} are refused. See Details.}
+\code{"deny"}, Deputy enforces non-preparing settings on launch
+(\code{r.resolution=disabled}, \verb{r.packages=[]}, \verb{languages=[r]}, and
+\code{tool.parameters.requirements.enabled=false}), verifies that \code{requirements},
+\code{python}, and \code{sql} are not exposed, and refuses any \code{requirements} call.
+Pass \code{"allow"} to use the full R, Python and SQL workbench with managed
+dependency preparation. See Details.}
 
 \item{project_config}{Set to \code{TRUE} to start even though the workspace
 contains \code{.agents/console/config.yaml}. That file can widen the sandbox,
@@ -87,13 +91,17 @@ annotations, so the cautious defaults also require \code{web = TRUE}.
 \code{requirements} also needs \code{install_packages = TRUE} and a connection created
 with \code{dependencies = "allow"}.
 
-By default in MCP Console 0.4.0, \code{requirements} is exposed and R resolves
-missing packages automatically on \code{library()} / \code{::} using its separate
-resolver sandbox. With \code{dependencies = "deny"}, either pass
-\code{dependencies = "allow"} or disable preparation explicitly (for example
-\code{args = c("-c", "r.resolution=disabled", "-c", "python.resolution=fixed", "-c", "tool.parameters.requirements.enabled=false")}).
-With \code{dependencies = "allow"}, automatic resolution remains part of the
-host's connection-level decision and cannot be checked call by call.
+By default in MCP Console 0.4.0, \code{requirements} is exposed, R resolves
+missing packages automatically on \code{library()} / \code{::}, and managed Python and
+DuckDB prepare runtimes and extensions in Console's separate resolver
+sandbox. With \code{dependencies = "deny"} (the default), Deputy passes trailing
+\code{-c} overrides (\code{r.resolution=disabled}, \verb{r.packages=[]}, \verb{languages=[r]},
+\code{tool.parameters.requirements.enabled=false}) so neither automatic
+resolution nor managed Python/SQL preparation can run, and closes the
+connection if \code{requirements}, \code{python}, or \code{sql} remain exposed. Pass
+\code{dependencies = "allow"} to enable the full R, Python and SQL workbench;
+automatic resolution then remains part of the host's connection-level
+decision and cannot be checked call by call.
 }
 
 \subsection{Long-running calls}{

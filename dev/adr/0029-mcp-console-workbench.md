@@ -126,11 +126,16 @@ superseded pre-CRAN `mcp_repl_connection()`, `mcp_repl_control()`, and
   sentence and closes the connection on any widened or unrecognized prose.
 - **Dependencies and recordings.** In 0.4.0, dependency preparation runs in a
   separate `resolver.sandbox` (still with registry network access and cache
-  writes). `dependencies = "deny"` still refuses servers that expose
-  `requirements`; hosts may opt in with `dependencies = "allow"` or disable
-  preparation via `-c`. Recordings use `.agents/console/sessions/` only when
-  `.agents/console` already exists in the workspace, otherwise
-  `$MCP_CONSOLE_HOME/sessions/` or `~/.agents/console/sessions/`.
+  writes). With `dependencies = "deny"` (the default), Deputy rejects
+  conflicting resolution overrides, appends trailing non-preparing overrides
+  (`-c r.resolution=disabled -c r.packages=[] -c languages=[r] -c tool.parameters.requirements.enabled=false`)
+  so automatic R resolution and managed Python/SQL preparation cannot run even
+  if a config file enables them, and fails closed if `requirements`, `python`,
+  or `sql` remain exposed. Hosts opt into the full R/Python/SQL workbench and
+  resolver sandbox with `dependencies = "allow"`. Recordings use
+  `.agents/console/sessions/` only when `.agents/console` already exists in the
+  workspace, otherwise `$MCP_CONSOLE_HOME/sessions/` or
+  `~/.agents/console/sessions/`.
 
 ## References
 
