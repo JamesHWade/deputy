@@ -21,7 +21,7 @@ Returns \code{run_r_code} and \code{run_bash}. Both run model-written code with 
 user account's access. Each call runs in a separate process, which is not a
 sandbox. \code{\link[=permissions_standard]{permissions_standard()}} denies both tools; allow them with
 \code{r_code = TRUE} and \code{bash = TRUE} in \code{\link[=Permissions]{Permissions()}}. For an OS sandbox, use
-\code{\link[=tools_mcp_repl]{tools_mcp_repl()}}.
+\code{\link[=mcp_console_connection]{mcp_console_connection()}}.
 
 The processes don't inherit your environment variables, and R there
 doesn't read \code{.Renviron}. They get the variables that locate programs,

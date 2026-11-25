@@ -24,7 +24,7 @@ seconds.
 The code runs with your user account's access to files and the network. The
 separate process protects your R session from crashes; it is not a sandbox.
 The default permissions deny this tool; allow it with \code{r_code = TRUE} in
-\code{\link[=Permissions]{Permissions()}}. For an OS sandbox, use \code{\link[=tools_mcp_repl]{tools_mcp_repl()}}.
+\code{\link[=Permissions]{Permissions()}}. For an OS sandbox, use \code{\link[=mcp_console_connection]{mcp_console_connection()}}.
 
 The process doesn't inherit your environment variables, and R there doesn't
 read \code{.Renviron}; a project \code{.Rprofile} still runs. It gets the variables

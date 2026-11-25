@@ -1,4 +1,4 @@
-# MCP Console producer tests. The fixture serves the released 0.0.4 `send`
+# MCP Console producer tests. The fixture serves the released 0.4.0 `send`
 # schema and description over stdio; no network or MCP Console install needed.
 
 console_agent <- function(fixture, ...) {
@@ -47,56 +47,86 @@ test_that("MCP Console requires an explicit, qualified executable", {
     "not an executable",
     class = "deputy_mcp_console"
   )
-  for (version in c("0.0.3", "0.0.5", "unknown")) {
+  for (version in c("0.0.4", "0.3.0", "0.5.0", "unknown")) {
     expect_error(
       mcp_console_connection(
         agent,
         fixture$command,
         env = c(console_bare, DEPUTY_CONSOLE_FIXTURE_VERSION = version)
       ),
-      "0.0.4",
+      "0.4.0",
       class = "deputy_mcp_console"
     )
   }
   expect_length(mcp_console_log(fixture, "start "), 0L)
 
+  console_home <- withr::local_tempdir("deputy-console-home-")
   withr::local_envvar(DEPUTY_MCP_CONSOLE_BIN = fixture$command)
-  connection <- mcp_console_connection(agent, env = console_bare)
+  connection <- mcp_console_connection(
+    agent,
+    env = c(console_bare, MCP_CONSOLE_HOME = console_home)
+  )
   withr::defer(connection$close())
   execution <- connection$status()$execution
   expect_identical(execution$backend, "mcp-console")
-  expect_identical(execution$version, "0.0.4")
-  expect_identical(execution$sandbox, "default")
-  expect_identical(execution$dependencies, "unavailable")
+  expect_identical(execution$version, "0.4.0")
+  expect_identical(execution$sandbox, "read_only")
+  expect_identical(execution$dependencies, "deny")
   expect_identical(execution$workspace, agent$working_dir)
-  expect_identical(
-    execution$recordings,
-    file.path(agent$working_dir, ".agents", "console", "sessions")
-  )
+  expect_identical(execution$recordings, file.path(console_home, "sessions"))
   expect_true(endsWith(
     mcp_console_log(fixture, "start "),
-    paste0("wd=", normalizePath(fixture$workspace), " args=serve")
+    paste0(
+      "wd=",
+      normalizePath(fixture$workspace),
+      " args=serve --no-project-config ",
+      paste(mcp_console_deny_dependencies_args, collapse = " ")
+    )
   ))
   expect_identical(
     tool_metadata(connection$tools()$send)$source$execution,
     execution
+  )
+  connection$close()
+
+  # When .agents/console already exists in the workspace, 0.4.0 stores
+  # recordings there instead of under MCP_CONSOLE_HOME.
+  dir.create(
+    file.path(fixture$workspace, ".agents", "console"),
+    recursive = TRUE
+  )
+  in_project <- mcp_console_connection(
+    agent,
+    env = c(console_bare, MCP_CONSOLE_HOME = console_home)
+  )
+  withr::defer(in_project$close())
+  expect_identical(
+    in_project$status()$execution$recordings,
+    file.path(agent$working_dir, ".agents", "console", "sessions")
   )
 })
 
 test_that("launch arguments cannot widen the Console sandbox", {
   refused <- list(
     "--no-sandbox" = "--no-sandbox",
-    "unrestricted" = c("-c", "sandbox.filesystem.kind=unrestricted"),
-    "external" = "--config=sandbox.filesystem={kind: external-sandbox}",
+    "unrestricted" = c("-c", "sandbox.filesystem.read_write=[.]"),
+    "tempdir" = c("-c", "sandbox.tempdir=read_write"),
     "whole sandbox" = c(
       "--config",
-      "sandbox={filesystem: {kind: unrestricted}}"
+      "sandbox={profile: workspace, network: true}"
     ),
     "proxy" = c("-c", "sandbox.proxy.enabled=true"),
     "proxy object" = "-csandbox={proxy: {enabled: true}}",
     "network" = c("-c", "sandbox.network=enabled"),
+    "network true" = c("-c", "sandbox.network=true"),
+    "inherit codex" = c("-c", "sandbox.profile=inherit_codex"),
+    "resolver" = c("-c", "resolver.sandbox.network=enabled"),
+    "tool description" = c("-c", "tool.description=Evaluated code"),
     "target" = c("-c", "target.transport.kind=ssh"),
-    "profile" = c("-c", "extends=:danger"),
+    "profile" = c("-c", "extends=:workspace"),
+    "config file" = c("--config-file", "/tmp/config.yaml"),
+    "control socket" = c("--control-socket", "/tmp/control.sock"),
+    "sessions zero" = c("-c", "sessions.max=0"),
     "worker" = c("--worker", "/tmp/worker"),
     "subcommand" = "serve",
     "missing value" = "-c"
@@ -109,18 +139,36 @@ test_that("launch arguments cannot widen the Console sandbox", {
   }
   expect_error(validate_mcp_console_args("--no-sandbox"), "no-sandbox")
   expect_error(
-    validate_mcp_console_args(c("-c", "sandbox.filesystem.kind=unrestricted")),
+    validate_mcp_console_args(c("-c", "sandbox.filesystem.read_write=[.]")),
     "filesystem overrides"
   )
   expect_error(
     validate_mcp_console_args(c("-c", "sandbox.proxy.enabled=true")),
     "proxy"
   )
+  expect_error(
+    validate_mcp_console_args(c("-c", "tool.description=fake")),
+    "tool.description"
+  )
+  expect_error(
+    validate_mcp_console_args(c("-c", "resolver.sandbox.network=enabled")),
+    "resolver overrides"
+  )
   allowed <- c(
     "-c",
-    "extends=:workspace",
-    "--config=extends=':read-only'",
+    "sandbox.profile=workspace",
+    "--config=sandbox.profile='read_only'",
     "-csandbox.network=restricted",
+    "-c",
+    "sandbox.network=false",
+    "-c",
+    "r.resolution=disabled",
+    "-c",
+    "python.resolution=fixed",
+    "-c",
+    "tool.parameters.requirements.enabled=false",
+    "-c",
+    "sessions.max=2",
     "--writable-root",
     "/tmp/output",
     "--writable-root=/tmp/cache"
@@ -137,14 +185,17 @@ test_that("launch arguments cannot widen the Console sandbox", {
   connection <- mcp_console_connection(
     agent,
     fixture$command,
-    args = c("-c", "extends=:workspace"),
+    args = c("-c", "sandbox.profile=workspace"),
     env = c(console_bare, DEPUTY_CONSOLE_FIXTURE_BOUNDARY = "workspace")
   )
   withr::defer(connection$close())
-  expect_console(
+  expect_true(endsWith(
     mcp_console_log(fixture, "start "),
-    "args=serve -c extends=:workspace$"
-  )
+    paste0(
+      "args=serve --no-project-config -c sandbox.profile=workspace ",
+      paste(mcp_console_deny_dependencies_args, collapse = " ")
+    )
+  ))
   expect_identical(connection$status()$execution$sandbox, "workspace")
 })
 
@@ -191,7 +242,7 @@ test_that("a workspace project configuration needs explicit host opt-in", {
 })
 
 test_that("only an advertised native sandbox with restricted networking is used", {
-  for (boundary in c("unsandboxed", "proxy")) {
+  for (boundary in c("unsandboxed", "proxy", "inherit_codex")) {
     fixture <- mcp_console_fixture()
     agent <- console_agent(fixture)
     expect_error(
@@ -208,31 +259,85 @@ test_that("only an advertised native sandbox with restricted networking is used"
   }
   expect_identical(
     mcp_console_sandbox_profile(paste(
-      "Workbench.\n\nEvaluated code can read host files, cannot directly",
-      "access the network, and can write in the worker's private temporary",
-      "directory and to paths explicitly allowed by the launcher."
+      "Workbench.\n\nEvaluated code can read host files subject to configured",
+      "restrictions and cannot directly access the network. Writable",
+      "locations: private `TMPDIR`; subject to more specific read/deny rules."
     )),
-    "default"
+    "read_only"
+  )
+  expect_identical(
+    mcp_console_sandbox_profile(paste(
+      "Evaluated code can read host files subject to configured restrictions",
+      "and cannot directly access the network. Writable locations: private",
+      "`TMPDIR`, workspace, `/tmp/out`; subject to more specific read/deny rules."
+    )),
+    "workspace"
+  )
+  expect_identical(
+    mcp_console_sandbox_profile(paste(
+      "Evaluated code can read host files subject to configured restrictions",
+      "and cannot directly access the network. Writable locations: private",
+      "`TMPDIR` (also `TEMP` and `TMP`); subject to more specific read/deny rules."
+    )),
+    "read_only"
   )
   expect_error(mcp_console_sandbox_profile("A new security sentence."))
   expect_error(mcp_console_sandbox_profile(paste(
-    "Evaluated code has unrestricted filesystem access and cannot directly",
-    "access the network."
+    "Evaluated code can read host files subject to configured restrictions",
+    "and cannot directly access the network. Writable locations: host",
+    "temporary directories; subject to more specific read/deny rules."
   )))
 })
 
 test_that("dependency preparation needs both host and Agent permission", {
   fixture <- mcp_console_fixture()
   agent <- console_agent(fixture)
+  # Conflicting resolution overrides are rejected before launch when denied.
+  for (bad_args in list(
+    c("-c", "r.resolution=explicit"),
+    c("-c", "r.resolution=fixed"),
+    c("-c", "python.resolution=fixed"),
+    c("-c", "python.resolution=explicit")
+  )) {
+    expect_error(
+      mcp_console_connection(agent, fixture$command, args = bad_args),
+      "conflicts with",
+      class = "deputy_mcp_console"
+    )
+  }
+  expect_length(mcp_console_log(fixture, "start "), 0L)
+
+  # If a server ignores the non-preparing overrides and still exposes
+  # requirements, python, or sql, Deputy fails closed and stops it.
   expect_error(
-    mcp_console_connection(agent, fixture$command),
-    "prepares dependencies outside its sandbox",
+    mcp_console_connection(
+      agent,
+      fixture$command,
+      env = c(DEPUTY_CONSOLE_FIXTURE_IGNORE_DENY = "1")
+    ),
+    "did not disable dependency preparation",
     class = "deputy_mcp_console"
   )
-  bare <- mcp_console_connection(agent, fixture$command, env = console_bare)
-  withr::defer(bare$close())
-  expect_false("requirements" %in% names(formals(bare$tools()$send)))
-  bare$close()
+  expect_false(console_pid_alive(console_pid(fixture)))
+  expect_error(
+    mcp_console_connection(
+      agent,
+      fixture$command,
+      env = c(console_bare, DEPUTY_CONSOLE_FIXTURE_IGNORE_DENY = "1")
+    ),
+    "did not disable dependency preparation",
+    class = "deputy_mcp_console"
+  )
+  expect_false(console_pid_alive(console_pid(fixture)))
+
+  # Default dependencies = "deny" enforces non-preparing settings on launch.
+  denied <- mcp_console_connection(agent, fixture$command)
+  withr::defer(denied$close())
+  expect_identical(denied$status()$execution$dependencies, "deny")
+  expect_false("requirements" %in% names(formals(denied$tools()$send)))
+  expect_false("python" %in% names(formals(denied$tools()$send)))
+  expect_false("sql" %in% names(formals(denied$tools()$send)))
+  denied$close()
 
   calls <- function() length(mcp_console_log(fixture, "call "))
   for (grant in c(FALSE, TRUE)) {
@@ -426,6 +531,21 @@ test_that("interrupt and restart map onto send control", {
   )
   # The host flag does not leak into later model-facing calls.
   expect_error(send(control = "restart"), class = "deputy_mcp_console")
+  expect_error(
+    mcp_console_control(connection, "interrupt", session = ""),
+    "non-empty string",
+    class = "deputy_mcp_console"
+  )
+  mcp_test_await(mcp_console_control(
+    connection,
+    "restart",
+    session = "analysis"
+  ))
+  expect_console(
+    tail(mcp_console_log(fixture, "call "), 1L),
+    "\"session\":\"analysis\"",
+    fixed = TRUE
+  )
 })
 
 test_that("a restart that outlasts the response window is reported, not hidden", {
@@ -546,7 +666,7 @@ test_that("released MCP Console keeps governed state across R, SQL and Python", 
   command <- Sys.getenv("DEPUTY_MCP_CONSOLE_BIN")
   skip_if(
     !nzchar(command),
-    "Set DEPUTY_MCP_CONSOLE_BIN to a qualified MCP Console 0.0.4 executable"
+    "Set DEPUTY_MCP_CONSOLE_BIN to a qualified MCP Console 0.4.0 executable"
   )
   skip_if_mcptools_unqualified()
   skip_on_os("windows")
@@ -588,11 +708,22 @@ test_that("released MCP Console keeps governed state across R, SQL and Python", 
   workspace_b <- withr::local_tempdir("deputy-console-b-")
   agent_a <- Agent$new(chat = create_mock_chat(), working_dir = workspace_a)
   agent_b <- Agent$new(chat = create_mock_chat(), working_dir = workspace_b)
-  a <- mcp_console_connection(agent_a, command, dependencies = "allow")
+  console_home <- withr::local_tempdir("deputy-console-real-home-")
+  a <- mcp_console_connection(
+    agent_a,
+    command,
+    env = c(MCP_CONSOLE_HOME = console_home),
+    dependencies = "allow"
+  )
   withr::defer(a$close())
-  b <- mcp_console_connection(agent_b, command, dependencies = "allow")
+  b <- mcp_console_connection(
+    agent_b,
+    command,
+    env = c(MCP_CONSOLE_HOME = console_home),
+    dependencies = "allow"
+  )
   withr::defer(b$close())
-  expect_identical(a$status()$execution$sandbox, "default")
+  expect_identical(a$status()$execution$sandbox, "read_only")
   send_a <- a$tools()$send
   send_b <- b$tools()$send
 
@@ -693,4 +824,28 @@ test_that("released MCP Console keeps governed state across R, SQL and Python", 
   expect_true(dir.exists(a$status()$execution$recordings))
   expect_console(cell(send_b, r = "1 + 1"), "[1] 2", fixed = TRUE)
   b$close()
+
+  # Default dependencies = "deny" enforces non-preparing R-only mode: no
+  # requirements/python/sql fields and missing packages fail without installing.
+  denied <- mcp_console_connection(
+    agent_a,
+    command,
+    env = c(MCP_CONSOLE_HOME = console_home)
+  )
+  withr::defer(denied$close())
+  expect_identical(denied$status()$execution$dependencies, "deny")
+  denied_send <- denied$tools()$send
+  expect_false("requirements" %in% names(formals(denied_send)))
+  expect_false("python" %in% names(formals(denied_send)))
+  expect_false("sql" %in% names(formals(denied_send)))
+  expect_console(cell(denied_send, r = "2 + 2"), "[1] 4", fixed = TRUE)
+  expect_console(
+    cell(
+      denied_send,
+      r = "tryCatch(library(fortunes), error = function(e) conditionMessage(e))"
+    ),
+    "there is no package called",
+    fixed = TRUE
+  )
+  denied$close()
 })

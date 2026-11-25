@@ -116,8 +116,8 @@ and the connection closes. The server's session state is lost, so create a new
 connection. Tools loaded with `tools_mcp()` stop that server on the first lost
 reply.
 
-## Sandboxed interpreters
+## Sandboxed interpreter
 
-mcp-repl and MCP Console are MCP servers that run R (and, for MCP Console,
-Python and SQL) inside an OS sandbox. Deputy has dedicated helpers for them
-that check the sandbox is really on: see [Running R code](code-execution.html).
+MCP Console is an MCP server that runs R, Python and DuckDB SQL inside an OS
+sandbox. Deputy has a dedicated helper (`mcp_console_connection()`) that checks
+the sandbox is really on: see [Running R code](code-execution.html).

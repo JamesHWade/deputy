@@ -67,30 +67,13 @@ mcp_test_await <- function(value, timeout = 10) {
 }
 
 # A stdio server whose replies can outlast mcptools' ~4 s response window.
-mcp_slow_config <- function(repl = FALSE) {
+mcp_slow_config <- function() {
   skip_if_mcptools_unqualified()
   log <- tempfile()
   file.create(log)
   fixture <- normalizePath(test_path("fixtures", "mcp-slow.R"))
   rscript <- file.path(R.home("bin"), "Rscript")
-  server <- if (repl) {
-    skip_on_os("windows")
-    # mcp_repl_connection() admits only an mcp-repl executable name.
-    bin <- tempfile("mcp-repl-bin-")
-    dir.create(bin)
-    command <- file.path(bin, "mcp-repl")
-    writeLines(
-      c(
-        "#!/bin/sh",
-        paste("exec", shQuote(rscript), shQuote(fixture), shQuote(log))
-      ),
-      command
-    )
-    Sys.chmod(command, "0755")
-    list(command = command, args = list("--sandbox", "workspace-write"))
-  } else {
-    list(command = rscript, args = list(fixture, log))
-  }
+  server <- list(command = rscript, args = list(fixture, log))
   path <- tempfile(fileext = ".json")
   jsonlite::write_json(
     list(mcpServers = list(slow = server)),
@@ -119,7 +102,7 @@ mcp_console_fixture <- function() {
     c(
       "#!/bin/sh",
       "if [ \"$1\" = \"--version\" ]; then",
-      "  echo \"mcp-console ${DEPUTY_CONSOLE_FIXTURE_VERSION:-0.0.4}\"",
+      "  echo \"mcp-console ${DEPUTY_CONSOLE_FIXTURE_VERSION:-0.4.0}\"",
       "  exit 0",
       "fi",
       paste(

@@ -219,7 +219,7 @@ load only skills you trust. `skills_list()` lists the skills in a directory.
 ## More tools
 
 - [Running R code](code-execution.html): trusted R execution, persistent R
-  sessions, and sandboxed interpreters through mcp-repl and MCP Console.
+  sessions, and sandboxed R, Python and SQL execution through MCP Console.
 - [MCP servers](mcp.html): tools, resources and prompts from Model Context
   Protocol servers.
 - [Human input and approvals](approvals.html): `tools_interactive()` lets the

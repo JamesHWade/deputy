@@ -1,10 +1,10 @@
 # Adapt MCP Console as a sandbox-first workbench
 
 `mcp_console_connection()` connects one Agent to one
-[MCP Console](https://github.com/t-kalinowski/mcp-console) server through the
+[MCP Console](https://github.com/posit-dev/mcp-console) server through the
 existing `McpConnection` machinery. MCP Console keeps R, Python and DuckDB SQL
 state in one sandboxed worker for a conversation. This ADR records the trust
-boundary of that adapter (#190).
+boundary of that adapter (#190, updated for 0.4.0 in #267).
 
 ## Context
 
@@ -99,9 +99,48 @@ upstream contract exists; #187 records the proposed producer contract.
   mcptools internals; a new MCP Console or mcptools release needs
   requalification.
 
+## Upgrade to posit-dev/mcp-console 0.4.0 and removal of mcp-repl (#267)
+
+Upstream consolidated `posit-dev/mcp-repl` and `t-kalinowski/mcp-console` into
+`posit-dev/mcp-console` and shipped `v0.4.0` on 2026-11-22. Deputy removed the
+superseded pre-CRAN `mcp_repl_connection()`, `mcp_repl_control()`, and
+`tools_mcp_repl()` functions and updated `mcp_console_connection()` to qualify
+`0.4.0`:
+
+- **Version and schema.** `mcp_console_qualified_versions` is now `"0.4.0"`.
+  `send` adds optional `note` and `session` fields; `mcp_console_control()`
+  accepts an optional `session` argument while keeping `restart` host-only.
+- **Launch isolation and overrides.** Deputy refuses launch when
+  `.agents/console/config.yaml` exists without `project_config = TRUE` and
+  passes `--no-project-config` by default. Allowed `-c` overrides match 0.4.0's
+  config schema (`sandbox.profile=workspace|read_only`,
+  `sandbox.network=restricted|false`, `r.resolution=disabled|fixed|explicit`,
+  `python.resolution=fixed|explicit`,
+  `tool.parameters.requirements.enabled=false`, and positive `sessions.max`);
+  `--no-sandbox`, `sandbox.profile=inherit_codex`, `sandbox.tempdir`,
+  `sandbox.filesystem*`, `resolver.*`, proxies, targets, and
+  `tool.description` (which could forge the verified sandbox summary) are
+  refused.
+- **Sandbox verification.** `mcp_console_sandbox_profile()` parses 0.4.0's
+  `Evaluated code can read host files subject to configured restrictions and cannot directly access the network. Writable locations: ...; subject to more specific read/deny rules.`
+  sentence and closes the connection on any widened or unrecognized prose.
+- **Dependencies and recordings.** In 0.4.0, dependency preparation runs in a
+  separate `resolver.sandbox` (still with registry network access and cache
+  writes). With `dependencies = "deny"` (the default), Deputy rejects
+  conflicting resolution overrides, appends trailing non-preparing overrides
+  (`-c r.resolution=disabled -c r.packages=[] -c languages=[r] -c tool.parameters.requirements.enabled=false`)
+  so automatic R resolution and managed Python/SQL preparation cannot run even
+  if a config file enables them, and fails closed if `requirements`, `python`,
+  or `sql` remain exposed. Hosts opt into the full R/Python/SQL workbench and
+  resolver sandbox with `dependencies = "allow"`. Recordings use
+  `.agents/console/sessions/` only when `.agents/console` already exists in the
+  workspace, otherwise `$MCP_CONSOLE_HOME/sessions/` or
+  `~/.agents/console/sessions/`.
+
 ## References
 
-- MCP Console v0.0.4: `README.md`, `docs/SEND_OPERATIONS.md`,
-  `docs/SANDBOX_CONFIGURATION.md`, `docs/REQUIREMENTS.md`,
-  `src/server/execution.rs`
-- ADR-0004, ADR-0005, ADR-0028; issues #187, #190, #196
+- MCP Console v0.4.0: `README.md`, `docs/API.md`, `docs/CLI.md`,
+  `docs/CONFIGURATION.md`, `docs/PACKAGE_CONFIGURATION.md`,
+  `docs/RECORDING_REFERENCE.md`, `docs/SANDBOX_CONFIGURATION.md`,
+  `docs/SEND_OPERATIONS.md`, `src/server/presentation.rs`
+- ADR-0004, ADR-0005, ADR-0028; issues #187, #190, #196, #267

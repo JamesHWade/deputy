@@ -16,7 +16,7 @@ knitr::opts_chunk$set(
 ```
 
 Letting the model write and run R code is the most flexible tool you can give
-an agent, and the most dangerous. Deputy offers four ways to do it, which
+an agent, and the most dangerous. Deputy offers three ways to do it, which
 differ in two respects: whether R state survives between calls, and whether
 the code is confined by an OS sandbox.
 
@@ -24,7 +24,6 @@ the code is confined by an OS sandbox.
 |---|---|---|
 | `tool_run_r_code` | none; each call starts a new R process | your user account's access |
 | `RSession` | variables, packages and plots persist | your user account's access |
-| mcp-repl, through `mcp_repl_connection()` or `tools_mcp_repl()` | persists | OS sandbox |
 | MCP Console, through `mcp_console_connection()` | persists; R, Python and SQL share data | OS sandbox |
 
 Deputy calls the first two *trusted-code tools*. A separate process protects
@@ -216,73 +215,13 @@ through the agent's permissions, hooks and usage limits like any other tool
 call. The selected tools must be registered with `convert = FALSE` and check
 their own arguments, and they can't pause for a durable approval.
 
-## Sandboxed R with mcp-repl
+## Sandboxed R, Python and SQL with MCP Console
 
-[mcp-repl](https://github.com/posit-dev/mcp-repl) runs an R interpreter as an
-MCP server inside an OS sandbox, so model-written code can only read and write
-what the sandbox allows. Configure the server in your mcptools config with an
-explicit `--sandbox` mode:
-
-```json
-{
-  "mcpServers": {
-    "r": {
-      "command": "/absolute/path/to/mcp-repl",
-      "args": ["--sandbox", "workspace-write", "--interpreter", "r"]
-    }
-  }
-}
-```
-
-Then connect an agent to its own REPL:
-
-```{r}
-agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6.2-sol"),
-  permissions = Permissions(web = FALSE)
-)
-repl <- mcp_repl_connection(
-  config = "~/.config/mcptools/config.json",
-  agent = agent,
-  server = "r",
-  sandbox = "workspace-write"
-)
-agent$register_tools(repl$tools())
-# ...
-repl$close()
-```
-
-Deputy checks that the server's final `--sandbox` argument matches the mode you
-ask for, and refuses to start otherwise. It accepts `"read-only"` and
-`"workspace-write"`; a configuration that leaves the mode out or uses any other
-mode is rejected. mcp-repl enforces the sandbox and refuses to start
-on a system where it can't. Its
-[sandbox documentation](https://github.com/posit-dev/mcp-repl/blob/main/docs/sandbox.md)
-describes what each mode allows on each platform.
-
-Each connection has its own REPL and belongs to one agent. Long computations
-return a "busy" result after about three seconds; the model then polls with an
-empty call to collect the output. `mcp_repl_control(repl, "interrupt")`
-interrupts the running code, and `mcp_repl_control(repl, "reset")` starts a
-fresh interpreter. Both return promises; check the result to see whether the
-REPL accepted the request.
-
-`tools_mcp_repl()` loads the same tools without a connection object, for simple
-scripts:
-
-```{r}
-agent$register_tools(tools_mcp_repl(server = "r", sandbox = "workspace-write"))
-```
-
-Deputy works with mcptools 1.0.2 and 1.0.3 and refuses other versions until
-they have been tested. It has been tested with mcp-repl 0.3.0.
-
-## R, Python and SQL with MCP Console
-
-[MCP Console](https://github.com/t-kalinowski/mcp-console) is a sandboxed
-workbench that grew out of mcp-repl. Its single `send` tool runs R, Python and
-DuckDB SQL cells in one worker, so a data frame made in R can be queried in SQL
-and read from Python in the same conversation.
+[MCP Console](https://github.com/posit-dev/mcp-console) is an OS-sandboxed
+workbench. Its single `send` tool runs R, Python and DuckDB SQL cells in one
+worker, so a data frame made in R can be queried in SQL and read from Python in
+the same conversation, with optional named sessions (`session`) and journal
+notes (`note`).
 
 ```{r}
 agent <- Agent$new(
@@ -299,19 +238,24 @@ agent$register_tools(console$tools())
 console$close()
 ```
 
-Install MCP Console 0.0.4 yourself (for example with
-`uv tool install mcp-console==0.0.4`) and pass the path to the executable.
-Deputy checks the version before starting it.
+Install MCP Console 0.4.0 yourself (for example with
+`uv tool install mcp-console==0.4.0`) and pass the path to the executable.
+Deputy checks the version before starting it, and works with mcptools 1.0.2
+and 1.0.3.
 
 In its sandbox, code can read files but can't reach the network, and it can
 write only to private temporary storage and to paths you allow. Deputy keeps it
 that way: it refuses options that would turn the sandbox off, widen file
-access, add a proxy, or run the code somewhere else. It accepts
-`--writable-root PATH` and the `-c extends=:workspace` (write in the agent's
-working directory), `-c extends=:read-only` and
-`-c sandbox.network=restricted` presets. A project config file,
-`.agents/console/config.yaml`, can change the sandbox policy, so Deputy won't
-start when one exists unless you have reviewed it and pass
+access, add a proxy, override `tool.description`, or run code somewhere else.
+It accepts `--writable-root PATH` and safe `-c` overrides including
+`-c sandbox.profile=workspace` (write in the agent's working directory),
+`-c sandbox.profile=read_only`, `-c sandbox.network=restricted`,
+`-c r.resolution=disabled|fixed|explicit`,
+`-c python.resolution=fixed|explicit`,
+`-c tool.parameters.requirements.enabled=false`, and `-c sessions.max=N`. A
+project config file, `.agents/console/config.yaml`, can change the sandbox
+policy, so Deputy refuses to start when one exists and passes
+`--no-project-config` unless you have reviewed it and pass
 `project_config = TRUE`. After starting, Deputy checks the sandbox the server
 reports and disconnects unless it is the native sandbox with restricted
 networking.
@@ -320,23 +264,32 @@ networking.
 `bash = TRUE`, plus `web = TRUE` because the server doesn't annotate its tools.
 Read-only and plan modes deny it.
 
-MCP Console can also install the packages that code asks for, and that happens
-outside the sandbox. It does this when a call lists `requirements`, and also on
-its own when code loads a missing package. Since Deputy can't switch the second
-case off, the default `dependencies = "deny"` refuses to connect to a server
-that offers installation. With `dependencies = "allow"`, a call that lists
-`requirements` also needs `install_packages = TRUE` in the agent's permissions.
-Installers use their usual caches in your home directory; set variables such
-as `UV_CACHE_DIR` through `env` to move them.
+MCP Console can also install the packages that code asks for using its separate
+resolver sandbox (which has network access to package repositories and cache
+writes). It does this when a call lists `requirements`, and by default R also
+resolves missing packages automatically on `library()` or `::`, while managed
+Python and DuckDB prepare runtimes and extensions. With the default
+`dependencies = "deny"`, Deputy launches Console with non-preparing R-only
+overrides (`-c r.resolution=disabled`, `-c r.packages=[]`, `-c languages=[r]`,
+`-c tool.parameters.requirements.enabled=false`) and verifies that
+`requirements`, `python`, and `sql` are not exposed, so missing packages fail
+without downloading anything. Pass `dependencies = "allow"` for the full R,
+Python and SQL workbench; a call that lists `requirements` also needs
+`install_packages = TRUE` in the agent's permissions. Set variables such as
+`UV_CACHE_DIR` or `MCP_CONSOLE_HOME` through `env` to control cache and
+recording locations.
 
 Calls wait up to 2.5 seconds. Longer work keeps running and returns
 `[running; poll with an empty send]`, and the model collects the output with an
 empty `send`. `mcp_console_control(console, "interrupt")` interrupts a cell and
 keeps the session's state; `mcp_console_control(console, "restart")` discards
-all R, Python and SQL state. If the restarted worker isn't ready within 2.5
-seconds, Deputy closes the connection and you need to start a new one.
+all R, Python and SQL state (pass `session = "name"` to target a named
+session). If the restarted worker isn't ready within 2.5 seconds, Deputy closes
+the connection and you need to start a new one.
 
-MCP Console records every call, with its output and plots, under
-`.agents/console/sessions/` in the agent's working directory. Recordings aren't
-redacted and aren't deleted automatically; `console$status()$execution` gives
-the path.
+MCP Console records every call, note, output and plot under
+`.agents/console/sessions/` when `.agents/console` already exists in the
+agent's working directory, or otherwise under `$MCP_CONSOLE_HOME/sessions/`
+(`~/.agents/console/sessions/` by default). Recordings aren't redacted and
+aren't deleted automatically; `console$status()$execution$recordings` gives the
+path.

@@ -18,34 +18,42 @@ mcp_console_connection(
 \arguments{
 \item{agent}{The agent that owns the connection. Its working directory
 becomes the Console workspace, where the server starts, the sandbox's
-workspace is rooted, and MCP Console reads its project configuration and
-writes recordings.}
+workspace is rooted, and MCP Console checks for project configuration.}
 
-\item{command}{Path to an \code{mcp-console} executable, version 0.0.4. Defaults
+\item{command}{Path to an \code{mcp-console} executable, version 0.4.0. Defaults
 to the \code{DEPUTY_MCP_CONSOLE_BIN} environment variable. Deputy doesn't
 install the executable or search for it.}
 
 \item{args}{Extra arguments for \verb{mcp-console serve}. Only
-\verb{--writable-root PATH} and the overrides \verb{-c extends=:workspace},
-\verb{-c extends=:read-only} and \verb{-c sandbox.network=restricted} are accepted.
-Anything else, including \code{--no-sandbox}, is an error.}
+\verb{--writable-root PATH} and sandbox-preserving \code{-c} overrides
+(\code{sandbox.profile=workspace}, \code{sandbox.profile=read_only},
+\code{sandbox.network=restricted} / \code{false}, \code{r.resolution=disabled} / \code{fixed} /
+\code{explicit}, \code{python.resolution=fixed} / \code{explicit},
+\code{tool.parameters.requirements.enabled=false}, and positive integer
+\code{sessions.max}) are accepted. Anything else, including \code{--no-sandbox} and
+\code{tool.description}, is an error.}
 
 \item{env}{Optional named character vector of environment variables for the
 server. The server inherits only a few variables (such as \code{HOME}, \code{PATH}
-and the \code{R_LIBS} family), so set others here, for example \code{UV_CACHE_DIR}
-or \code{XDG_CACHE_HOME}. Without them, dependency installs write to caches
-under \code{HOME}.}
+and the \code{R_LIBS} family), so set others here, for example \code{UV_CACHE_DIR},
+\code{XDG_CACHE_HOME}, or \code{MCP_CONSOLE_HOME}. Without them, dependency installs
+and fallback recordings write under \code{HOME}.}
 
 \item{dependencies}{\code{"deny"} (the default) or \code{"allow"}. MCP Console can
-install packages that code needs, and it does so outside its sandbox,
-with the server's permissions. With \code{"deny"}, the connection errors if the
-server offers this, and calls that declare \code{requirements} are refused.
-See Details.}
+prepare packages that code needs using its separate resolver sandbox
+(which downloads packages from registries and writes caches). With
+\code{"deny"}, Deputy enforces non-preparing settings on launch
+(\code{r.resolution=disabled}, \verb{r.packages=[]}, \verb{languages=[r]}, and
+\code{tool.parameters.requirements.enabled=false}), verifies that \code{requirements},
+\code{python}, and \code{sql} are not exposed, and refuses any \code{requirements} call.
+Pass \code{"allow"} to use the full R, Python and SQL workbench with managed
+dependency preparation. See Details.}
 
 \item{project_config}{Set to \code{TRUE} to start even though the workspace
 contains \code{.agents/console/config.yaml}. That file can widen the sandbox,
-so by default the connection refuses to start when it exists. Review the
-file before you opt in.}
+so by default the connection refuses to start when it exists and passes
+\code{--no-project-config} to \verb{mcp-console serve}. Review the file before you
+opt in.}
 
 \item{timeout}{Maximum seconds for one MCP request.}
 
@@ -56,21 +64,22 @@ A \link{McpConnection}. Call its \verb{$close()} method when the conversation
 ends.
 }
 \description{
-Starts an \href{https://github.com/t-kalinowski/mcp-console}{MCP Console} server
+Starts an \href{https://github.com/posit-dev/mcp-console}{MCP Console} server
 for one agent and connects to it. MCP Console runs R, Python and DuckDB SQL
-in an OS sandbox and keeps their state for the conversation. Each connection
-starts its own server. Register \code{connection$tools()} on the agent so that
-the \code{send} tool goes through its permissions, hooks and limits.
+in an OS sandbox and keeps their state for the conversation, with optional
+named \code{session}s and recording \code{note}s. Each connection starts its own
+server. Register \code{connection$tools()} on the agent so that the \code{send} tool
+goes through its permissions, hooks and limits.
 }
 \details{
 \subsection{Supported versions}{
 
-Requires MCP Console 0.0.4 and mcptools 1.0.2 or 1.0.3. The connection
+Requires MCP Console 0.4.0 and mcptools 1.0.2 or 1.0.3. The connection
 checks the version with \code{command --version} before starting the server.
 After starting, it checks the arguments of \code{send} and the sandbox
 description MCP Console adds to it, and closes the connection unless the
-server uses its native sandbox with restricted networking (the default
-policy, or the \verb{:workspace} or \verb{:read-only} profile).
+server uses its native sandbox with restricted networking (\code{read_only} or
+\code{workspace} profile with private temporary storage).
 }
 
 \subsection{Permissions}{
@@ -82,12 +91,17 @@ annotations, so the cautious defaults also require \code{web = TRUE}.
 \code{requirements} also needs \code{install_packages = TRUE} and a connection created
 with \code{dependencies = "allow"}.
 
-With \code{dependencies = "allow"}, the server can also install packages on its
-own, outside the sandbox, when code calls \code{library()} for a missing package
-or imports a missing Python module. These installs can't be checked call by
-call. MCP Console offers dependency installs when \code{ir}, \code{uv} or a recent
-reticulate is available to it. The server's environment decides where they
-are written.
+By default in MCP Console 0.4.0, \code{requirements} is exposed, R resolves
+missing packages automatically on \code{library()} / \code{::}, and managed Python and
+DuckDB prepare runtimes and extensions in Console's separate resolver
+sandbox. With \code{dependencies = "deny"} (the default), Deputy passes trailing
+\code{-c} overrides (\code{r.resolution=disabled}, \verb{r.packages=[]}, \verb{languages=[r]},
+\code{tool.parameters.requirements.enabled=false}) so neither automatic
+resolution nor managed Python/SQL preparation can run, and closes the
+connection if \code{requirements}, \code{python}, or \code{sql} remain exposed. Pass
+\code{dependencies = "allow"} to enable the full R, Python and SQL workbench;
+automatic resolution then remains part of the host's connection-level
+decision and cannot be checked call by call.
 }
 
 \subsection{Long-running calls}{
@@ -100,8 +114,8 @@ the model this. Installs requested with \code{requirements}, restarts, and input
 sent to a stopped worker have no time limit in MCP Console. If one takes
 longer than the reply window, the connection closes with a
 \code{deputy_mcp_desynchronized} error and the session is lost. That is why only
-you can restart the session, with \code{\link[=mcp_console_control]{mcp_console_control()}}; the model's
-\code{send} refuses it.
+you can restart a session, with \code{\link[=mcp_console_control]{mcp_console_control()}}; the model's \code{send}
+refuses it.
 }
 
 \subsection{Closing and recordings}{
@@ -111,10 +125,11 @@ you can restart the session, with \code{\link[=mcp_console_control]{mcp_console_
 server without asking; MCP Console's sandbox runner then stops its worker.
 Processes that escape the runner are outside Deputy's control.
 
-MCP Console records every call, result and plot, without redaction, under
-\verb{.agents/console/sessions/<run-id>/} in the workspace. Version 0.0.4 can't
-change that location or how long recordings are kept. The path is reported
-in \verb{$status()$execution$recordings}; deleting old recordings is up to you.
+MCP Console records every call, note, result and plot, without redaction,
+under \verb{.agents/console/sessions/<run-id>/} when \code{.agents/console} already
+exists in the workspace, or otherwise under \verb{$MCP_CONSOLE_HOME/sessions/}
+(\verb{~/.agents/console/sessions/} by default). The directory is reported in
+\verb{$status()$execution$recordings}; deleting old recordings is up to you.
 }
 }
 \examples{
@@ -123,7 +138,11 @@ agent <- Agent$new(
   chat = ellmer::chat("openai/gpt-6.2-sol"),
   permissions = Permissions(bash = TRUE, web = TRUE)
 )
-console <- mcp_console_connection(agent, command = "/path/to/mcp-console")
+console <- mcp_console_connection(
+  agent,
+  command = "/path/to/mcp-console",
+  dependencies = "allow"
+)
 agent$register_tools(console$tools())
 # In a Shiny app: session$onSessionEnded(function() console$close())
 console$close()
