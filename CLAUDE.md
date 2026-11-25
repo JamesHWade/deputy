@@ -98,6 +98,7 @@ deputy/
 │   ├── tools-execution.R   # Trusted one-shot R and shell tools
 │   ├── subprocess-env.R    # Allow-listed environment for model-code subprocesses
 │   ├── tools-bundles.R     # Tool presets (minimal, standard, dev, data, full)
+│   ├── tools-commons.R     # Opt-in Commons 0.2.0 public search/measure adapter
 │   ├── tools-interactive.R # tool_ask_user for human-in-the-loop
 │   ├── tools-mcp.R         # MCP tool discovery through mcptools
 │   ├── mcp-connection.R    # Host-owned MCP connection and immutable admission lists
@@ -191,21 +192,27 @@ streaming response (ellmer's `req_perform_connection()` blocks R until
 headers arrive) or by sleeps. Run
 `devtools::test(filter = "background-tasks-example")`.
 
-`inst/examples/commons-subagents/` is the end-to-end Commons workflow for #238:
-actual `commons::commons()` chats as graph members (sales and ops from the root,
-an auditor under sales), strict `TrustedResults(measure = call_measure)` with
-Commons cut to `search_pool` + `call_measure` (one shared tool object), activity
-cards, saved subagent records and a Shiny app. `fixture.R` is a callr/httpuv
+`inst/examples/commons-subagents/` is the end-to-end Commons workflow for #238
+and #270: one model-free `commons::commons()` object (Commons >= 0.2.0) wrapped
+once with `tools_commons()` (`commons_search` and `commons_measure`) and shared
+across graph members (sales and ops from the root, an auditor under sales)
+under strict `TrustedResults(measure = tools$commons_measure)`, with activity
+cards, saved subagent records, saved receipt links and a Shiny app. No private
+tool extraction or metadata mutation; public Commons methods return R values
+rather than native SQL/bindings/`commons_tag`, so Deputy records bounded
+displays and receipts without fabricating query metadata while preserving
+existing saved records. `fixture.R` is a callr/httpuv
 OpenAI-compatible server keyed by model name (`commons-<role>`) with scripted
-replies, a scripted ops failure and a slow ops path for cancellation (five
-short search steps: ellmer 0.5.0 opens a stream with httr2's
-`req_perform_connection()`, which blocks R until response headers arrive, so a
-reply delayed whole would freeze the app and the cancel click with it). Run
-`devtools::test(filter = "commons-subagents-example")`; it covers concurrency,
-the grandchild, repeated names, partial failure, cancellation, reopened
-conversations with zero re-execution, failed delivery and refused Commons
+replies, an unsupported-question path, a scripted ops failure and a slow ops
+path for cancellation (five short search steps: ellmer 0.5.0 opens a stream
+with httr2's `req_perform_connection()`, which blocks R until response headers
+arrive, so a reply delayed whole would freeze the app and the cancel click with
+it). Run `devtools::test(filter = "commons-subagents-example")`; it covers
+concurrency, the grandchild, repeated names, unsupported questions, partial
+failure, cancellation, reopened conversations with identical receipt links and
+displays and zero re-execution, failed delivery and refused Commons
 configurations. `dev/browser/commons-subagents.js` drives the running app in
-Chromium with Playwright (22 checks; see `dev/browser/README.md`); it found the
+Chromium with Playwright (see `dev/browser/README.md`); it found the
 app's `on_result` reading a reactiveVal outside a reactive context, which the
 fixture's scripted replies hid from the R tests.
 

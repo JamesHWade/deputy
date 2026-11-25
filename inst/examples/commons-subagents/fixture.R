@@ -103,14 +103,14 @@ commons_local_fixture <- function(delay = 0.1, slow = 1) {
       measure <- function(name, n) {
         list(
           id = paste0("call_", n),
-          name = "call_measure",
+          name = "commons_measure",
           arguments = list(name = name, arguments = "{}")
         )
       }
       search <- function(query, n) {
         list(
           id = paste0("call_", n),
-          name = "search_pool",
+          name = "commons_search",
           arguments = list(query = query)
         )
       }
@@ -128,7 +128,21 @@ commons_local_fixture <- function(delay = 0.1, slow = 1) {
         n <- done + 1L
         switch(
           role,
-          root = if (grepl("again", task, ignore.case = TRUE)) {
+          root = if (grepl("inventory", task, ignore.case = TRUE)) {
+            if (done == 0L) {
+              list(
+                calls = list(route(
+                  "ask_ops",
+                  "Check inventory turnover.",
+                  n
+                ))
+              )
+            } else {
+              list(
+                text = "ROOT: No approved calculation covers inventory turnover."
+              )
+            }
+          } else if (grepl("again", task, ignore.case = TRUE)) {
             if (done == 0L) {
               list(calls = list(route("ask_sales", "Total revenue only.", n)))
             } else {
@@ -187,7 +201,15 @@ commons_local_fixture <- function(delay = 0.1, slow = 1) {
               )
             )
           },
-          ops = if (grepl("SLOW", task, fixed = TRUE)) {
+          ops = if (grepl("inventory", task, ignore.case = TRUE)) {
+            if (done == 0L) {
+              list(calls = list(search("inventory turnover", n)))
+            } else {
+              list(
+                text = "OPS: No approved calculation covers inventory turnover."
+              )
+            }
+          } else if (grepl("SLOW", task, fixed = TRUE)) {
             Sys.sleep(slow)
             if (done < 5L) {
               list(calls = list(search("shipments", n)))

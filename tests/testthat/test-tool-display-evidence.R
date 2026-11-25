@@ -830,16 +830,28 @@ test_that("a Commons display and tag survive retained inspection", {
     runtime_reply("Total revenue is 60.")
   ))
   sales <- data.frame(region = c("north", "south"), revenue = c(25, 35))
-  analyst <- commons::commons(
-    runtime_chat(sales_server),
-    data_sources = commons::data_source(sales = sales),
-    semantic_layer = commons::semantic_layer(commons::measure(
-      "total_revenue",
-      "Total revenue across regions.",
-      function() sum(sales$revenue),
-      arguments = list()
-    ))
-  )
+  sales_source <- commons::data_source(sales = sales)
+  sales_layer <- commons::semantic_layer(commons::measure(
+    "total_revenue",
+    "Total revenue across regions.",
+    function() sum(sales$revenue),
+    arguments = list()
+  ))
+  analyst <- if (utils::packageVersion("commons") >= numeric_version("0.2.0")) {
+    commons::agent(
+      runtime_chat(sales_server),
+      commons = commons::commons(
+        data_sources = sales_source,
+        semantic_layer = sales_layer
+      )
+    )
+  } else {
+    commons::commons(
+      runtime_chat(sales_server),
+      data_sources = sales_source,
+      semantic_layer = sales_layer
+    )
+  }
   kept <- analyst$get_tools()[c("search_pool", "call_measure")]
   kept <- lapply(kept, function(tool) {
     tool@annotations$open_world_hint <- FALSE

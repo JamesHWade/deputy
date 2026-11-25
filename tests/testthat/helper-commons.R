@@ -1,11 +1,15 @@
-# commons builds a chat only where it can sandbox its `run_r` tool (macOS, or
-# Linux with seccomp and Landlock or user namespaces). Elsewhere, Windows
-# included, it refuses before a chat's tools can be chosen.
+# Commons 0.2.0 separates the model-free `commons()` object (which works on
+# every platform) from `agent()`, which still needs an OS sandbox for `run_r`
+# (macOS, or Linux with seccomp and Landlock or user namespaces).
+skip_if_no_commons <- function() {
+  skip_if_not_installed("commons", "0.2.0")
+}
+
 skip_if_commons_refuses <- function() {
   skip_if_not_installed("commons")
   refusal <- commons_refusal()
   if (!is.null(refusal)) {
-    skip(paste("commons refuses to build a chat here:", refusal))
+    skip(paste("commons refuses to build an agent chat here:", refusal))
   }
 }
 
@@ -16,15 +20,21 @@ commons_refusal <- local({
     if (!probed) {
       message <- tryCatch(
         {
-          commons::commons(
-            ellmer::chat_openai_compatible(
-              base_url = "http://127.0.0.1:9/v1",
-              credentials = function() "probe",
-              model = "probe",
-              echo = "none"
-            ),
-            data_sources = commons::data_source(probe = data.frame(x = 1))
+          probe_chat <- ellmer::chat_openai_compatible(
+            base_url = "http://127.0.0.1:9/v1",
+            credentials = function() "probe",
+            model = "probe",
+            echo = "none"
           )
+          source <- commons::data_source(probe = data.frame(x = 1))
+          if (utils::packageVersion("commons") >= numeric_version("0.2.0")) {
+            commons::agent(
+              probe_chat,
+              commons = commons::commons(data_sources = source)
+            )
+          } else {
+            commons::commons(probe_chat, data_sources = source)
+          }
           NULL
         },
         error = conditionMessage

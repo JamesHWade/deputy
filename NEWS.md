@@ -1,5 +1,17 @@
 # deputy (development version)
 
+* `tools_commons(commons)` wraps the public `$search()` and `$measure()`
+  methods of a model-free `commons::commons()` object (**commons** >= 0.2.0) as
+  `commons_search` and `commons_measure` without exposing arbitrary SQL or R
+  execution or mutating tool metadata. Construct the bundle once and share it
+  across a lead agent and specialists under `TrustedResults(measure = tools$commons_measure)`.
+  Public Commons methods return R values rather than native `commons::agent()`
+  query evidence (`commons_tag`, SQL, bindings), so Deputy records bounded
+  displays and receipts without fabricating query metadata while preserving
+  existing saved records. The `commons-subagents` example now uses the released
+  Commons 0.2.0 API and exercises unsupported questions and saved receipt links
+  (#270).
+
 * `mcp_console_connection()` now targets
   [posit-dev/mcp-console](https://github.com/posit-dev/mcp-console) 0.4.0,
   accepting its `session` and `note` fields, `sandbox.profile=workspace|read_only`

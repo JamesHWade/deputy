@@ -19,7 +19,7 @@ Roxygen: list(markdown = TRUE)
 Suggests:
     bslib,
     commonmark,
-    commons,
+    commons (>= 0.2.0),
     DT,
     flextable,
     gt,
@@ -161,6 +161,7 @@ Collate:
     'tool-rich-results.R'
     'tool-runtime.R'
     'tools-bundles.R'
+    'tools-commons.R'
     'tools-documents.R'
     'tools-execution.R'
     'tools-files.R'
