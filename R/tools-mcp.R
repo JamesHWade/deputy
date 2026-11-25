@@ -159,7 +159,7 @@ validate_mcp_repl_sandbox_server <- function(server, sandbox) {
 #'   sandbox = "workspace-write"
 #' )
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("openai/gpt-6-luna"),
+#'   chat = ellmer::chat("openai/gpt-6.2-sol"),
 #'   tools = repl_tools,
 #'   permissions = Permissions(web = FALSE)
 #' )
@@ -280,7 +280,7 @@ tools_mcp_repl <- function(
 #'
 #' # Create an agent with MCP tools
 #' agent <- Agent$new(
-#'   chat = ellmer::chat("anthropic/claude-sonnet-5"),
+#'   chat = ellmer::chat("anthropic/claude-sonnet-5-5"),
 #'   tools = c(tools_file(), mcp_tools),
 #'   permissions = Permissions(web = TRUE)
 #' )

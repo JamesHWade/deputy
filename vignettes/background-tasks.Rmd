@@ -40,19 +40,19 @@ Retain each specialist, then give the lead the task tools with
 library(deputy)
 
 lead <- Agent$new(
-  chat = ellmer::chat("anthropic/claude-sonnet-5"),
+  chat = ellmer::chat("anthropic/claude-opus-5-5"),
   system_prompt = "You write batch reports with help from two specialists.",
   usage_limits = UsageLimits(max_requests = 30)
 )
 
 analyst <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_data(),
   permissions = permissions_readonly(),
   system_prompt = "You analyse measurement files and explain your reasoning."
 )
 reviewer <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("google_gemini/gemini-4-neon"),
   tools = tools_preset("minimal"),
   permissions = permissions_readonly(),
   system_prompt = "You review draft reports against the style guide."

@@ -285,7 +285,7 @@ abort_request_limit <- function(
 #' abort_provider(
 #'   c("API error from {.val {provider_name}}", "x" = "Rate limit exceeded"),
 #'   provider_name = "openai",
-#'   model = "gpt-6-luna"
+#'   model = "gpt-6.2-sol"
 #' )
 #' }
 #'

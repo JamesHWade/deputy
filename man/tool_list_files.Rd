@@ -32,7 +32,7 @@ A tool that lists the files and directories in a directory, with sizes.
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = list(tool_list_files)
 )
 }

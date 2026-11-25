@@ -57,7 +57,7 @@ Imports:
     cli,
     coro (>= 1.1.0.9000),
     digest,
-    ellmer (>= 0.5.0),
+    ellmer (>= 0.5.2),
     filelock (>= 1.0.3),
     evaluate,
     grDevices,

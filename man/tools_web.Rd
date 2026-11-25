@@ -37,13 +37,13 @@ set \code{web = TRUE}, list the tool names in \code{tool_allowlist}, and have no
 \dontrun{
 # Default tools, for any provider
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_web(),
   permissions = Permissions(web = TRUE)
 )
 
 # Anthropic's own web tools
-chat <- ellmer::chat("anthropic/claude-sonnet-5")
+chat <- ellmer::chat("anthropic/claude-sonnet-5-5")
 agent <- Agent$new(
   chat = chat,
   tools = tools_web(chat),

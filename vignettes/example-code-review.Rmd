@@ -75,7 +75,7 @@ The lead decides what to ask each reviewer and merges their answers:
 
 ```{r create-lead}
 lead <- LeadAgent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   sub_agents = list(bug_hunter, style_reviewer, doc_checker),
   system_prompt = "You lead a code review. Give each specialist a clear,
     specific task, then merge their findings: remove duplicates, sort by

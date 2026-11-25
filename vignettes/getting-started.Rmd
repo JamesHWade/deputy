@@ -27,13 +27,17 @@ Install Deputy from GitHub:
 pak::pak("JamesHWade/deputy")
 ```
 
-The examples use OpenAI's `gpt-6-luna`, so they need `OPENAI_API_KEY`. Put it
+The examples use OpenAI's `gpt-6.2-sol`, so they need `OPENAI_API_KEY`. Put it
 in your `.Renviron` file (`usethis::edit_r_environ()` opens it) and restart R.
-Keep keys out of scripts and version control.
+Keep keys out of scripts and version control. If you enforce `max_cost_usd`
+with a model newer than ellmer's bundled price table, run
+`ellmer::models_update_prices()` first.
 
 To use another provider, pass a different
-[ellmer chat](https://ellmer.tidyverse.org/reference/index.html). Deputy uses
-whatever model and settings that chat has.
+[ellmer chat](https://ellmer.tidyverse.org/reference/index.html) such as
+`ellmer::chat("anthropic/claude-sonnet-5-5")` or
+`ellmer::chat("google_gemini/gemini-4-neon")`. Deputy uses whatever model and
+settings that chat has.
 
 ## Create an agent
 
@@ -45,7 +49,7 @@ library(deputy)
 workspace <- normalizePath(getwd(), winslash = "/", mustWork = TRUE)
 
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_preset("minimal"),
   permissions = permissions_readonly(),
   usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),
@@ -134,7 +138,7 @@ can't run R or shell code, use the web or install packages.
 
 ```{r write-agent, eval = FALSE}
 write_agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   tools = tools_file(),
   permissions = Permissions(file_write = workspace),
   usage_limits = UsageLimits(max_requests = 6, max_tool_calls = 8),

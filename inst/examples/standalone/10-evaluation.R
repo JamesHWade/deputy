@@ -13,7 +13,7 @@ cases <- data.frame(
 rows <- lapply(seq_len(nrow(cases)), function(i) {
   agent <- Agent$new(
     ellmer::chat_openai(
-      model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-6-luna")
+      model = Sys.getenv("DEPUTY_EXAMPLE_MODEL", "gpt-6.2-sol")
     ),
     permissions = permissions_readonly(),
     usage_limits = UsageLimits(max_requests = 2),

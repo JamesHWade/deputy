@@ -819,7 +819,7 @@ LeadAgent <- R6::R6Class(
           }
         )
       } else {
-        # Use the specified model string (e.g., "openai/gpt-6-luna", "anthropic/claude-sonnet-5")
+        # Use the specified model string (e.g., "openai/gpt-6.2-sol", "anthropic/claude-sonnet-5-5")
         sub_chat <- tryCatch(
           ellmer::chat(
             def$model,

@@ -120,7 +120,7 @@ in \verb{$status()$execution$recordings}; deleting old recordings is up to you.
 \examples{
 \dontrun{
 agent <- Agent$new(
-  chat = ellmer::chat("openai/gpt-6-luna"),
+  chat = ellmer::chat("openai/gpt-6.2-sol"),
   permissions = Permissions(bash = TRUE, web = TRUE)
 )
 console <- mcp_console_connection(agent, command = "/path/to/mcp-console")

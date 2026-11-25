@@ -30,9 +30,12 @@ calls count too.}
 \item{max_total_tokens}{Maximum input plus output tokens. Cached input
 tokens are reported separately and aren't added again.}
 
-\item{max_cost_usd}{Maximum estimated cost in US dollars. If the cost of a
-response is unknown, the run stops with \code{"cost_unavailable"} rather than
-guessing, unless \code{on_unknown_cost = "continue"}.}
+\item{max_cost_usd}{Maximum estimated cost in US dollars. Cost comes from
+ellmer's price table; for models newer than your installed ellmer's
+bundled table (such as \code{gpt-6.2-sol} or \code{gemini-4-neon} on ellmer 0.5.2),
+run \code{\link[ellmer:models_update_prices]{ellmer::models_update_prices()}} first. If the cost of a response is
+unknown, the run stops with \code{"cost_unavailable"} rather than guessing,
+unless \code{on_unknown_cost = "continue"}.}
 
 \item{on_exceed}{What happens when a limit is reached. \code{"stop"} (the
 default) ends the run and returns an \link{AgentResult} whose \code{stop_reason}

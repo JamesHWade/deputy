@@ -82,9 +82,9 @@ can each overshoot them by one response.
 
 \examples{
 \dontrun{
-lead <- Agent$new(ellmer::chat("anthropic/claude-sonnet-5"))
+lead <- Agent$new(ellmer::chat("anthropic/claude-sonnet-5-5"))
 analyst <- adopt_chat(
-  ellmer::chat("openai/gpt-6-luna"),
+  ellmer::chat("openai/gpt-6.2-sol"),
   owner = lead,
   permissions = permissions_readonly(),
   usage_limits = UsageLimits(max_requests = 20),

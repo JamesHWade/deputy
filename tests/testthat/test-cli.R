@@ -138,12 +138,12 @@ test_that("CLI model defaults and overrides reach the real ellmer Chat", {
   )
 
   Rapp::run(cli_test_app(), "inspect files")
-  expect_identical(chat$get_model(), "gpt-5.6-luna")
+  expect_identical(chat$get_model(), "gpt-6.2-sol")
 
   Rapp::run(cli_test_app(), c("--provider", "openai", "inspect files"))
-  expect_identical(chat$get_model(), "gpt-5.6-luna")
+  expect_identical(chat$get_model(), "gpt-6.2-sol")
 
-  for (model in c("gpt-5.6-terra", "gpt-5.6-sol", "gpt-4o-mini")) {
+  for (model in c("gpt-6.1-terra", "gpt-6-luna", "gpt-4o-mini")) {
     Rapp::run(cli_test_app(), c("--model", model, "inspect files"))
     expect_identical(chat$get_model(), model)
     agent <- Agent$new(chat, tools = list())

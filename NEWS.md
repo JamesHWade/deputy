@@ -1,5 +1,13 @@
 # deputy (development version)
 
+* Deputy now requires `ellmer` (>= 0.5.2). Examples and documentation have been
+  refreshed for current Anthropic (`claude-sonnet-5-5`, `claude-opus-5-5`),
+  OpenAI (`gpt-6.2-sol`), and Google Gemini (`gemini-4-neon`) models, and the
+  CLI's OpenAI default is now `gpt-6.2-sol`. Cost limits (`max_cost_usd` /
+  `--max-cost`) still stop with `"cost_unavailable"` when a model is not in
+  ellmer's local price table; run `ellmer::models_update_prices()` to refresh
+  prices for models newer than ellmer's bundled table (#228).
+
 * Deputy temporarily uses development httr2 and its curl dependency so
   `Agent$stream_async()` and `Agent$chat_async()` can keep the R event loop
   responsive while waiting for a delayed response body. Waiting for
