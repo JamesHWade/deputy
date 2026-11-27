@@ -190,7 +190,7 @@ tool_read_file <- ellmer::tool(
       )
     }
 
-    tryCatch(
+    tool_reject_on_error(
       {
         if (!is_pdf) {
           return(paste(readLines(path, warn = FALSE), collapse = "\n"))
@@ -226,9 +226,7 @@ tool_read_file <- ellmer::tool(
           text = paste(selected_text, collapse = "\n\n--- page break ---\n\n")
         )
       },
-      error = function(e) {
-        ellmer::tool_reject(paste("Error reading file:", conditionMessage(e)))
-      }
+      "Error reading file:"
     )
   },
   name = "read_file",
@@ -271,7 +269,7 @@ tool_read_file <- ellmer::tool(
 #' @export
 tool_write_file <- ellmer::tool(
   fun = function(path, content, append = FALSE) {
-    tryCatch(
+    tool_reject_on_error(
       {
         # Ensure directory exists
         dir <- dirname(path)
@@ -287,9 +285,7 @@ tool_write_file <- ellmer::tool(
 
         paste("Successfully wrote", nchar(content), "characters to", path)
       },
-      error = function(e) {
-        ellmer::tool_reject(paste("Error writing file:", e$message))
-      }
+      "Error writing file:"
     )
   },
   name = "write_file",
@@ -336,7 +332,7 @@ tool_edit_file <- ellmer::tool(
       ellmer::tool_reject(paste("File not found:", path))
     }
 
-    tryCatch(
+    tool_reject_on_error(
       {
         updated <- replace_fixed_bytes(
           readBin(path, "raw", n = file.size(path)),
@@ -356,9 +352,7 @@ tool_edit_file <- ellmer::tool(
           )
         )
       },
-      error = function(e) {
-        ellmer::tool_reject(paste("Error editing file:", e$message))
-      }
+      "Error editing file:"
     )
   },
   name = "edit_file",
@@ -408,7 +402,7 @@ tool_multi_edit <- ellmer::tool(
       ellmer::tool_reject(paste("File not found:", path))
     }
 
-    tryCatch(
+    tool_reject_on_error(
       {
         operations <- parse_multi_edits(edits)
         bytes <- readBin(path, "raw", n = file.size(path))
@@ -439,9 +433,7 @@ tool_multi_edit <- ellmer::tool(
           )
         )
       },
-      error = function(e) {
-        ellmer::tool_reject(paste("Error applying edits:", conditionMessage(e)))
-      }
+      "Error applying edits:"
     )
   },
   name = "multi_edit",
@@ -500,7 +492,7 @@ tool_list_files <- ellmer::tool(
       ellmer::tool_reject(paste("Directory not found:", path))
     }
 
-    tryCatch(
+    tool_reject_on_error(
       {
         files <- list.files(
           path = path,
@@ -542,9 +534,7 @@ tool_list_files <- ellmer::tool(
           collapse = "\n"
         )
       },
-      error = function(e) {
-        ellmer::tool_reject(paste("Error listing files:", e$message))
-      }
+      "Error listing files:"
     )
   },
   name = "list_files",
@@ -597,7 +587,7 @@ tool_list_files <- ellmer::tool(
 #' @export
 tool_glob_files <- ellmer::tool(
   fun = function(pattern = "*", path = ".", recursive = TRUE) {
-    tryCatch(
+    tool_reject_on_error(
       {
         matches <- glob_relative_paths(
           path = path,
@@ -619,9 +609,7 @@ tool_glob_files <- ellmer::tool(
           collapse = "\n"
         )
       },
-      error = function(e) {
-        ellmer::tool_reject(paste("Error globbing files:", e$message))
-      }
+      "Error globbing files:"
     )
   },
   name = "glob_files",
@@ -675,7 +663,7 @@ tool_grep_files <- ellmer::tool(
     ignore_case = FALSE,
     max_matches = 100
   ) {
-    tryCatch(
+    tool_reject_on_error(
       {
         rel_paths <- glob_relative_paths(
           path = path,
@@ -747,9 +735,7 @@ tool_grep_files <- ellmer::tool(
           collapse = "\n"
         )
       },
-      error = function(e) {
-        ellmer::tool_reject(paste("Error searching files:", e$message))
-      }
+      "Error searching files:"
     )
   },
   name = "grep_files",
@@ -807,7 +793,7 @@ tool_read_csv <- ellmer::tool(
       ellmer::tool_reject(paste("File not found:", path))
     }
 
-    tryCatch(
+    tool_reject_on_error(
       {
         # Use readr if available, otherwise base R
         if (rlang::is_installed("readr")) {
@@ -842,9 +828,7 @@ tool_read_csv <- ellmer::tool(
 
         paste(summary_lines, collapse = "\n")
       },
-      error = function(e) {
-        ellmer::tool_reject(paste("Error reading CSV:", e$message))
-      }
+      "Error reading CSV:"
     )
   },
   name = "read_csv",

@@ -32,7 +32,7 @@
 #' @export
 tool_web_fetch <- ellmer::tool(
   fun = function(url) {
-    tryCatch(
+    tool_reject_on_error(
       {
         # Fetch the page
         resp <- httr2::request(url) |>
@@ -72,9 +72,7 @@ tool_web_fetch <- ellmer::tool(
           "\n</web_page>"
         )
       },
-      error = function(e) {
-        ellmer::tool_reject(paste("Error fetching URL:", e$message))
-      }
+      "Error fetching URL:"
     )
   },
   name = "web_fetch",
@@ -118,7 +116,7 @@ tool_web_fetch <- ellmer::tool(
 #' @export
 tool_web_search <- ellmer::tool(
   fun = function(query, num_results = 10) {
-    tryCatch(
+    tool_reject_on_error(
       {
         # Use DuckDuckGo HTML search
         search_url <- paste0(
@@ -169,9 +167,7 @@ tool_web_search <- ellmer::tool(
           paste(formatted, collapse = "\n\n")
         )
       },
-      error = function(e) {
-        ellmer::tool_reject(paste("Error performing search:", e$message))
-      }
+      "Error performing search:"
     )
   },
   name = "web_search",

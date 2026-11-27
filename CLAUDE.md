@@ -105,7 +105,9 @@ deputy/
 │   ├── tool-invocation.R  # Governed nested tool admission and invocation
 │   ├── r-session-result.R # Native ellmer content and portable display evidence
 │   ├── tool-rich-results.R # Independent native text and image context bounds
-│   ├── tool-runtime.R      # Runtime tool wrapping, native markers and result offloading
+│   ├── tool-runtime.R      # Runtime tool wrapping, ownership checks and path resolution
+│   ├── tool-result-store.R # Offloaded tool-result storage, manifests and validation
+│   ├── tool-result-reader.R # Offloaded tool-result references, previews and chunk reader
 │   ├── tool-request-validation.R # Provider tool request validation
 │   ├── tools-execution.R   # Trusted one-shot R and shell tools
 │   ├── subprocess-env.R    # Allow-listed environment for model-code subprocesses

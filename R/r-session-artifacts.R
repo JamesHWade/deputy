@@ -11,27 +11,60 @@ r_session_artifact_abort <- function(message, parent = NULL) {
   )
 }
 
-r_session_artifact_config <- function(directory, owner_id, owner) {
+r_session_store_config <- function(
+  directory,
+  owner_id,
+  dir_arg,
+  owner_arg,
+  abort_fn,
+  owner_message = paste0(
+    "{.arg ",
+    owner_arg,
+    "} must be one non-empty string of at most 4096 bytes."
+  )
+) {
   if (is.null(directory) && is.null(owner_id)) {
     return(NULL)
   }
   if (!is_nonempty_string(directory) || !dir.exists(directory)) {
-    r_session_artifact_abort(
-      "{.arg artifact_dir} must be an existing directory."
-    )
+    abort_fn("{.arg {dir_arg}} must be an existing directory.")
   }
   if (!is_nonempty_string(owner_id) || nchar(owner_id, "bytes") > 4096L) {
-    r_session_artifact_abort(
-      "{.arg artifact_owner_id} must be one nonempty string of at most 4096 bytes."
-    )
+    abort_fn(owner_message)
+  }
+  list(
+    directory = normalizePath(directory, winslash = "/", mustWork = TRUE),
+    owner_id = unname(owner_id)
+  )
+}
+
+r_session_store_verify_dir <- function(config, label, abort_fn) {
+  directory <- normalizePath(config$directory, winslash = "/", mustWork = FALSE)
+  if (!dir.exists(directory) || !identical(directory, config$directory)) {
+    abort_fn("The R session {label} directory has changed.")
+  }
+  directory
+}
+
+r_session_artifact_config <- function(directory, owner_id, owner) {
+  base <- r_session_store_config(
+    directory = directory,
+    owner_id = owner_id,
+    dir_arg = "artifact_dir",
+    owner_arg = "artifact_owner_id",
+    abort_fn = r_session_artifact_abort,
+    owner_message = "{.arg artifact_owner_id} must be one nonempty string of at most 4096 bytes."
+  )
+  if (is.null(base)) {
+    return(NULL)
   }
   identity <- jsonlite::toJSON(unname(c(
-    owner_id,
+    base$owner_id,
     owner$agent_id,
     owner$session_id
   )))
   list(
-    directory = normalizePath(directory, winslash = "/", mustWork = TRUE),
+    directory = base$directory,
     scope = r_session_artifact_digest(as.character(identity))
   )
 }
@@ -49,10 +82,11 @@ r_session_artifact_path <- function(config, id) {
   if (!is_nonempty_string(id) || !grepl("^r_artifact_[0-9a-f]{64}$", id)) {
     r_session_artifact_abort("The R session artifact ID is invalid.")
   }
-  directory <- normalizePath(config$directory, winslash = "/", mustWork = FALSE)
-  if (!dir.exists(directory) || !identical(directory, config$directory)) {
-    r_session_artifact_abort("The R session artifact directory has changed.")
-  }
+  directory <- r_session_store_verify_dir(
+    config,
+    "artifact",
+    r_session_artifact_abort
+  )
   file.path(directory, paste0(config$scope, "-", id, ".html"))
 }
 

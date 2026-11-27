@@ -239,7 +239,7 @@ ask_user_tool_impl <- function(
       error_class <- paste(class(e), collapse = ", ")
       ellmer::tool_reject(paste0(
         "Failed to get user input: ",
-        e$message,
+        conditionMessage(e),
         " [",
         error_class,
         "]"

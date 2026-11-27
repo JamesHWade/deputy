@@ -110,7 +110,7 @@ load_mcp_tools_result <- function(config, servers) {
     error = function(e) {
       error_class <- paste(class(e), collapse = ", ")
       # Escape braces in error message to prevent cli glue interpretation
-      safe_msg <- gsub("\\{", "{{", gsub("\\}", "}}", e$message))
+      safe_msg <- gsub("\\{", "{{", gsub("\\}", "}}", conditionMessage(e)))
       cli::cli_warn(c(
         "Failed to fetch MCP tools",
         "x" = safe_msg,
@@ -135,7 +135,7 @@ load_mcp_tools_result <- function(config, servers) {
           error = function(e) {
             cli::cli_warn(c(
               "Could not read name from MCP tool {.val {i}}",
-              "x" = e$message
+              "x" = conditionMessage(e)
             ))
             paste0("<unknown_", i, ">")
           }
@@ -216,7 +216,7 @@ agent_load_mcp <- function(
         cli::cli_abort(
           c(
             "Failed to register MCP tools",
-            "x" = e$message,
+            "x" = conditionMessage(e),
             "i" = "Check for tool name conflicts with existing tools"
           ),
           call = call
@@ -237,7 +237,7 @@ agent_load_mcp <- function(
           error = function(e) {
             cli::cli_warn(c(
               "Could not read name from MCP tool {.val {i}}",
-              "x" = e$message
+              "x" = conditionMessage(e)
             ))
             paste0("<unknown_", i, ">")
           }

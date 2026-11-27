@@ -41,6 +41,9 @@ remain stable as these internal modules evolve.
 | Governed asynchronous compaction requests and recovery | `R/compaction-run.R` |
 | Permission/hook callbacks and upstream tool content extraction | `R/agent-tool-callbacks.R` |
 | Tool adaptation, execution, trusted delivery and offloading | `R/agent-tool-execution.R` |
+| Runtime tool wrapping, ownership checks and path resolution | `R/tool-runtime.R` |
+| Offloaded tool-result storage, manifests and integrity validation | `R/tool-result-store.R` |
+| Offloaded tool-result references, previews and chunk reader | `R/tool-result-reader.R` |
 | Tool call records and delegation correlation | `R/agent-tool-records.R` |
 | Public ellmer request callbacks and explicit Chat selection | `R/agent-requests.R` |
 | Ellmer structured requests and finite application corrections | `R/structured-run.R` |
@@ -124,8 +127,6 @@ These files have since grown past 1,000 lines and have no agreed exception
 | `R/delegation-activity.R` | 1,279 |
 | `R/agents-multi.R` | 1,126 |
 | `R/delegation-inspection.R` | 1,197 |
-| `R/tool-runtime.R` | 1,097 |
-| `R/r-session.R` | 1,071 |
 
 Split each along its responsibility boundaries, or record an exception here
 with the reason, as for `R/agent.R`. Count with `wc -l R/*.R | sort -n`.

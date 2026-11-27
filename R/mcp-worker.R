@@ -290,17 +290,12 @@ validate_mcp_tool_owner <- function(
   agent,
   run_context = agent$run_context
 ) {
-  source <- runtime_source_tool(tool)
-  owner <- attr(source, "deputy_mcp_owner", exact = TRUE)
-  if (
-    !is.null(owner) &&
-      !identical(owner, mcp_connection_owner(agent, run_context))
-  ) {
-    tool_registration_error(
-      "The MCP connection belongs to a different Agent, session or run context."
-    )
-  }
-  invisible(NULL)
+  validate_owned_tool(
+    tool,
+    owner_attr = "deputy_mcp_owner",
+    expected_owner = mcp_connection_owner(agent, run_context),
+    message = "The MCP connection belongs to a different Agent, session or run context."
+  )
 }
 
 mcp_condition_inherits <- function(condition, class) {
@@ -337,14 +332,10 @@ mcp_desynchronized_error <- function(server, parent) {
 }
 
 cancel_active_mcp_tools <- function(tools, agent, run_context) {
-  owner <- mcp_connection_owner(agent, run_context)
-  for (tool in tools) {
-    source <- runtime_source_tool(tool)
-    if (!identical(attr(source, "deputy_mcp_owner", exact = TRUE), owner)) {
-      next
-    }
-    cancel <- attr(source, "deputy_mcp_cancel_active", exact = TRUE)
-    if (is.function(cancel)) cancel()
-  }
-  invisible(NULL)
+  cancel_owned_tools(
+    tools,
+    owner_attr = "deputy_mcp_owner",
+    cancel_attr = "deputy_mcp_cancel_active",
+    expected_owner = mcp_connection_owner(agent, run_context)
+  )
 }

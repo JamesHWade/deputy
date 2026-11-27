@@ -59,6 +59,19 @@ runtime_source_tool <- function(tool) {
   attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
 }
 
+# Run a tool body and convert unexpected errors into ellmer tool rejections.
+tool_reject_on_error <- function(expr, prefix) {
+  tryCatch(
+    expr,
+    error = function(e) {
+      if (inherits(e, "ellmer_tool_reject")) {
+        rlang::cnd_signal(e)
+      }
+      ellmer::tool_reject(paste(prefix, conditionMessage(e)))
+    }
+  )
+}
+
 # Validate a positive whole-number integer option (optionally NULL).
 validate_positive_int <- function(
   value,

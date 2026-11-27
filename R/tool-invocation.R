@@ -1,7 +1,6 @@
 # Governed host invocation from a persistent R session.
 
 r_session_tool_argument_max_bytes <- 1024^2
-r_session_tool_result_max_bytes <- 8 * 1024^2
 
 r_session_tool_dispatch_abort <- function(
   message,
@@ -125,13 +124,6 @@ r_session_tool_notify <- function(private, message, record, ...) {
   )
 }
 
-r_session_tool_argument_size <- function(arguments) {
-  tryCatch(
-    length(serialize(arguments, NULL, version = 3)),
-    error = function(error) NA_real_
-  )
-}
-
 r_session_tool_validate_arguments <- function(arguments) {
   if (!is.list(arguments) || is.object(arguments)) {
     r_session_tool_dispatch_abort(
@@ -139,35 +131,28 @@ r_session_tool_validate_arguments <- function(arguments) {
     )
   }
   approval_validate_inputs(arguments)
-  bytes <- r_session_tool_argument_size(arguments)
-  if (
-    is.na(bytes) ||
-      !is.finite(bytes) ||
-      bytes > r_session_tool_argument_max_bytes
-  ) {
-    r_session_tool_dispatch_abort(c(
+  r_session_tool_check_size(
+    arguments,
+    max_bytes = r_session_tool_argument_max_bytes,
+    oversize_message = c(
       "Nested R session tool arguments exceed the 1 MiB transfer bound.",
       "i" = "Pass a bounded JSON record and keep large values in a host-owned artifact."
-    ))
-  }
+    ),
+    abort_fn = r_session_tool_dispatch_abort
+  )
   arguments
 }
 
 r_session_tool_validate_result_size <- function(value) {
-  bytes <- tryCatch(
-    length(serialize(value, NULL, version = 3)),
-    error = function(error) NA_real_
-  )
-  if (
-    is.na(bytes) ||
-      !is.finite(bytes) ||
-      bytes > r_session_tool_result_max_bytes
-  ) {
-    r_session_tool_dispatch_abort(c(
+  r_session_tool_check_size(
+    value,
+    max_bytes = r_session_tool_max_result_bytes,
+    oversize_message = c(
       "Nested R session tool result exceeds the 8 MiB transfer bound.",
       "i" = "Return a bounded value or use Deputy's existing result offload path."
-    ))
-  }
+    ),
+    abort_fn = r_session_tool_dispatch_abort
+  )
   invisible(value)
 }
 
@@ -260,39 +245,21 @@ r_session_tool_dispatcher <- function(
   }
 
   registered <- private$.chat$get_tools()
-  selected <- lapply(tool_names, function(name) {
-    tool <- registered[[name]]
-    if (is.null(tool) || !inherits(tool, "ellmer::ToolDef")) {
-      r_session_tool_dispatch_abort(
-        "Nested R session tool {.val {name}} is not registered as a function tool."
-      )
-    }
-    source <- runtime_source_tool(tool)
-    if (!identical(source@name, name)) {
-      r_session_tool_dispatch_abort(
-        "Nested R session tool {.val {name}} does not have an exact registered executable."
-      )
-    }
-    if (isTRUE(source@convert)) {
-      r_session_tool_dispatch_abort(c(
-        "Nested R session tool {.val {name}} must use {.code convert = FALSE}.",
-        "i" = "The worker sends bounded raw JSON arguments; the tool validates its own domain inputs."
-      ))
-    }
-    if (
-      identical(name, "run_r_code") ||
-        identical(name, "run_bash") ||
-        !is.null(composition_tool_owner(tool)) ||
-        !is.null(composition_tool_owner(source)) ||
-        !is.null(attr(source, "deputy_r_session_owner", exact = TRUE))
-    ) {
-      r_session_tool_dispatch_abort(
-        "Nested R session dispatch cannot invoke recursive execution or composition tools."
-      )
-    }
-    list(tool = tool, source = source)
-  })
-  names(selected) <- tool_names
+  selected <- r_session_tool_admit(
+    registered = registered,
+    tool_names = tool_names,
+    abort_fn = function(message, ...) {
+      env <- list2env(list(...), parent = parent.frame())
+      r_session_tool_dispatch_abort(message, .envir = env)
+    },
+    missing_message = "Nested R session tool {.val {name}} is not registered as a function tool.",
+    convert_message = c(
+      "Nested R session tool {.val {name}} must use {.code convert = FALSE}.",
+      "i" = "The worker sends bounded raw JSON arguments; the tool validates its own domain inputs."
+    ),
+    disallowed_message = "Nested R session dispatch cannot invoke recursive execution or composition tools.",
+    require_exact_name = TRUE
+  )
 
   state <- new.env(parent = emptyenv())
   state$active <- list()

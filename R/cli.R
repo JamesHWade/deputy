@@ -265,7 +265,9 @@ cli_process_command <- function(input, agent) {
           cli::cli_alert_success("Session saved to {.path {path}}")
         },
         error = function(error) {
-          cli::cli_alert_danger("Failed to save session: {error$message}")
+          cli::cli_alert_danger(
+            "Failed to save session: {conditionMessage(error)}"
+          )
           cli::cli_alert_info("Check the path is writable: {.path {path}}")
         }
       )
@@ -296,7 +298,9 @@ cli_process_command <- function(input, agent) {
           )
         },
         error = function(error) {
-          cli::cli_alert_danger("Compaction failed: {error$message}")
+          cli::cli_alert_danger(
+            "Compaction failed: {conditionMessage(error)}"
+          )
         }
       )
       return(list(is_command = TRUE, action = "continue"))
@@ -352,7 +356,13 @@ cli_next_event <- function(generator) {
   tryCatch(
     generator(),
     error = function(error) {
-      if (grepl("generator has been exhausted", error$message, fixed = TRUE)) {
+      if (
+        grepl(
+          "generator has been exhausted",
+          conditionMessage(error),
+          fixed = TRUE
+        )
+      ) {
         return(coro::exhausted())
       }
       stop(error)
@@ -529,11 +539,15 @@ cli_run_interactive <- function(
       input_reader(cli::col_cyan("> ")),
       error = function(error) {
         if (
-          grepl("EOF|end of file|connection", error$message, ignore.case = TRUE)
+          grepl(
+            "EOF|end of file|connection",
+            conditionMessage(error),
+            ignore.case = TRUE
+          )
         ) {
           return(NULL)
         }
-        cli::cli_alert_warning("Input error: {error$message}")
+        cli::cli_alert_warning("Input error: {conditionMessage(error)}")
         NULL
       }
     )
@@ -621,7 +635,7 @@ deputy_cli_main <- function(config) {
     error = function(error) {
       cli::cli_abort(c(
         "Failed to connect to provider",
-        "x" = error$message,
+        "x" = conditionMessage(error),
         "i" = "Check your provider credentials and configuration"
       ))
     }

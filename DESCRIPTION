@@ -168,6 +168,8 @@ Collate:
     'tool-metadata.R'
     'tool-registration.R'
     'tool-request-validation.R'
+    'tool-result-reader.R'
+    'tool-result-store.R'
     'tool-rich-results.R'
     'tool-runtime.R'
     'tools-bundles.R'
