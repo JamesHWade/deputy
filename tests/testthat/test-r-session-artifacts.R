@@ -75,7 +75,6 @@ expect_rich_artifact <- function(result, expected = 1L) {
 
 expect_rich_producer <- function(code, package, renderer) {
   skip_if_not_installed(package)
-  skip_if_not_installed("htmltools")
   directory <- withr::local_tempdir("deputy-r-rich-work-")
   artifact_dir <- withr::local_tempdir("deputy-r-rich-store-")
   session <- RSession$new(
@@ -285,7 +284,6 @@ test_that("a rich result that exceeds the output budget is not published", {
 
 test_that("saved rich tool displays survive load and a fresh R process", {
   skip_if_not_installed("plotly")
-  skip_if_not_installed("callr")
   skip_if_not_installed("pkgload")
 
   directory <- withr::local_tempdir("deputy-r-rich-agent-work-")

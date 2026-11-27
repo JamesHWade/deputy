@@ -1,7 +1,4 @@
 test_that("an interrupt while a PermissionRequest hook is pending keeps the call denied", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   sandbox <- withr::local_tempdir(pattern = "deputy-promise-interrupt-")
   root <- file.path(sandbox, "root")
   outside <- file.path(sandbox, "outside")
@@ -41,9 +38,6 @@ test_that("an interrupt while a PermissionRequest hook is pending keeps the call
 })
 
 test_that("a tool waits for a PreToolUse hook's promise", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
     runtime_reply("final answer")
@@ -75,9 +69,6 @@ test_that("a tool waits for a PreToolUse hook's promise", {
 })
 
 test_that("a PreToolUse hook's promised denial rejects the call", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
     runtime_reply("final answer")
@@ -118,9 +109,6 @@ test_that("a PreToolUse hook's promised denial rejects the call", {
 })
 
 test_that("a PreToolUse hook's promised stop stops the run", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
     runtime_reply("final answer")
@@ -160,9 +148,6 @@ test_that("a PreToolUse hook's promised stop stops the run", {
 })
 
 test_that("a PreToolUse hook whose promise rejects or times out denies the call", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   run_with_hook <- function(hook_promise, promise_timeout = 60) {
     server <- local_runtime_server(list(
       runtime_reply(tool = "probe", arguments = list()),
@@ -220,9 +205,6 @@ test_that("a PreToolUse hook whose promise rejects or times out denies the call"
 })
 
 test_that("an interrupt while a PreToolUse hook is pending keeps the tool from running", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
     runtime_reply("final answer")
@@ -253,9 +235,6 @@ test_that("an interrupt while a PreToolUse hook is pending keeps the tool from r
 })
 
 test_that("a PermissionRequest hook's promised allow lets a denied call through", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   sandbox <- withr::local_tempdir(pattern = "deputy-promise-allow-")
   root <- file.path(sandbox, "root")
   outside <- file.path(sandbox, "outside")
@@ -292,9 +271,6 @@ test_that("a PermissionRequest hook's promised allow lets a denied call through"
 })
 
 test_that("a PermissionRequest hook whose promise does not settle in time leaves the call denied", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   sandbox <- withr::local_tempdir(pattern = "deputy-promise-timeout-")
   root <- file.path(sandbox, "root")
   outside <- file.path(sandbox, "outside")
@@ -362,9 +338,6 @@ test_that("plain-value tool hooks keep the tool events in order", {
 })
 
 test_that("the next model request waits for a PostToolUse hook's promise", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
     runtime_reply("final answer")
@@ -393,9 +366,6 @@ test_that("the next model request waits for a PostToolUse hook's promise", {
 })
 
 test_that("an interrupt while a PostToolUse hook is pending ends the run before the next request", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
     runtime_reply("final answer")
@@ -421,9 +391,6 @@ test_that("an interrupt while a PostToolUse hook is pending ends the run before 
 })
 
 test_that("a PostToolUse hook's promised stop ends the run before the next request", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
     runtime_reply("final answer")
@@ -451,9 +418,6 @@ test_that("a PostToolUse hook's promised stop ends the run before the next reque
 })
 
 test_that("a PostToolUse hook's promised output change reaches the tool_end event", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
     runtime_reply("final answer")
@@ -483,9 +447,6 @@ test_that("a PostToolUse hook's promised output change reaches the tool_end even
 })
 
 test_that("a PostToolUseFailure hook's promise is waited for before the next request", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
     runtime_reply("final answer")
@@ -517,9 +478,6 @@ test_that("a PostToolUseFailure hook's promise is waited for before the next req
 })
 
 test_that("a PostToolUse hook that answers after its run failed changes nothing in the next run", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   callbacks <- new.env(parent = emptyenv())
   callbacks$request <- function(request) invisible(NULL)
   callbacks$result <- function(result) invisible(NULL)
@@ -574,9 +532,6 @@ test_that("a PostToolUse hook that answers after its run failed changes nothing 
 })
 
 test_that("a stop that arrives while a PermissionRequest hook is pending wins over its allow", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   # A stream that does not end when the run is stopped: it waits for the
   # request callback as ellmer does, then runs the tool unless it was
   # rejected. So the run is still active when the hook answers.

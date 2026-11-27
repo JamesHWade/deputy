@@ -13,10 +13,13 @@ skip_if_mcptools_unqualified <- function() {
   )
 }
 
-mcp_test_config <- function(capabilities = c("tools", "resources", "prompts")) {
+mcp_test_config <- function(
+  capabilities = c("tools", "resources", "prompts"),
+  .local_envir = parent.frame()
+) {
   skip_if_mcptools_unqualified()
-  path <- tempfile(fileext = ".json")
-  log <- tempfile()
+  path <- withr::local_tempfile(fileext = ".json", .local_envir = .local_envir)
+  log <- withr::local_tempfile(.local_envir = .local_envir)
   file.create(log)
   jsonlite::write_json(
     list(
@@ -39,42 +42,18 @@ mcp_test_config <- function(capabilities = c("tools", "resources", "prompts")) {
 }
 
 mcp_test_await <- function(value, timeout = 10) {
-  done <- FALSE
-  result <- NULL
-  error <- NULL
-  promises::then(
-    value,
-    function(x) {
-      result <<- x
-      done <<- TRUE
-    },
-    function(e) {
-      error <<- e
-      done <<- TRUE
-    }
-  )
-  until <- Sys.time() + timeout
-  while (!done && Sys.time() < until) {
-    later::run_now(0.01)
-  }
-  if (!done) {
-    stop("MCP test promise did not settle.")
-  }
-  if (!is.null(error)) {
-    stop(error)
-  }
-  result
+  await_promise(value, timeout = timeout, label = "MCP test promise")
 }
 
 # A stdio server whose replies can outlast mcptools' ~4 s response window.
-mcp_slow_config <- function() {
+mcp_slow_config <- function(.local_envir = parent.frame()) {
   skip_if_mcptools_unqualified()
-  log <- tempfile()
+  log <- withr::local_tempfile(.local_envir = .local_envir)
   file.create(log)
   fixture <- normalizePath(test_path("fixtures", "mcp-slow.R"))
   rscript <- file.path(R.home("bin"), "Rscript")
   server <- list(command = rscript, args = list(fixture, log))
-  path <- tempfile(fileext = ".json")
+  path <- withr::local_tempfile(fileext = ".json", .local_envir = .local_envir)
   jsonlite::write_json(
     list(mcpServers = list(slow = server)),
     path,
@@ -89,14 +68,16 @@ mcp_slow_calls <- function(config) {
 
 # An executable that answers `--version` like MCP Console and otherwise serves
 # the MCP Console fixture. The version is read from the launch environment.
-mcp_console_fixture <- function() {
+mcp_console_fixture <- function(.local_envir = parent.frame()) {
   skip_if_mcptools_unqualified()
   skip_on_os("windows")
-  log <- tempfile()
+  log <- withr::local_tempfile(.local_envir = .local_envir)
   file.create(log)
   fixture <- normalizePath(test_path("fixtures", "mcp-console.R"))
-  bin <- tempfile("mcp-console-bin-")
-  dir.create(bin)
+  bin <- withr::local_tempdir(
+    pattern = "mcp-console-bin-",
+    .local_envir = .local_envir
+  )
   command <- file.path(bin, "mcp-console")
   writeLines(
     c(
@@ -116,8 +97,10 @@ mcp_console_fixture <- function() {
     command
   )
   Sys.chmod(command, "0755")
-  workspace <- tempfile("mcp-console-workspace-")
-  dir.create(workspace)
+  workspace <- withr::local_tempdir(
+    pattern = "mcp-console-workspace-",
+    .local_envir = .local_envir
+  )
   list(command = command, log = log, workspace = workspace)
 }
 

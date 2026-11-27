@@ -1056,9 +1056,6 @@ test_that("an exhausted allowance still permits a correlated denial without anot
 })
 
 test_that("a resumed approval waits for a current hook's promised denial", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   fixture <- local_approval_runtime()
   resumed <- fixture$make_agent()
   resumed$add_hook(HookMatcher(event = "PreToolUse", callback = function(...) {
@@ -1080,9 +1077,6 @@ test_that("a resumed approval waits for a current hook's promised denial", {
 })
 
 test_that("a resumed approval waits for a current hook's promised allow", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   fixture <- local_approval_runtime()
   resumed <- fixture$make_agent()
   effects_at_answer <- NULL

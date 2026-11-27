@@ -259,8 +259,6 @@ test_that("errors support parent chaining", {
 })
 
 test_that("abort_session_load is thrown by Agent$load_session", {
-  skip_if_not_installed("ellmer")
-
   # Create a mock agent
   mock_chat <- ellmer::chat_openai(model = "gpt-4o")
   agent <- Agent$new(chat = mock_chat)

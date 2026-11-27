@@ -398,9 +398,6 @@ test_that("a delegate batch fires SessionStart and UserPromptSubmit as before", 
 })
 
 test_that("a delegate batch waits for its SessionStart and UserPromptSubmit hooks", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   lead <- parallel_test_lead(state)
   log <- character()
@@ -454,9 +451,6 @@ test_that("a delegate batch waits for its SessionStart and UserPromptSubmit hook
 })
 
 test_that("an interrupt while a batch's SessionStart hook is pending starts no subagent", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   lead <- parallel_test_lead(state)
   fired <- character()

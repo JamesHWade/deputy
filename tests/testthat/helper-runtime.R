@@ -185,38 +185,7 @@ collect_agent_events <- function(generator) {
   events
 }
 
-collect_async_stream <- function(stream) {
-  result <- NULL
-  stream_error <- NULL
-  done <- FALSE
-
-  coro::async_collect(stream) |>
-    promises::then(function(value) {
-      result <<- value
-      done <<- TRUE
-    }) |>
-    promises::catch(function(cnd) {
-      stream_error <<- cnd
-      done <<- TRUE
-    })
-
-  for (i in seq_len(100)) {
-    if (done) {
-      break
-    }
-    later::run_now(0.01)
-  }
-
-  if (!done) {
-    stop("Async stream did not settle")
-  }
-  if (!is.null(stream_error)) {
-    stop(stream_error)
-  }
-  result
-}
-
-resolve_async_value <- function(promise, max_polls = 100L) {
+await_promise <- function(promise, timeout = 10, label = "Promise") {
   result <- NULL
   stream_error <- NULL
   done <- FALSE
@@ -231,19 +200,52 @@ resolve_async_value <- function(promise, max_polls = 100L) {
       done <<- TRUE
     })
 
-  for (i in seq_len(max_polls)) {
-    if (done) {
-      break
-    }
+  deadline <- Sys.time() + timeout
+  while (!done && Sys.time() < deadline) {
     later::run_now(0.01)
   }
   if (!done) {
-    stop("Async value did not settle")
+    cli::cli_abort("{label} did not settle within {timeout}s.")
   }
   if (!is.null(stream_error)) {
-    stop(stream_error)
+    rlang::cnd_signal(stream_error)
   }
   result
+}
+
+wait_until <- function(
+  condition,
+  timeout = 10,
+  label = "Condition",
+  interval = 0.01,
+  step = NULL
+) {
+  deadline <- Sys.time() + timeout
+  while (!isTRUE(condition())) {
+    if (Sys.time() >= deadline) {
+      cli::cli_abort("Timed out waiting for {label}.")
+    }
+    later::run_now(interval)
+    if (is.function(step)) {
+      step()
+    }
+  }
+  invisible(TRUE)
+}
+
+collect_async_stream <- function(stream, timeout = 10) {
+  await_promise(
+    coro::async_collect(stream),
+    timeout = timeout,
+    label = "Async stream"
+  )
+}
+
+resolve_async_value <- function(promise, max_polls = NULL, timeout = 10) {
+  if (!is.null(max_polls)) {
+    timeout <- max(timeout, max_polls * 0.01)
+  }
+  await_promise(promise, timeout = timeout, label = "Async value")
 }
 
 create_shiny_tool_chat <- function(tool_name, tool_input, execute = NULL) {
@@ -295,29 +297,6 @@ create_shiny_tool_chat <- function(tool_name, tool_input, execute = NULL) {
   }
 
   list(chat = chat, state = state)
-}
-
-create_checkpoint_callback_chat <- function() {
-  chat <- create_mock_chat("done")
-  request_callback <- NULL
-  result_callback <- NULL
-  original_request_callback <- chat$on_tool_request
-  original_result_callback <- chat$on_tool_result
-
-  chat$on_tool_request <- function(callback) {
-    request_callback <<- callback
-    original_request_callback(callback)
-  }
-  chat$on_tool_result <- function(callback) {
-    result_callback <<- callback
-    original_result_callback(callback)
-  }
-
-  list(
-    chat = chat,
-    request_callback = function() request_callback,
-    result_callback = function() result_callback
-  )
 }
 
 # A promise that resolves to `value` after `delay` seconds of the event loop.

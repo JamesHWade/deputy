@@ -257,7 +257,6 @@ test_that("tool_list_files handles empty directory", {
 
 test_that("tool_run_r_code executes code", {
   skip_on_cran()
-  skip_if_not_installed("callr")
   result <- tool_run_r_code("1 + 1")
   expect_true(grepl("2", result))
 })
@@ -270,14 +269,12 @@ test_that("tool_run_r_code describes its process boundary accurately", {
 
 test_that("tool_run_r_code captures output", {
   skip_on_cran()
-  skip_if_not_installed("callr")
   result <- tool_run_r_code("print('hello')")
   expect_true(grepl("hello", result))
 })
 
 test_that("tool_run_r_code handles errors", {
   skip_on_cran()
-  skip_if_not_installed("callr")
   result <- tool_run_r_code("stop('test error')")
   expect_true(grepl("Error", result) || grepl("error", result))
 })
@@ -412,16 +409,12 @@ test_that("tool_read_csv returns tool_reject for invalid CSV", {
 })
 
 test_that("tool_run_r_code handles syntax errors", {
-  skip_if_not_installed("callr")
-
   result <- tool_run_r_code("this is not valid R code {{{")
 
   # Should contain error information
   expect_true(grepl("Error|error", result, ignore.case = TRUE))
 })
 test_that("tool_run_r_code handles runtime errors", {
-  skip_if_not_installed("callr")
-
   result <- tool_run_r_code("stop('intentional error')")
 
   # Should contain error information
@@ -429,8 +422,6 @@ test_that("tool_run_r_code handles runtime errors", {
 })
 
 test_that("tool_run_r_code rejects subprocess timeouts readably", {
-  skip_if_not_installed("callr")
-
   error <- tryCatch(
     run_r_code_impl("Sys.sleep(10)", timeout = 0.05),
     ellmer_tool_reject = identity
@@ -441,7 +432,6 @@ test_that("tool_run_r_code rejects subprocess timeouts readably", {
 })
 
 test_that("tool_run_bash rejects subprocess timeouts readably", {
-  skip_if_not_installed("callr")
   skip_on_os("windows")
 
   error <- tryCatch(

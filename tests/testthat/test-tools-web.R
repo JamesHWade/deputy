@@ -88,23 +88,17 @@ test_that("tools_all includes web tools", {
 })
 
 test_that("web_fetch requires httr2 package", {
-  skip_if_not_installed("httr2")
-
   # If httr2 is installed, the tool should work (we can't easily mock uninstalled)
   # Just verify the tool is callable
   expect_true(is.function(tool_web_fetch))
 })
 
 test_that("web_search requires httr2 package", {
-  skip_if_not_installed("httr2")
-
   # If httr2 is installed, the tool should work
   expect_true(is.function(tool_web_search))
 })
 
 test_that("web_fetch extracts a mocked HTML response", {
-  skip_if_not_installed("httr2")
-
   url <- "https://example.test/page"
   httr2::local_mocked_responses(list(httr2::response(
     status_code = 200,
@@ -127,7 +121,6 @@ test_that("web_fetch extracts a mocked HTML response", {
 })
 
 test_that("web_fetch handles invalid URL", {
-  skip_if_not_installed("httr2")
   skip_on_cran()
 
   # This should return an error
@@ -141,8 +134,6 @@ test_that("web_fetch handles invalid URL", {
 })
 
 test_that("web_search returns results", {
-  skip_if_not_installed("httr2")
-
   httr2::local_mocked_responses(list(httr2::response(
     status_code = 200,
     url = "https://html.duckduckgo.com/html/?q=R%20programming%20language",

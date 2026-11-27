@@ -74,9 +74,6 @@ test_that("PostModelRequest fires for a run that calls no tools", {
 })
 
 test_that("the next model request waits for a PostModelRequest hook's promise", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
     runtime_reply("final answer")
@@ -105,9 +102,6 @@ test_that("the next model request waits for a PostModelRequest hook's promise", 
 })
 
 test_that("an interrupt while a PostModelRequest hook is pending ends the run before the next request", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "probe", arguments = list()),
     runtime_reply("final answer")
@@ -159,9 +153,6 @@ count_type <- function() {
 }
 
 test_that("a structured request waits for a PostModelRequest hook's promise", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply('{"count":0}', stream = FALSE),
     runtime_reply('{"count":1}', stream = FALSE)
@@ -204,9 +195,6 @@ test_that("a structured request waits for a PostModelRequest hook's promise", {
 })
 
 test_that("an interrupt while a structured request's PostModelRequest hook is pending ends the run there", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply('{"count":0}', stream = FALSE),
     runtime_reply('{"count":1}', stream = FALSE)

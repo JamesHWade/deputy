@@ -399,9 +399,6 @@ test_that("run_sync fires SessionStart hook before first turn", {
 })
 
 test_that("an interrupt while a SessionStart hook is pending stops the run before any model request", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   model_asked <- FALSE
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
@@ -429,9 +426,6 @@ test_that("an interrupt while a SessionStart hook is pending stops the run befor
 })
 
 test_that("an interrupt while a SessionStart hook is pending keeps UserPromptSubmit from firing", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   model_asked <- FALSE
   submitted <- 0L
   chat <- create_mock_chat()
@@ -504,9 +498,6 @@ test_that("a SessionStart hook that interrupts the run keeps UserPromptSubmit fr
 })
 
 test_that("a run waits for a UserPromptSubmit hook's promise, after SessionStart", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   moments <- character()
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
@@ -557,9 +548,6 @@ test_that("a run waits for a UserPromptSubmit hook's promise, after SessionStart
 })
 
 test_that("a run waits for a SessionStart hook's promise before its first model request", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   moments <- character()
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {

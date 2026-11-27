@@ -862,9 +862,6 @@ test_that("compaction hooks can cancel, replace, or fail without losing the run"
 })
 
 test_that("automatic compaction waits for a PreCompact hook's promise", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(runtime_reply("Task response")))
   chat <- runtime_compaction_chat(server)
   before <- chat$get_turns()
@@ -885,9 +882,6 @@ test_that("automatic compaction waits for a PreCompact hook's promise", {
 })
 
 test_that("a PreCompact hook's promised summary is used", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(runtime_reply("Task response")))
   chat <- runtime_compaction_chat(server)
   agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
@@ -910,9 +904,6 @@ test_that("a PreCompact hook's promised summary is used", {
 })
 
 test_that("automatic compaction waits for a PostCompact hook's promise before the request goes on", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(runtime_reply("Task response")))
   chat <- runtime_compaction_chat(server)
   agent <- Agent$new(chat, context_policy = ContextPolicy(max_tokens = 50))
@@ -948,9 +939,6 @@ test_that("automatic compaction waits for a PostCompact hook's promise before th
 })
 
 test_that("a manual compact() does not wait for a PreCompact hook's promise", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(runtime_reply("Task response")))
   chat <- runtime_compaction_chat(server)
   chat$set_turns(list(
@@ -973,9 +961,6 @@ test_that("a manual compact() does not wait for a PreCompact hook's promise", {
 })
 
 test_that("compact(automatic = TRUE) does not wait for a PreCompact hook's promise either", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(runtime_reply("Task response")))
   chat <- runtime_compaction_chat(server)
   chat$set_turns(list(
@@ -1003,9 +988,6 @@ test_that("compact(automatic = TRUE) does not wait for a PreCompact hook's promi
 })
 
 test_that("compact(automatic = TRUE) does not wait for a PostCompact hook's promise either", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(runtime_reply("Task response")))
   chat <- runtime_compaction_chat(server)
   chat$set_turns(list(
@@ -1087,9 +1069,6 @@ test_that("PostModelRequest fires after a compaction summary request, with its u
 })
 
 test_that("the task request waits for a PostModelRequest hook's promise after a compaction request", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply("A summary of the earlier turns."),
     runtime_reply("Task response")
@@ -1114,9 +1093,6 @@ test_that("the task request waits for a PostModelRequest hook's promise after a 
 })
 
 test_that("an interrupt while a compaction request's PostModelRequest hook is pending ends the run before the task", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply("A summary of the earlier turns."),
     runtime_reply("Task response")

@@ -102,9 +102,6 @@ test_that("SessionEnd fires once, after the last stop", {
 })
 
 test_that("the stream carries every pass", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   scripted <- scripted_stop_chat(list("First answer.", "Second answer."))
   agent <- Agent$new(chat = scripted$chat)
   agent$hooks$add(HookMatcher(
@@ -195,9 +192,6 @@ test_that("a Stop hook cannot send on a run that was stopped", {
 })
 
 test_that("an interrupt while a Stop hook is pending wins over its answer", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   scripted <- scripted_stop_chat(list("First answer.", "Second answer."))
   agent <- Agent$new(chat = scripted$chat)
   agent$hooks$add(HookMatcher(

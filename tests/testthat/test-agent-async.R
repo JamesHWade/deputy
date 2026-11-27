@@ -1,7 +1,4 @@
 test_that("run_async resolves to an AgentResult with the final turn's text", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
     coro::async_generator(function() {
@@ -38,9 +35,6 @@ test_that("run_async resolves to an AgentResult with the final turn's text", {
 })
 
 test_that("run_async accepts text chunks and never reuses a stale turn", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   chat <- create_mock_chat(responses = list("from last turn"))
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
     coro::async_generator(function() {
@@ -72,9 +66,6 @@ test_that("run_async accepts text chunks and never reuses a stale turn", {
 })
 
 test_that("run_async enforces tool-call limits and releases the run", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   calls <- 0L
   chat <- create_mock_chat()
   request_cb <- NULL
@@ -131,9 +122,6 @@ test_that("run_async enforces tool-call limits and releases the run", {
 })
 
 test_that("run_async leaves tool calls unbounded when no tool-call limit is set", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   observed <- NULL
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
@@ -146,9 +134,6 @@ test_that("run_async leaves tool calls unbounded when no tool-call limit is set"
 })
 
 test_that("run_async honors on_exceed = 'error' by rejecting the promise", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   cost <- 0
   chat <- create_mock_chat()
   chat$get_tokens <- function() {
@@ -180,9 +165,6 @@ test_that("run_async honors on_exceed = 'error' by rejecting the promise", {
 })
 
 test_that("run_async fires lifecycle hooks and records usage on the result", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   fired <- character()
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
@@ -213,9 +195,6 @@ test_that("run_async fires lifecycle hooks and records usage on the result", {
 })
 
 test_that("run_async rejects on stream failure and releases the agent", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   # The mock chat is a plain list, so the stream must consult mutable state
   # rather than being reassigned after the Agent captured it.
   mode <- new.env(parent = emptyenv())
@@ -239,9 +218,6 @@ test_that("run_async rejects on stream failure and releases the agent", {
 })
 
 test_that("run_async refuses to start while another run is active", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
     coro::async_generator(function() {
@@ -259,9 +235,6 @@ test_that("run_async refuses to start while another run is active", {
 })
 
 test_that("run_async resolves relative native-tool paths in the workspace", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   dir <- withr::local_tempdir()
   writeLines("hello", file.path(dir, "note.txt"))
   read <- create_shiny_tool_chat(
@@ -282,9 +255,6 @@ test_that("run_async resolves relative native-tool paths in the workspace", {
 })
 
 test_that("run_async reports clean interruption", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   agent <- NULL
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
@@ -299,9 +269,6 @@ test_that("run_async reports clean interruption", {
 })
 
 test_that("a stopped run reports the cost of the requests that finished", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   # The first reply calls a tool; the second is held until the run is
   # interrupted, so its cost is never reported.
   server <- local_runtime_server(list(
@@ -332,9 +299,6 @@ test_that("a stopped run reports the cost of the requests that finished", {
 })
 
 test_that("stream_async records usage on the shared callback state", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
     coro::async_generator(function() coro::yield("done"))()

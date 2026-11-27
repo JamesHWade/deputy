@@ -21,7 +21,6 @@ commons_example_environment <- function() {
 
 commons_example_skip <- function() {
   skip_if_no_commons()
-  skip_if_not_installed("callr")
   skip_if_not_installed("httpuv")
   skip_if_not(capabilities("png"), "PNG graphics are unavailable")
 }
@@ -46,13 +45,7 @@ commons_example_local <- function(
 # Runs the event loop until `ready()` is true, failing the test after
 # `seconds` instead of hanging it.
 commons_wait <- function(ready, what, seconds = 60) {
-  deadline <- Sys.time() + seconds
-  while (!ready()) {
-    if (Sys.time() > deadline) {
-      cli::cli_abort("{what} took more than {seconds} seconds.")
-    }
-    later::run_now(0.02)
-  }
+  wait_until(ready, timeout = seconds, label = what, interval = 0.02)
 }
 
 commons_collect <- function(agent, task) {

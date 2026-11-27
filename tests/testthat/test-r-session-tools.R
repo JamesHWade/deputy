@@ -519,9 +519,6 @@ test_that("replacing a selected tool during an observer prevents its effect", {
 })
 
 test_that("transient mailbox read failures retry within the call deadline", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   calls <- 0L
   reads <- 0L
   read_bytes <- r_session_tool_read_bytes
@@ -720,9 +717,6 @@ test_that("mailbox protocol errors are not retried", {
 })
 
 test_that("a nested tool call waits for a PreToolUse hook's promised denial", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   calls <- 0L
   fixture <- local_r_tool_journey(
     r_bridge_test_tool(function() {
@@ -749,9 +743,6 @@ test_that("a nested tool call waits for a PreToolUse hook's promised denial", {
 })
 
 test_that("an interrupt while a nested tool call's hook is pending keeps the tool from running", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   calls <- 0L
   fixture <- local_r_tool_journey(
     r_bridge_test_tool(function() {
