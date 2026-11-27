@@ -18,8 +18,8 @@ submitted at most once.
 This is the input review step of Will Landau and Sam Parmar's
 trusted mini-agent pattern:
 a person checks the model-generated inputs before a trusted tool runs.
-The server adds a Stop hook to agent so the review refreshes when a run
-pauses. Call it once per agent, while no run is active."><meta property="og:description" content="A Shiny module for reviewing the inputs of a tool call that is waiting for
+The server adds a SessionEnd hook to agent so the review refreshes when a
+run finishes or pauses. Call it once per agent, while no run is active."><meta property="og:description" content="A Shiny module for reviewing the inputs of a tool call that is waiting for
 approval (see approval_dir in Agent and PermissionResultPending). The
 call stays paused until the reviewer acts. The module shows each argument
 with its declared type, description and proposed value, using
@@ -38,8 +38,8 @@ submitted at most once.
 This is the input review step of Will Landau and Sam Parmar's
 trusted mini-agent pattern:
 a person checks the model-generated inputs before a trusted tool runs.
-The server adds a Stop hook to agent so the review refreshes when a run
-pauses. Call it once per agent, while no run is active."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
+The server adds a SessionEnd hook to agent so the review refreshes when a
+run finishes or pauses. Call it once per agent, while no run is active."><meta property="og:image" content="https://jameshwade.github.io/deputy/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -125,8 +125,8 @@ submitted at most once.</p>
 <p>This is the input review step of Will Landau and Sam Parmar's
 <a href="https://trustedminiagents.dev/definition.html" class="external-link">trusted mini-agent</a> pattern:
 a person checks the model-generated inputs before a trusted tool runs.</p>
-<p>The server adds a <code>Stop</code> hook to <code>agent</code> so the review refreshes when a run
-pauses. Call it once per agent, while no run is active.</p>
+<p>The server adds a <code>SessionEnd</code> hook to <code>agent</code> so the review refreshes when a
+run finishes or pauses. Call it once per agent, while no run is active.</p>
     </div>
 
     <div class="section level2">

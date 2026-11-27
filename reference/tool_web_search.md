@@ -1,8 +1,8 @@
 # Search the web
 
 A tool that searches the web with DuckDuckGo's HTML search page and
-returns the title, URL and snippet of each result. Needs the httr2
-package. For better results, use a provider's own search tool (see
+returns the title, URL and snippet of each result. For better results,
+use a provider's own search tool (see
 [`tools_web()`](https://jameshwade.github.io/deputy/reference/tools_web.md))
 or a dedicated search API.
 
