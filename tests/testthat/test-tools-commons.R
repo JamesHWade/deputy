@@ -353,6 +353,61 @@ test_that("tools_commons preserves full numeric precision in measure values and 
   expect_identical(delivered[[1L]]$value@value, "1234567.89")
 })
 
+test_that("tools_commons preserves labels on named vectors and dimensions on matrices", {
+  local_mocked_bindings(
+    commons_package_version = function() numeric_version("0.2.0")
+  )
+  stub <- structure(
+    list(
+      search = function(query) {
+        "### by_region\nRun with `$measure(\"by_region\")`."
+      },
+      measure = function(name, arguments = list()) {
+        switch(
+          name,
+          named_rev = c(North = 1234567.89, South = 140),
+          partial_names = c(North = 100, 140),
+          quantiles = stats::quantile(c(10, 20, 30, 40, 50)),
+          html_label = c("<b>North</b>" = 100),
+          rev_matrix = matrix(
+            c(1234567.89, 200, 300, 400),
+            nrow = 2L,
+            dimnames = list(c("North", "South"), c("Q1", "Q2"))
+          )
+        )
+      }
+    ),
+    class = "commons"
+  )
+  tools <- tools_commons(stub)
+
+  named <- tools$commons_measure("named_rev")
+  expect_identical(named@value, "North: 1234567.89, South: 140")
+  expect_match(named@extra$display$html, "North: 1234567\\.89, South: 140")
+
+  partial <- tools$commons_measure("partial_names")
+  expect_identical(partial@value, "North: 100, 140")
+
+  qs <- tools$commons_measure("quantiles")
+  expect_identical(qs@value, "0%: 10, 25%: 20, 50%: 30, 75%: 40, 100%: 50")
+
+  escaped <- tools$commons_measure("html_label")
+  expect_no_match(as.character(escaped@extra$display$html), "<b>North</b>")
+  expect_match(
+    as.character(escaped@extra$display$html),
+    "&lt;b&gt;North&lt;/b&gt;: 100"
+  )
+
+  mat <- tools$commons_measure("rev_matrix")
+  expect_match(mat@value, "Q1")
+  expect_match(mat@value, "Q2")
+  expect_match(mat@value, "North")
+  expect_match(mat@value, "South")
+  expect_match(mat@value, "1234567\\.89")
+  expect_match(mat@value, "\n")
+  expect_match(as.character(mat@extra$display$html), "<pre>")
+})
+
 test_that("tools_commons governs permissions, budgets, and trusted receipts without substitute bypass", {
   skip_if_no_commons()
   sales <- data.frame(region = c("North", "East"), revenue = c(100, 140))

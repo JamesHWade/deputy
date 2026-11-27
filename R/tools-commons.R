@@ -134,12 +134,22 @@ commons_format_atomic <- function(value) {
   formatted
 }
 
+commons_format_vector <- function(value) {
+  formatted <- commons_format_atomic(value)
+  nms <- names(value)
+  if (!is.null(nms) && length(formatted)) {
+    labeled <- !is.na(nms) & nzchar(nms)
+    formatted[labeled] <- paste0(nms[labeled], ": ", formatted[labeled])
+  }
+  paste(formatted, collapse = ", ")
+}
+
 commons_format_arg_value <- function(value) {
   if (is.null(value)) {
     return("null")
   }
-  if (is.atomic(value) && length(value) <= 20L) {
-    return(paste(commons_format_atomic(value), collapse = ", "))
+  if (is.atomic(value) && is.null(dim(value)) && length(value) <= 20L) {
+    return(commons_format_vector(value))
   }
   as.character(jsonlite::toJSON(value, auto_unbox = TRUE, digits = NA))
 }
@@ -277,11 +287,8 @@ commons_format_value_text <- function(value) {
   if (is.null(value)) {
     return("NULL")
   }
-  if (is.atomic(value) && length(value) <= 20L) {
-    return(commons_bound_text(paste(
-      commons_format_atomic(value),
-      collapse = ", "
-    )))
+  if (is.atomic(value) && is.null(dim(value)) && length(value) <= 20L) {
+    return(commons_bound_text(commons_format_vector(value)))
   }
   old <- options(digits = 15L)
   on.exit(options(old), add = TRUE)
