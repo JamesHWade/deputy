@@ -57,6 +57,44 @@ overlay_split <- function(turns, marked) {
   list(turns = turns, overlay = overlay)
 }
 
+overlay_merge <- function(turns, overlay) {
+  for (entry in overlay) {
+    index <- entry$turn
+    if (index > length(turns)) {
+      next
+    }
+    turn <- turns[[index]]
+    turn@contents <- c(turn@contents, list(entry$content))
+    turns[[index]] <- turn
+  }
+  turns
+}
+
+# One turn of the complete conversation, at `position`, with any overlay
+# entries belonging to it.
+overlay_merge_turn <- function(turn, position, overlay) {
+  for (entry in overlay) {
+    if (isTRUE(entry$turn == position)) {
+      turn@contents <- c(turn@contents, list(entry$content))
+    }
+  }
+  turn
+}
+
+# Overlay entries are keyed by their turn's position in the complete
+# conversation: the compacted prefix (`offset` turns), then the context. When
+# moving to another Chat drops context turns, each entry moves to where its
+# turn now sits.
+overlay_remap <- function(overlay, kept, offset) {
+  overlay <- lapply(overlay, function(entry) {
+    if (entry$turn > offset) {
+      entry$turn <- offset + match(entry$turn - offset, kept)
+    }
+    entry
+  })
+  Filter(function(entry) !is.na(entry$turn), overlay)
+}
+
 # Contents kept beside the turns, as a saved session keeps them: each with the
 # index of its turn. A conversation with none has no field.
 overlay_session_entries <- function(overlay) {

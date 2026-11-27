@@ -44,6 +44,7 @@ deputy/
 │   ├── approval-review.R    # Shiny module for reviewing a pending tool call
 │   ├── agent-requests.R    # Public ellmer callbacks and explicit fallback
 │   ├── agents-multi.R      # LeadAgent for multi-agent orchestration
+│   ├── agents-multi-helpers.R # LeadAgent internal prompt, child setup and policy helpers
 │   ├── owned-conversations.R # Retained specialist handles, leases and release
 │   ├── background-tasks.R  # Model-started tasks on retained agents and their run-end join
 │   ├── chat-composition.R  # adopt_chat() and delegation_tool() composition
@@ -54,14 +55,18 @@ deputy/
 │   ├── delegation-manifest.R # Initial receipts and context inspection
 │   ├── context-fork.R       # Authorized host-selected native history snapshots
 │   ├── delegation-binding.R # Host governance and child resource ownership
-│   ├── delegation-inspection.R # Compact outcomes, authorized history and replay
+│   ├── delegation-content-records.R # Portable content record/replay, duration and sizing
+│   ├── delegation-inspection.R # Compact outcomes, authorized history and disclosure
 │   ├── delegation-lifecycle.R # Shared live records and child settlement
 │   ├── delegation-observation.R # Bounded child events and independent cursors
 │   ├── delegation-activity.R # Descendant tool cards in the lead's shown conversation
+│   ├── delegation-activity-stream.R # Activity presenter lifecycle and stream merging
 │   ├── parallel-delegate.R # Bounded stateless responder batches
 │   ├── subagent-chat.R    # Optional authorized child activity and transcript UI
+│   ├── subagent-chat-content.R # Shiny-independent Markdown and nested content sanitization
 │   ├── subagent-display.R # Inert HTML for tool displays shown by the Shiny adapter
 │   ├── subagent-history.R # Subagent records saved with a shinychat conversation
+│   ├── subagent-history-codec.R # Typed JSON codec for portable subagent history records
 │   ├── tool-display-evidence.R # Approved, bounded tool display/provenance projection
 │   ├── agent-run-state.R   # Shared run initialization, settlement, end hooks and teardown
 │   ├── compaction-run.R    # Governed asynchronous summary attempts and recovery

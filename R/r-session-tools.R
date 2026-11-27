@@ -36,7 +36,7 @@ r_session_tool_names <- function(value) {
 }
 
 r_session_tool_agent_private <- function(agent) {
-  tryCatch(agent$.__enclos_env__$private, error = function(error) NULL)
+  agent_private(agent)
 }
 
 r_session_tool_is_disallowed <- function(name, tool, source) {

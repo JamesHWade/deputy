@@ -228,20 +228,27 @@ lead_delegation_hook <- function(lead, id, event, definition = NULL) {
   fire_with_errors(
     lead$hooks,
     function() do.call(private$fire_hook, args),
-    function(errors) {
-      messages <- vapply(
-        errors,
-        function(error) paste0(error$event, ": ", error$error),
-        character(1)
-      )
-      current <- private$subagent_runs[[id]]
-      current$hook_error <- paste(
-        c(current$hook_error, messages),
-        collapse = "\n"
-      )
-      private$subagent_runs[[id]] <- current
-    }
+    function(errors) record_delegation_hook_errors(lead, id, errors)
   )
+}
+
+record_delegation_hook_errors <- function(lead, id, errors) {
+  private <- agent_private(lead)
+  record <- private$subagent_runs[[id]]
+  if (is.null(record) || !length(errors)) {
+    return(invisible(NULL))
+  }
+  messages <- vapply(
+    errors,
+    function(error) paste0(error$event, ": ", error$error),
+    character(1)
+  )
+  record$hook_error <- paste(
+    c(record$hook_error, messages),
+    collapse = "\n"
+  )
+  private$subagent_runs[[id]] <- record
+  invisible(NULL)
 }
 
 # Both callers reserve usage before starting this promise. Always release it,

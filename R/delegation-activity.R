@@ -143,207 +143,6 @@ activity_split <- function(turns) {
   overlay_split(turns, is_activity_content)
 }
 
-activity_merge <- function(turns, overlay) {
-  for (entry in overlay) {
-    index <- entry$turn
-    if (index > length(turns)) {
-      next
-    }
-    turn <- turns[[index]]
-    turn@contents <- c(turn@contents, list(entry$content))
-    turns[[index]] <- turn
-  }
-  turns
-}
-
-# One turn of the complete conversation, at `position`, with the activity
-# shown in it.
-activity_merge_turn <- function(turn, position, overlay) {
-  for (entry in overlay) {
-    if (isTRUE(entry$turn == position)) {
-      turn@contents <- c(turn@contents, list(entry$content))
-    }
-  }
-  turn
-}
-
-# Shown activity is keyed by its turn's position in the complete conversation:
-# the compacted prefix (`offset` turns), then the context. When moving to
-# another Chat drops context turns, each card moves to where its turn now sits.
-activity_remap <- function(overlay, kept, offset) {
-  overlay <- lapply(overlay, function(entry) {
-    if (entry$turn > offset) {
-      entry$turn <- offset + match(entry$turn - offset, kept)
-    }
-    entry
-  })
-  Filter(function(entry) !is.na(entry$turn), overlay)
-}
-
-# The agent's shown activity as a session payload keeps it. A save made
-# mid-reply first reads what the reply hasn't shown yet, so a call that has
-# returned is saved with its result. A card still waiting for its result gets
-# one saying so in the payload, since nothing settles it once the payload is
-# loaded; the live conversation keeps waiting for the call.
-activity_saved_entries <- function(agent) {
-  private <- agent$.__enclos_env__$private
-  state <- private$.activity
-  # Only the reply this presenter is streaming is read again. After
-  # `run_sync()`, a text stream or a finished reply, the run's calls were
-  # never shown here.
-  if (
-    !is.null(state) &&
-      isTRUE(private$run_active) &&
-      identical(state$stream_run, private$current_run_id)
-  ) {
-    activity_poll(agent, final = TRUE, presenter = state)
-  }
-  overlay <- private$.activity_overlay
-  for (open in activity_open_entries(agent)) {
-    overlay[[length(overlay) + 1L]] <- list(
-      turn = open$turn,
-      content = activity_settled_result(
-        open,
-        "Not completed: the conversation was saved before this call returned."
-      )
-    )
-  }
-  overlay_session_entries(overlay)
-}
-
-# The shown activity of a saved session, checked against the turns it is
-# loaded with. Cards are shown in assistant turns, but `$set_turns()` and
-# `$add_turn()` keep a card from any turn, so a load takes back what a save
-# wrote.
-activity_session_overlay <- function(session, path = NULL) {
-  overlay_session_overlay(
-    session,
-    field = "activity",
-    accepts = is_activity_content,
-    malformed = "Invalid session file - its subagent activity is malformed",
-    path = path
-  )
-}
-
-new_activity_presenter <- function(requester, interval) {
-  state <- new.env(parent = emptyenv())
-  state$requester <- requester
-  state$interval <- interval
-  state$queue <- list()
-  state$delegations <- list()
-  state$run_id <- NULL
-  # The run of the reply this presenter streams.
-  state$stream_run <- NULL
-  state$calls <- 0L
-  state$limited <- FALSE
-  state$error <- NULL
-  state
-}
-
-# A replaced conversation starts the presenter afresh: cards waiting to be
-# streamed, labels and counts belong to the conversation they were shown in,
-# as do the results a stopped presenter left for the reply streaming now.
-activity_reset <- function(agent) {
-  private <- agent$.__enclos_env__$private
-  private$.activity_leftover <- NULL
-  state <- private$.activity
-  if (is.null(state)) {
-    return(invisible(NULL))
-  }
-  state$queue <- list()
-  state$delegations <- list()
-  state$run_id <- NULL
-  state$calls <- 0L
-  state$limited <- FALSE
-  # A reply still streaming belongs to the replaced conversation: its
-  # subagents' calls aren't shown in the new one.
-  state$skip_run <- private$current_run_id
-  invisible(NULL)
-}
-
-activity_enable <- function(agent, requester, interval = 0.1) {
-  if (!is.function(requester)) {
-    cli::cli_abort("{.arg requester} must be a function returning the viewer.")
-  }
-  private <- agent$.__enclos_env__$private
-  # One presenter per lead. A second would show the same calls again under
-  # new keys, and the first one's running cards would never be settled.
-  if (!is.null(private$.activity)) {
-    cli::cli_abort(c(
-      "Subagent activity is already shown for this lead.",
-      "i" = paste(
-        "Call {.fn stop} on the value {.fn subagent_chat_activity} returned",
-        "before showing it again."
-      )
-    ))
-  }
-  state <- new_activity_presenter(requester, interval)
-  private$.activity <- state
-  invisible(state)
-}
-
-# `presenter` is the one to stop: once it has been stopped and another shown,
-# stopping it again leaves the other running.
-activity_disable <- function(agent, presenter = NULL) {
-  private <- agent$.__enclos_env__$private
-  state <- private$.activity
-  if (!is.null(presenter) && !identical(state, presenter)) {
-    return(invisible(agent))
-  }
-  # Cards still running when the presenter stops would stay running in saved
-  # history, since no later poll will settle them.
-  for (entry in activity_open_entries(agent)) {
-    activity_settle(
-      agent,
-      entry,
-      "Not shown: subagent activity stopped before this call returned.",
-      state = state
-    )
-  }
-  # The reply streaming now, if it started with this presenter, takes what
-  # was queued, those results included; a later reply doesn't. A presenter
-  # shown during a reply has no stream in it, so an earlier presenter's
-  # results for that reply are kept.
-  run_id <- private$current_run_id
-  earlier <- private$.activity_leftover
-  if (
-    !is.null(state) &&
-      length(state$queue) &&
-      !is.null(run_id) &&
-      !identical(earlier$run_id, run_id)
-  ) {
-    private$.activity_leftover <- list(
-      run_id = run_id,
-      presenter = state,
-      queue = state$queue
-    )
-  }
-  private$.activity <- NULL
-  invisible(agent)
-}
-
-# `presenter` is the one the reading stream started with: a stream takes only
-# its own presenter's cards, and what that presenter left queued for this
-# reply when it stopped, never another presenter's.
-activity_take <- function(agent, presenter = NULL) {
-  private <- agent$.__enclos_env__$private
-  mine <- function(state) is.null(presenter) || identical(state, presenter)
-  queue <- list()
-  leftover <- private$.activity_leftover
-  if (!is.null(leftover) && mine(leftover$presenter)) {
-    private$.activity_leftover <- NULL
-    if (identical(leftover$run_id, private$current_run_id)) {
-      queue <- leftover$queue
-    }
-  }
-  state <- private$.activity
-  if (!is.null(state) && mine(state)) {
-    queue <- c(queue, state$queue)
-    state$queue <- list()
-  }
-  queue
-}
-
 # The depth-one delegation a descendant belongs to: its tool call is the one
 # in the lead's own turn.
 activity_root_record <- function(records, record) {
@@ -388,7 +187,7 @@ activity_signature <- function(record) {
 # the newest turn: provider IDs can repeat across turns, but the delegation
 # belongs to the run in progress.
 activity_anchor_turn <- function(agent, tool_call_id) {
-  turns <- agent$.__enclos_env__$private$transcript_turns()
+  turns <- agent_private(agent)$transcript_turns()
   fallback <- NULL
   for (index in rev(seq_along(turns))) {
     turn <- turns[[index]]
@@ -426,7 +225,7 @@ activity_new_key <- function() {
 activity_label <- function(agent, state, name) {
   keys <- c(
     vapply(
-      agent$.__enclos_env__$private$.activity_overlay,
+      agent_private(agent)$.activity_overlay,
       function(entry) {
         marker <- activity_marker(entry$content)
         if (identical(marker$agent_name, name)) {
@@ -453,14 +252,9 @@ activity_label <- function(agent, state, name) {
 # like an inspection view so a host's redactor treats both alike. NULL when the
 # redacted view is over the disclosure's size bound.
 activity_view <- function(agent, record, requester) {
-  private <- agent$.__enclos_env__$private
-  disclosure <- private$.delegation_disclosure
+  disclosure <- lead_disclosure(agent)
   view <- lead_inspection_view(agent, record, TRUE, activity_own_turns(record))
-  view <- disclosure$redact(view, requester)
-  if (!is.list(view)) {
-    cli::cli_abort("Disclosure redaction must return a list.")
-  }
-  inspection_portable(view)
+  view <- inspection_redact(disclosure, view, requester)
   fits <- tryCatch(
     {
       inspection_bound(view, disclosure)
@@ -622,7 +416,7 @@ activity_unfinished_content <- function(
 }
 
 activity_emit <- function(agent, state, anchor_turn, content) {
-  private <- agent$.__enclos_env__$private
+  private <- agent_private(agent)
   private$.activity_overlay[[length(private$.activity_overlay) + 1L]] <- list(
     turn = anchor_turn,
     content = content
@@ -637,7 +431,7 @@ activity_open_entries <- function(agent, key = NULL) {
   prefix <- paste0("deputy_activity_", if (!is.null(key)) paste0(key, "_"))
   requests <- list()
   answered <- character()
-  for (entry in agent$.__enclos_env__$private$.activity_overlay) {
+  for (entry in agent_private(agent)$.activity_overlay) {
     marker <- activity_marker(entry$content)
     if (is.null(marker) || !startsWith(marker$activity_id, prefix)) {
       next
@@ -668,7 +462,7 @@ activity_settled_result <- function(entry, text) {
 activity_settle <- function(agent, entry, text, state = NULL) {
   result <- activity_settled_result(entry, text)
   if (is.null(state)) {
-    private <- agent$.__enclos_env__$private
+    private <- agent_private(agent)
     private$.activity_overlay[[length(private$.activity_overlay) + 1L]] <-
       list(turn = entry$turn, content = result)
   } else {
@@ -723,73 +517,6 @@ activity_limit_note <- function(agent, state, entry, runtime, root_call) {
   )
   state$limited <- TRUE
   invisible(NULL)
-}
-
-# Bring the lead's view of its subagents' tool calls up to date. `final`
-# rereads every open delegation and settles calls that won't return once their
-# delegation has settled; `closing` does so for every open call, because the
-# lead's reply is ending and a card must not stay running in saved history.
-# A stream polls only the presenter it started with; once that presenter is
-# stopped, or another shown, it reads nothing more.
-activity_poll <- function(
-  agent,
-  final = FALSE,
-  closing = FALSE,
-  presenter = NULL
-) {
-  private <- agent$.__enclos_env__$private
-  state <- private$.activity
-  run_id <- private$current_run_id
-  if (
-    is.null(state) ||
-      is.null(run_id) ||
-      identical(state$skip_run, run_id) ||
-      (!is.null(presenter) && !identical(state, presenter))
-  ) {
-    return(invisible(NULL))
-  }
-  if (!identical(state$run_id, run_id)) {
-    state$run_id <- run_id
-    state$calls <- 0L
-    state$limited <- FALSE
-  }
-  result <- tryCatch(
-    {
-      requester <- state$requester()
-      inspection_authorize(
-        private$.delegation_disclosure,
-        requester,
-        inspection_scope(agent)
-      )
-      activity_refresh(
-        agent,
-        state,
-        requester,
-        run_id,
-        final || closing,
-        closing
-      )
-      state$error <- NULL
-    },
-    error = function(error) {
-      # A viewer who may not see the subagents sees no activity; the runs and
-      # the lead's own conversation are unaffected.
-      state$error <- inspection_text(conditionMessage(error), 1024L)
-      # Cards already shown still get a result when the reply ends, so none
-      # stays running in saved history.
-      if (closing) {
-        for (open in activity_open_entries(agent)) {
-          activity_settle(
-            agent,
-            open,
-            "Not shown: subagent activity could not be read when the reply ended.",
-            state = state
-          )
-        }
-      }
-    }
-  )
-  invisible(result)
 }
 
 activity_name <- function(runtime) {
@@ -864,6 +591,155 @@ activity_attribution <- function(agent, state, records, id, requester, pass) {
   attribution
 }
 
+activity_handle_oversized <- function(agent, state, id, entry) {
+  # Without a view, nothing the viewer may see links the delegation to
+  # the lead's call, so its note doesn't name one.
+  root_call <- NULL
+  # Calls shown before the record grew too large get a result, so no card
+  # stays running in saved history.
+  for (open in activity_open_entries(agent, entry$key)) {
+    activity_settle(
+      agent,
+      open,
+      paste(
+        "Not shown: the subagent's record grew past the size the viewer",
+        "may see."
+      ),
+      state = state
+    )
+  }
+  # The note is a card like any other, so it counts toward the reply's limit.
+  if (state$calls >= activity_max_calls) {
+    activity_limit_note(agent, state, entry, list(), root_call)
+  } else {
+    activity_note(
+      agent,
+      state,
+      entry,
+      list(),
+      root_call,
+      "oversized",
+      paste(
+        "More tool calls of this subagent aren't shown here: its record is",
+        "over the size the viewer may see. Its history is in the subagent",
+        "records."
+      )
+    )
+    state$calls <- state$calls + 1L
+  }
+  entry$done <- TRUE
+  state$delegations[[id]] <- entry
+  invisible(entry)
+}
+
+activity_emit_delegation_calls <- function(
+  agent,
+  state,
+  record,
+  view,
+  entry,
+  runtime,
+  root_call,
+  settled,
+  closing
+) {
+  calls <- activity_calls(view)
+  # Each call keeps the number it was first shown with, matched by its
+  # provider ID, tool and arguments, so a redaction that later hides an
+  # earlier call can't move a later call onto that call's card.
+  known <- entry$calls %||% list()
+  call_ids <- vapply(
+    calls,
+    function(call) activity_call_identity(call$request),
+    character(1)
+  )
+  result_ids <- lapply(calls, function(call) {
+    if (!is.null(call$result)) activity_call_identity(call$result)
+  })
+  # Its provider ID and tool alone identify a call when no other request in
+  # the record or the view has them, so a call the redactor shows
+  # differently from one view to the next keeps its card.
+  call_keys <- vapply(
+    calls,
+    function(call) activity_call_key(call$request),
+    character(1)
+  )
+  record_keys <- activity_record_keys(record)
+  unique_keys <- vapply(
+    call_keys,
+    function(key) {
+      sum(record_keys == key) == 1L && sum(call_keys == key) == 1L
+    },
+    logical(1),
+    USE.NAMES = FALSE
+  )
+  slots <- activity_call_slots(
+    known,
+    call_ids,
+    result_ids,
+    call_keys,
+    unique_keys
+  )
+  for (position in seq_along(calls)) {
+    call <- calls[[position]]
+    call_identity <- call_ids[[position]]
+    result_identity <- result_ids[[position]]
+    index <- slots[[position]]
+    if (is.na(index)) {
+      index <- length(known) + 1L
+      known[[index]] <- list(
+        identity = call_identity,
+        key = call_keys[[position]],
+        emitted = character()
+      )
+    }
+    # The card follows the call as it's shown now, so later views match it
+    # in that form.
+    known[[index]]$identity <- call_identity
+    emitted <- known[[index]]$emitted
+    activity_id <- paste0("deputy_activity_", entry$key, "_", index)
+    marker <- activity_lineage(
+      runtime,
+      root_call,
+      entry$label,
+      activity_id,
+      index
+    )
+    request <- activity_request_content(call$request, marker)
+    if (!"request" %in% emitted) {
+      if (state$calls >= activity_max_calls) {
+        activity_limit_note(agent, state, entry, runtime, root_call)
+        break
+      }
+      activity_emit(agent, state, entry$anchor_turn, request)
+      state$calls <- state$calls + 1L
+      emitted <- c(emitted, "request")
+    }
+    if (!"result" %in% emitted) {
+      content <- if (!is.null(call$result)) {
+        activity_result_content(call$result, request, marker)
+      } else if (settled || closing) {
+        activity_unfinished_content(
+          request,
+          marker,
+          runtime,
+          settled,
+          closing
+        )
+      }
+      if (!is.null(content)) {
+        activity_emit(agent, state, entry$anchor_turn, content)
+        emitted <- c(emitted, "result")
+        known[[index]]$result <- result_identity %||% "closed"
+      }
+    } else if (!is.null(result_identity)) {
+      known[[index]]$result <- result_identity
+    }
+    known[[index]]$emitted <- emitted
+  }
+  known
+}
+
 activity_refresh <- function(
   agent,
   state,
@@ -911,44 +787,7 @@ activity_refresh <- function(
     }
     view <- activity_view(agent, record, requester)
     if (is.null(view)) {
-      # Without a view, nothing the viewer may see links the delegation to
-      # the lead's call, so its note doesn't name one.
-      root_call <- NULL
-      # Calls shown before the record grew too large get a result, so no card
-      # stays running in saved history.
-      for (open in activity_open_entries(agent, entry$key)) {
-        activity_settle(
-          agent,
-          open,
-          paste(
-            "Not shown: the subagent's record grew past the size the viewer",
-            "may see."
-          ),
-          state = state
-        )
-      }
-      # The note is a card like any other, so it counts toward the reply's
-      # limit.
-      if (state$calls >= activity_max_calls) {
-        activity_limit_note(agent, state, entry, list(), root_call)
-      } else {
-        activity_note(
-          agent,
-          state,
-          entry,
-          list(),
-          root_call,
-          "oversized",
-          paste(
-            "More tool calls of this subagent aren't shown here: its record is",
-            "over the size the viewer may see. Its history is in the subagent",
-            "records."
-          )
-        )
-        state$calls <- state$calls + 1L
-      }
-      entry$done <- TRUE
-      state$delegations[[id]] <- entry
+      activity_handle_oversized(agent, state, id, entry)
       next
     }
     runtime <- view$outcome$runtime
@@ -973,102 +812,17 @@ activity_refresh <- function(
     )
     pass$done[[id]] <- attribution
     entry$label <- attribution$label
-    root_call <- attribution$root_call
-    calls <- activity_calls(view)
-    # Each call keeps the number it was first shown with, matched by its
-    # provider ID, tool and arguments, so a redaction that later hides an
-    # earlier call can't move a later call onto that call's card.
-    known <- entry$calls %||% list()
-    call_ids <- vapply(
-      calls,
-      function(call) activity_call_identity(call$request),
-      character(1)
+    entry$calls <- activity_emit_delegation_calls(
+      agent = agent,
+      state = state,
+      record = record,
+      view = view,
+      entry = entry,
+      runtime = runtime,
+      root_call = attribution$root_call,
+      settled = settled,
+      closing = closing
     )
-    result_ids <- lapply(calls, function(call) {
-      if (!is.null(call$result)) activity_call_identity(call$result)
-    })
-    # Its provider ID and tool alone identify a call when no other request in
-    # the record or the view has them, so a call the redactor shows
-    # differently from one view to the next keeps its card.
-    call_keys <- vapply(
-      calls,
-      function(call) activity_call_key(call$request),
-      character(1)
-    )
-    record_keys <- activity_record_keys(record)
-    unique_keys <- vapply(
-      call_keys,
-      function(key) {
-        sum(record_keys == key) == 1L && sum(call_keys == key) == 1L
-      },
-      logical(1),
-      USE.NAMES = FALSE
-    )
-    slots <- activity_call_slots(
-      known,
-      call_ids,
-      result_ids,
-      call_keys,
-      unique_keys
-    )
-    for (position in seq_along(calls)) {
-      call <- calls[[position]]
-      call_identity <- call_ids[[position]]
-      result_identity <- result_ids[[position]]
-      index <- slots[[position]]
-      if (is.na(index)) {
-        index <- length(known) + 1L
-        known[[index]] <- list(
-          identity = call_identity,
-          key = call_keys[[position]],
-          emitted = character()
-        )
-      }
-      # The card follows the call as it's shown now, so later views match it
-      # in that form.
-      known[[index]]$identity <- call_identity
-      emitted <- known[[index]]$emitted
-      activity_id <- paste0("deputy_activity_", entry$key, "_", index)
-      marker <- activity_lineage(
-        runtime,
-        root_call,
-        entry$label,
-        activity_id,
-        index
-      )
-      request <- activity_request_content(call$request, marker)
-      if (!"request" %in% emitted) {
-        if (state$calls >= activity_max_calls) {
-          activity_limit_note(agent, state, entry, runtime, root_call)
-          break
-        }
-        activity_emit(agent, state, entry$anchor_turn, request)
-        state$calls <- state$calls + 1L
-        emitted <- c(emitted, "request")
-      }
-      if (!"result" %in% emitted) {
-        content <- if (!is.null(call$result)) {
-          activity_result_content(call$result, request, marker)
-        } else if (settled || closing) {
-          activity_unfinished_content(
-            request,
-            marker,
-            runtime,
-            settled,
-            closing
-          )
-        }
-        if (!is.null(content)) {
-          activity_emit(agent, state, entry$anchor_turn, content)
-          emitted <- c(emitted, "result")
-          known[[index]]$result <- result_identity %||% "closed"
-        }
-      } else if (!is.null(result_identity)) {
-        known[[index]]$result <- result_identity
-      }
-      known[[index]]$emitted <- emitted
-    }
-    entry$calls <- known
     if (settled || closing) {
       # A call shown earlier that the view no longer includes still gets a
       # result, so no card stays running in saved history.
@@ -1175,101 +929,3 @@ activity_call_slots <- function(
   }
   slots
 }
-
-activity_wait <- function(slot, seconds) {
-  promises::promise(function(resolve, reject) {
-    slot$waiter <- resolve
-    later::later(
-      function() {
-        if (identical(slot$waiter, resolve)) {
-          slot$waiter <- NULL
-          resolve(FALSE)
-        }
-      },
-      seconds
-    )
-  })
-}
-
-activity_wake <- function(slot) {
-  waiter <- slot$waiter
-  if (is.function(waiter)) {
-    slot$waiter <- NULL
-    waiter(TRUE)
-  }
-  invisible(NULL)
-}
-
-activity_watch <- function(slot, value) {
-  slot$done <- FALSE
-  slot$value <- NULL
-  slot$error <- NULL
-  promises::then(
-    promises::as.promise(value),
-    onFulfilled = function(result) {
-      slot$value <- result
-      slot$done <- TRUE
-      activity_wake(slot)
-    },
-    onRejected = function(error) {
-      slot$error <- error
-      slot$done <- TRUE
-      activity_wake(slot)
-    }
-  )
-  invisible(NULL)
-}
-
-# The lead's stream with its subagents' tool calls merged in as they happen.
-# While the lead waits on a delegation, the stream checks for new calls on a
-# timer; before it yields a tool result, and when it ends, it settles them.
-activity_stream <- coro::async_generator(function(agent, inner, presenter) {
-  slot <- new.env(parent = emptyenv())
-  waiting <- FALSE
-  interval <- presenter$interval
-  repeat {
-    for (content in activity_take(agent, presenter)) {
-      coro::yield(content)
-    }
-    if (!waiting) {
-      next_value <- tryCatch(
-        inner(),
-        error = function(error) promises::promise_reject(error)
-      )
-      # The reply has started its run by now.
-      presenter$stream_run <- agent$.__enclos_env__$private$current_run_id
-      activity_watch(slot, next_value)
-      waiting <- TRUE
-    }
-    if (!isTRUE(slot$done)) {
-      coro::await(activity_wait(slot, interval))
-      if (!isTRUE(slot$done)) {
-        activity_poll(agent, presenter = presenter)
-        next
-      }
-    }
-    waiting <- FALSE
-    if (!is.null(slot$error)) {
-      activity_poll(agent, closing = TRUE, presenter = presenter)
-      for (content in activity_take(agent, presenter)) {
-        coro::yield(content)
-      }
-      rlang::cnd_signal(slot$error)
-    }
-    value <- slot$value
-    if (coro::is_exhausted(value)) {
-      activity_poll(agent, closing = TRUE, presenter = presenter)
-      for (content in activity_take(agent, presenter)) {
-        coro::yield(content)
-      }
-      break
-    }
-    if (inherits(value, "ellmer::ContentToolResult")) {
-      activity_poll(agent, final = TRUE, presenter = presenter)
-      for (content in activity_take(agent, presenter)) {
-        coro::yield(content)
-      }
-    }
-    coro::yield(value)
-  }
-})

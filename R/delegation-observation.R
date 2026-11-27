@@ -1,4 +1,4 @@
-#' @include value-properties.R delegation-inspection.R
+#' @include value-properties.R delegation-content-records.R delegation-inspection.R
 NULL
 
 #' Set limits for the subagent event buffer
@@ -220,16 +220,7 @@ observation_payload <- function(event, max_bytes = 65536) {
         is.factor(value) ||
         inherits(value, c("Date", "POSIXt", "difftime"))
     ) {
-      if (inherits(value, "difftime") || is.data.frame(value)) {
-        return(inspection_duration_json(value))
-      }
-      return(as.character(jsonlite::toJSON(
-        value,
-        dataframe = "rows",
-        auto_unbox = TRUE,
-        null = "null",
-        na = "null"
-      )))
+      return(inspection_classed_value_json(value))
     }
     if (inherits(value, "ellmer_dollars")) {
       return(as.numeric(value))
@@ -366,14 +357,9 @@ DelegationSubscription <- R6::R6Class(
         private$delegation_id,
         transcript
       )
-      disclosure <- lead$.__enclos_env__$private$.delegation_disclosure
+      disclosure <- lead_disclosure(lead)
       children <- lapply(children, function(view) {
-        result <- disclosure$redact(view, private$requester)
-        inspection_portable(result)
-        if (!is.list(result)) {
-          cli::cli_abort("Disclosure redaction must return a list.")
-        }
-        result
+        inspection_redact(disclosure, view, private$requester)
       })
       out <- inspection_bound(
         list(children = children, cursor = cursor),
@@ -394,7 +380,7 @@ DelegationSubscription <- R6::R6Class(
       private$authorize()
       private$check_stream()
       lead <- private$lead
-      buffer <- lead$.__enclos_env__$private$.delegation_buffer
+      buffer <- agent_private(lead)$.delegation_buffer
       cursor <- observation_cursor(buffer)
       retained <- buffer$events
       selected <- Filter(
@@ -406,7 +392,7 @@ DelegationSubscription <- R6::R6Class(
       gaps <- lapply(which(diff(boundaries) > 1), function(i) {
         list(from = boundaries[[i]] + 1, to = boundaries[[i + 1L]] - 1)
       })
-      disclosure <- lead$.__enclos_env__$private$.delegation_disclosure
+      disclosure <- lead_disclosure(lead)
       if (!is.null(private$delegation_id)) {
         selected <- Filter(
           function(event) {
@@ -416,14 +402,11 @@ DelegationSubscription <- R6::R6Class(
         )
       }
       events <- lapply(selected, function(event) {
-        view <- disclosure$redact(
+        view <- inspection_redact(
+          disclosure,
           list(kind = "event", event = event),
           private$requester
         )
-        inspection_portable(view)
-        if (!is.list(view)) {
-          cli::cli_abort("Disclosure redaction must return a list.")
-        }
         view$event
       })
       events <- Filter(Negate(is.null), events)
@@ -452,7 +435,7 @@ DelegationSubscription <- R6::R6Class(
         cli::cli_abort("This child observation subscription is closed.")
       }
       inspection_authorize(
-        private$lead$.__enclos_env__$private$.delegation_disclosure,
+        lead_disclosure(private$lead),
         private$requester,
         inspection_scope(private$lead)
       )
@@ -463,195 +446,9 @@ DelegationSubscription <- R6::R6Class(
     check_stream = function() {
       validate_observation_cursor(
         private$position,
-        private$lead$.__enclos_env__$private$.delegation_buffer
+        agent_private(private$lead)$.delegation_buffer
       )
       invisible(NULL)
     }
   )
 )
-
-# Budget traversal itself as well as the data. Inspect shared values without
-# materializing public records or serializing large payloads on the runtime path.
-observation_payload_fits <- function(
-  value,
-  max_bytes,
-  duration_projection = FALSE
-) {
-  remaining <- max_bytes
-  visit <- function(value, depth = 0L, json = FALSE) {
-    # Classed values become JSON text before the final envelope is serialized.
-    # Every input byte may require a six-byte Unicode escape in that projection.
-    json <- json || is.data.frame(value) || is.factor(value)
-    remaining <<- remaining - 64
-    if (remaining < 0 || depth > 64L) {
-      return(FALSE)
-    }
-    if (duration_projection && is.object(value)) {
-      # Projection calls JSON only for known data shapes. Reject application
-      # classes before any generic length/format method can be dispatched.
-      classes <- class(value)
-      known <- list(
-        "factor",
-        c("ordered", "factor"),
-        "Date",
-        c("POSIXct", "POSIXt"),
-        c("POSIXlt", "POSIXt"),
-        c("AsIs", "POSIXct", "POSIXt"),
-        c("AsIs", "POSIXlt", "POSIXt")
-      )
-      container <- !inherits(value, c("Date", "POSIXt")) &&
-        (is.data.frame(value) ||
-          (inherits(value, "AsIs") && is.list(unclass(value))))
-      if (
-        !container &&
-          !inherits(value, "difftime") &&
-          !any(vapply(known, identical, logical(1), classes))
-      ) {
-        return(FALSE)
-      }
-    }
-    if (is.null(value) || inherits(value, "ellmer::ContentThinking")) {
-      return(TRUE)
-    }
-    if (inherits(value, "condition")) {
-      return(visit(inspection_text(conditionMessage(value), 1024L), depth + 1L))
-    }
-    if (inherits(value, "difftime")) {
-      values <- unclass(value)
-      value_count <- length(values)
-      repeats <- if (json) max(1L, value_count) else 1L
-      if (!inspection_duration_shape_supported(value)) {
-        remaining <<- remaining -
-          nchar(inspection_duration_omission, type = "bytes") *
-            6 *
-            repeats
-        return(remaining >= 0)
-      }
-      units <- attr(value, "units", exact = TRUE)
-      # Duration values are projected as one numeric vector plus one units
-      # field. Data-frame rows repeat the units field, so charge the escaped
-      # units text once per value while still avoiding its materialization.
-      unit_bytes <- nchar(units, type = "bytes") * 6 + 16
-      value_bytes <- max(1L, value_count) * 32
-      if (json) {
-        unit_bytes <- unit_bytes * max(1L, value_count)
-      }
-      if (remaining - 128 - unit_bytes - value_bytes < 0) {
-        return(FALSE)
-      }
-      if (!inspection_duration_supported(value)) {
-        remaining <<- remaining -
-          nchar(inspection_duration_omission, type = "bytes") *
-            6 *
-            repeats
-        return(remaining >= 0)
-      }
-      remaining <<- remaining - 128 - unit_bytes - value_bytes
-      return(remaining >= 0)
-    }
-    if (inherits(value, "S7_object")) {
-      fields <- setdiff(S7::prop_names(value), c("tool", "extra", "json"))
-      if (inherits(value, "ellmer::Turn")) {
-        fields <- setdiff(fields, c("text", "role"))
-      }
-      for (field in fields) {
-        if (!visit(S7::prop(value, field), depth + 1L, json = json)) {
-          return(FALSE)
-        }
-      }
-      return(TRUE)
-    }
-    for (field in c("names", "dim", "dimnames", "levels")) {
-      metadata <- attr(value, field, exact = TRUE)
-      if (!is.null(metadata) && !visit(metadata, depth + 1L, json = json)) {
-        return(FALSE)
-      }
-    }
-    if (inherits(value, c("Date", "POSIXt"))) {
-      # Timestamp JSON needs quotes, separators, date/time, fractional seconds
-      # and zone text. Charge a conservative rendered allowance before format().
-      raw <- unclass(value)
-      count <- length(raw)
-      if (inherits(value, "POSIXlt")) {
-        # POSIXlt is a list of component vectors, not a vector of timestamps.
-        if (count * 64 > remaining) {
-          return(FALSE)
-        }
-        count <- 0L
-        for (component in raw) {
-          count <- max(count, length(unclass(component)))
-        }
-      }
-      remaining <<- remaining - 64 * count
-      return(remaining >= 0)
-    }
-    if (is.data.frame(value)) {
-      columns <- unclass(value)
-      row_bytes <- sum(6 * nchar(names(columns), type = "bytes") + 8)
-      if (duration_projection) {
-        # A malformed short column can repeat an omission for every declared
-        # row. Charge that expansion in this shared recursive budget before
-        # allocating it; nested frames and sibling columns share the allowance.
-        expands <- vapply(
-          columns,
-          function(column) {
-            inherits(column, "difftime") ||
-              is.data.frame(column) ||
-              (is.list(column) &&
-                (!is.object(column) || inherits(column, "AsIs")) &&
-                !inherits(column, "POSIXlt"))
-          },
-          logical(1)
-        )
-        row_bytes <- row_bytes + 128 * sum(expands)
-      }
-      remaining <<- remaining - inspection_data_frame_rows(value) * row_bytes
-      if (remaining < 0) return(FALSE)
-    }
-    list_container <- is.data.frame(value) || inherits(value, "AsIs")
-    list_value <- if (list_container) unclass(value) else value
-    if (is.list(list_value) && (!is.object(list_value) || list_container)) {
-      if (length(list_value) * 64 > remaining) {
-        return(FALSE)
-      }
-      for (item in list_value) {
-        if (!visit(item, depth + 1L, json = json)) return(FALSE)
-      }
-      return(TRUE)
-    }
-    if (is.character(value)) {
-      if (length(unclass(value)) * 16 > remaining) {
-        return(FALSE)
-      }
-      for (item in value) {
-        remaining <<- remaining -
-          16 -
-          if (is.na(item)) {
-            0
-          } else {
-            nchar(item, type = "bytes") * if (json) 6 else 1
-          }
-        if (remaining < 0) return(FALSE)
-      }
-      return(TRUE)
-    }
-    if (is.factor(value)) {
-      if (length(unclass(value)) * 16 > remaining) {
-        return(FALSE)
-      }
-      labels <- attr(value, "levels", exact = TRUE)
-      for (code in unclass(value)) {
-        label <- if (is.na(code)) NA_character_ else labels[[code]]
-        if (!visit(label, depth + 1L, json = TRUE)) return(FALSE)
-      }
-      return(TRUE)
-    }
-    if (is.atomic(value)) {
-      remaining <<- remaining -
-        length(unclass(value)) * if (is.raw(value)) 1 else 16
-      return(remaining >= 0)
-    }
-    FALSE
-  }
-  visit(value)
-}

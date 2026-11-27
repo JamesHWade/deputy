@@ -145,20 +145,7 @@ graph_fire_hooks <- function(agent, event, tool_name = NULL, ...) {
         do.call(registry$fire, c(list(event, tool_name = tool_name), args))
       },
       function(errors) {
-        rp <- root$.__enclos_env__$private
-        record <- rp$subagent_runs[[private$.delegation_id]]
-        record$hook_error <- paste(
-          c(
-            record$hook_error,
-            vapply(
-              errors,
-              function(x) paste0(x$event, ": ", x$error),
-              character(1)
-            )
-          ),
-          collapse = "\n"
-        )
-        rp$subagent_runs[[private$.delegation_id]] <- record
+        record_delegation_hook_errors(root, private$.delegation_id, errors)
       }
     )
   })

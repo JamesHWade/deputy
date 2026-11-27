@@ -24,12 +24,8 @@ graph_positive_integer <- function(value, field) {
   )
 }
 
-graph_agent_private <- function(agent) {
-  agent$.__enclos_env__$private
-}
-
 graph_chat <- function(agent) {
-  graph_agent_private(agent)$.chat
+  agent_private(agent)$.chat
 }
 
 graph_node_tools <- function(agent) {
@@ -59,7 +55,7 @@ graph_validate_root <- function(owner) {
   if (!inherits(owner, "Agent") || inherits(owner, "LeadAgent")) {
     graph_abort("A delegation graph requires a standalone Agent root.")
   }
-  private <- graph_agent_private(owner)
+  private <- agent_private(owner)
   if (
     isTRUE(private$run_active) ||
       length(private$active_subagents) ||
@@ -110,9 +106,8 @@ graph_validate_agents <- function(owner, agents) {
     graph_abort("Agent names must be unique.")
   }
 
-  graph_validate_root(owner)
   all_agents <- c(list(root = owner), agents)
-  all_private <- lapply(all_agents, graph_agent_private)
+  all_private <- lapply(all_agents, agent_private)
   for (index in seq_along(agents)) {
     validate_conversation_candidate(owner, agents[[index]])
     candidate_private <- all_private[[index + 1L]]
@@ -334,7 +329,7 @@ graph_route_install <- function(tree, source_name, source, route_name, spec) {
     spec$usage_limits
   )
   attr(tool, "deputy_graph_route_tree") <- tree
-  private <- graph_agent_private(source)
+  private <- agent_private(source)
   adapted <- private$adapt_tool(tool)
   attr(adapted, "deputy_graph_route_tree") <- tree
   tools <- private$.chat$get_tools()
@@ -373,7 +368,7 @@ graph_restore_member_tools <- function(tree, node_name) {
   if (is.null(agent)) {
     return(invisible(NULL))
   }
-  private <- graph_agent_private(agent)
+  private <- agent_private(agent)
   base_tools <- tree$base_tools[[node_name]]
   graph_restore_tools(private, base_tools)
   invisible(NULL)
@@ -388,7 +383,7 @@ graph_remove_root_routes <- function(tree, root = NULL) {
   if (is.null(root)) {
     return(invisible(NULL))
   }
-  private <- graph_agent_private(root)
+  private <- agent_private(root)
   tools <- private$.chat$get_tools()
   for (route_name in tree$route_names[["root"]] %||% character()) {
     if (
@@ -411,7 +406,7 @@ graph_restore_after_failure <- function(
   member_tools,
   member_hooks
 ) {
-  root_private <- graph_agent_private(owner)
+  root_private <- agent_private(owner)
   if (!is.null(root_tools)) {
     root_private$.chat$set_tools(root_tools)
   }
@@ -420,7 +415,7 @@ graph_restore_after_failure <- function(
     if (is.null(agent)) {
       next
     }
-    private <- graph_agent_private(agent)
+    private <- agent_private(agent)
     graph_restore_tools(private, member_tools[[node_name]])
     private$.hooks <- member_hooks[[node_name]]
     private$.delegation_tree <- NULL
@@ -439,9 +434,9 @@ graph_restore_after_failure <- function(
       error = function(error) {
         entry <- root_private$owned_conversations[[handle]]
         if (!is.null(entry)) {
-          child_private <- graph_agent_private(entry$agent)
+          child_private <- agent_private(entry$agent)
           child_private$.conversation_owner <- NULL
-          child_private$.hooks$.__enclos_env__$private$configuration_locked <- FALSE
+          hook_registry_set_locked(child_private$.hooks, FALSE)
           trusted_release_conversation(entry)
           attr(child_private$.chat, "deputy_conversation_owner") <- NULL
           root_private$owned_conversations[[handle]] <- NULL
@@ -491,7 +486,7 @@ retain_agent_graph <- function(
   root_tools <- graph_node_tools(owner)
   member_tools <- lapply(agents, graph_node_tools)
   member_hooks <- lapply(agents, function(agent) {
-    graph_agent_private(agent)$.hooks
+    agent_private(agent)$.hooks
   })
 
   tree <- new_delegation_tree(
@@ -559,13 +554,13 @@ retain_agent_graph <- function(
   # whole and a failure still sets up nothing.
   for (source_name in names(routes)) {
     source <- graph_route_source(tree, source_name)
-    graph_agent_private(source)$check_trusted_tools(source$get_tools())
+    agent_private(source)$check_trusted_tools(source$get_tools())
   }
 
-  root_private <- graph_agent_private(owner)
+  root_private <- agent_private(owner)
   root_private$.delegation_tree <- tree
   for (node_name in node_names) {
-    private <- graph_agent_private(agents[[node_name]])
+    private <- agent_private(agents[[node_name]])
     private$.delegation_tree <- tree
     private$.delegation_ancestors <- NULL
     entry <- root_private$owned_conversations[[handles[[node_name]]]]
@@ -575,12 +570,30 @@ retain_agent_graph <- function(
   handles
 }
 
+graph_is_idle <- function(private, tree) {
+  !isTRUE(private$run_active) &&
+    !length(private$active_subagents) &&
+    !any(vapply(
+      tree$handles,
+      function(handle) {
+        entry <- private$owned_conversations[[handle]]
+        !is.null(entry) && isTRUE(entry$busy)
+      },
+      logical(1)
+    )) &&
+    !any(vapply(
+      tree$agents,
+      function(agent) isTRUE(agent_private(agent)$run_active),
+      logical(1)
+    ))
+}
+
 graph_release_agent_graph <- function(
   owner,
   tree,
   allow_unavailable_root = FALSE
 ) {
-  private <- graph_agent_private(owner)
+  private <- agent_private(owner)
   root <- tryCatch(
     delegation_tree_root(tree),
     error = function(error) NULL
@@ -596,25 +609,8 @@ graph_release_agent_graph <- function(
     graph_abort("This Agent does not own a delegation graph.")
   }
   handles <- tree$handles
-  if (
-    isTRUE(private$run_active) ||
-      length(private$active_subagents) ||
-      any(vapply(
-        handles,
-        function(handle) {
-          entry <- private$owned_conversations[[handle]]
-          !is.null(entry) && isTRUE(entry$busy)
-        },
-        logical(1)
-      ))
-  ) {
+  if (!graph_is_idle(private, tree)) {
     graph_abort("Cancel and await graph work before release.")
-  }
-  for (node_name in names(tree$agents)) {
-    child_private <- graph_agent_private(tree$agents[[node_name]])
-    if (isTRUE(child_private$run_active)) {
-      graph_abort("Cancel and await graph work before release.")
-    }
   }
 
   graph_remove_root_routes(tree, owner)
@@ -624,7 +620,7 @@ graph_release_agent_graph <- function(
 
   private$.delegation_tree <- NULL
   for (node_name in names(tree$agents)) {
-    child_private <- graph_agent_private(tree$agents[[node_name]])
+    child_private <- agent_private(tree$agents[[node_name]])
     child_private$.delegation_tree <- NULL
     child_private$.delegation_ancestors <- NULL
   }
@@ -641,7 +637,7 @@ release_agent_graph <- function(owner) {
   if (!inherits(owner, "Agent")) {
     graph_abort("owner must be an Agent.")
   }
-  private <- graph_agent_private(owner)
+  private <- agent_private(owner)
   tree <- private$.delegation_tree
   if (is.null(tree)) {
     graph_abort("This Agent does not own a delegation graph.")
@@ -651,7 +647,7 @@ release_agent_graph <- function(owner) {
 
 # Registered as a finalizer callback without capturing the owner in the tree.
 finalize_delegation_graph <- function(owner) {
-  private <- tryCatch(graph_agent_private(owner), error = function(error) NULL)
+  private <- agent_private(owner)
   tree <- if (is.null(private)) NULL else private$.delegation_tree
   if (is.null(tree)) {
     return(invisible(NULL))
@@ -659,17 +655,7 @@ finalize_delegation_graph <- function(owner) {
   if (!identical(owner$agent_id, tree$root_agent_id)) {
     return(invisible(NULL))
   }
-  idle <- !isTRUE(private$run_active) &&
-    !length(private$active_subagents) &&
-    !any(vapply(
-      tree$handles,
-      function(handle) {
-        entry <- private$owned_conversations[[handle]]
-        !is.null(entry) && isTRUE(entry$busy)
-      },
-      logical(1)
-    ))
-  if (isTRUE(idle)) {
+  if (isTRUE(graph_is_idle(private, tree))) {
     tryCatch(
       graph_release_agent_graph(owner, tree, allow_unavailable_root = TRUE),
       error = function(error) NULL

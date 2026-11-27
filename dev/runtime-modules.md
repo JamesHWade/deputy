@@ -11,8 +11,18 @@ remain stable as these internal modules evolve.
 | S7 AgentDefinition values and routing normalization | `R/agent-definition.R` |
 | Portable YAML definition format and explicit registry resolution | `R/agent-definition-files.R` |
 | Mutable LeadAgent registry and delegated policy | `R/agents-multi.R` |
+| LeadAgent internal prompt, child setup and policy helpers | `R/agents-multi-helpers.R` |
 | Immutable briefs and bounded scoped evidence preparation | `R/delegation-input.R` |
 | Host governance forwarding, resource leases and owned cleanup | `R/delegation-binding.R` |
+| Portable content record/replay, duration projection and sizing | `R/delegation-content-records.R` |
+| Compact outcomes, authorized disclosure and history replay | `R/delegation-inspection.R` |
+| Bounded child events and independent observation cursors | `R/delegation-observation.R` |
+| Descendant tool cards in the lead's shown conversation | `R/delegation-activity.R` |
+| Activity presenter lifecycle and async stream merging | `R/delegation-activity-stream.R` |
+| Authorized Shiny child conversation panel | `R/subagent-chat.R` |
+| Shiny-independent Markdown and nested content sanitization | `R/subagent-chat-content.R` |
+| Subagent records saved with a shinychat conversation | `R/subagent-history.R` |
+| Typed JSON codec for portable subagent history records | `R/subagent-history-codec.R` |
 | Initial context receipts and independent context views | `R/delegation-manifest.R` |
 | Authorized host-selected native history forks | `R/context-fork.R` |
 | Admitted delegation records, lifecycle hooks and child settlement | `R/delegation-lifecycle.R` |
@@ -112,34 +122,22 @@ public interface across source files would make its contract harder to discover
 and document. This is the explicit exception allowed by #72, not a target to
 satisfy with arbitrary fragments.
 
-The other files listed in #72 are below 1,000 lines. Tests now separate hook
-registry behavior, hook result values, built-in hook policies, AgentDefinitions,
-and delegated permission/budget policy. Whole test cases move along those
-boundaries and continue to use shared helper files.
+The other files listed in #72 — and all other non-exempt `R/` source files
+following the cleanup series (#272–#278) — are below 1,000 lines. Count with
+`wc -l R/*.R | sort -n`.
 
-These files have since grown past 1,000 lines and have no agreed exception
-(line counts on 2026-11-26; tracked in cleanup issues #274–#277):
-
-| Source | Lines |
-| --- | --- |
-| `R/subagent-chat.R` | 1,514 |
-| `R/subagent-history.R` | 1,315 |
-| `R/delegation-activity.R` | 1,279 |
-| `R/agents-multi.R` | 1,126 |
-| `R/delegation-inspection.R` | 1,197 |
-
-Split each along its responsibility boundaries, or record an exception here
-with the reason, as for `R/agent.R`. Count with `wc -l R/*.R | sort -n`.
-
-`R/delegation-inspection.R` owns compact outcomes, authorized disclosure and
-settled public-content replay. It reuses ContextPolicy artifacts and ellmer
-record/replay; it does not execute children or implement a UI renderer.
-`R/tool-display-evidence.R` owns the versioned display/provenance projection
-that those records carry (ADR-0032), and `R/subagent-display.R` owns the
-adapter's inert rebuild of display HTML, so neither grows the files above.
-`R/subagent-history.R` owns saving those records with a shinychat conversation
-and the typed codec they are stored in (ADR-0034); the panel only asks it for
-the open conversation's views.
+`R/delegation-content-records.R` owns portable content record/replay, duration
+projection, and recursive payload sizing (`observation_payload_fits()`), keeping
+a clean one-way dependency from `R/delegation-inspection.R` and
+`R/delegation-observation.R`. `R/delegation-inspection.R` owns compact outcomes
+and authorized disclosure; it does not execute children or implement a UI
+renderer. `R/tool-display-evidence.R` owns the versioned display/provenance
+projection that those records carry (ADR-0032), and `R/subagent-display.R` owns
+the adapter's inert rebuild of display HTML. `R/subagent-history-codec.R` owns
+the typed JSON codec and `R/subagent-history.R` owns saving those records with
+a shinychat conversation (ADR-0034); the panel only asks it for the open
+conversation's views. `R/subagent-chat-content.R` owns Shiny-independent
+Markdown and nested content sanitization for `R/subagent-chat.R`.
 
 `R/delegation-observation.R` owns bounded event envelopes and authorized cursor
 readers. The Agent event kernel appends data; subscribers never consume child

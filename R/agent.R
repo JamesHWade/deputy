@@ -1321,10 +1321,10 @@ Agent <- R6::R6Class(
       }
       turns <- portable_tool_errors(private$transcript_turns())
       if (activity) {
-        turns <- activity_merge(turns, private$.activity_overlay)
+        turns <- overlay_merge(turns, private$.activity_overlay)
       }
       if (notes) {
-        turns <- activity_merge(turns, private$.note_overlay)
+        turns <- overlay_merge(turns, private$.note_overlay)
       }
       if (isTRUE(include_system_prompt)) {
         context <- self$get_context_turns(include_system_prompt = TRUE)
@@ -1661,8 +1661,8 @@ Agent <- R6::R6Class(
       if (is.null(found)) {
         NULL
       } else {
-        activity_merge_turn(
-          activity_merge_turn(
+        overlay_merge_turn(
+          overlay_merge_turn(
             found$turn,
             found$position,
             private$.activity_overlay

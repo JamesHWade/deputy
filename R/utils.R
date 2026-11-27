@@ -59,6 +59,37 @@ runtime_source_tool <- function(tool) {
   attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
 }
 
+# Read an R6 Agent's private environment safely.
+agent_private <- function(agent) {
+  tryCatch(agent$.__enclos_env__$private, error = function(error) NULL)
+}
+
+# Find the largest count in 0..n for which check(k) returns a non-NULL,
+# non-FALSE value, assuming monotonicity (if k fits, every j < k fits).
+bisect_max_fitting <- function(n, check, empty = NULL) {
+  if (n <= 0L) {
+    return(list(count = 0L, value = empty))
+  }
+  best <- check(n)
+  if (!is.null(best) && !isFALSE(best)) {
+    return(list(count = n, value = best))
+  }
+  low <- 0L
+  high <- n
+  best <- empty
+  while (high - low > 1L) {
+    middle <- (low + high) %/% 2L
+    candidate <- check(middle)
+    if (!is.null(candidate) && !isFALSE(candidate)) {
+      low <- middle
+      best <- candidate
+    } else {
+      high <- middle
+    }
+  }
+  list(count = low, value = best)
+}
+
 # Run a tool body and convert unexpected errors into ellmer tool rejections.
 tool_reject_on_error <- function(expr, prefix) {
   tryCatch(
