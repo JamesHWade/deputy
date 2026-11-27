@@ -372,15 +372,21 @@ members it asks through its routes, for as long as each task it gives them
 runs. Releasing the agent gives it back its own policy and removes the tools
 you made for it with `delegation_tool()`.
 
-Commons chats can be retained this way, but not as they come. Their
-`run_sql` and `run_r` tools compute anything the model asks for, so they would
-get around a trusted measure; remove them. Commons doesn't mark its other
-tools as closed-world, so set `open_world_hint = FALSE` on the ones you keep
-after checking that they don't reach outside the data you gave Commons, and
-name `call_measure` as the trusted tool. Each Commons chat makes its own
-`call_measure`, so for one producer across several specialists, take the tools
-from one Commons chat and give the same list to each with `$set_tools()`. The
-`commons-subagents` example, in
+With **commons** 0.2.0 or later, build one model-free `commons::commons()`
+object for the current viewer and wrap its public `$search()` and `$measure()`
+methods once with `tools_commons()`. Give the returned tools (`commons_search`
+and `commons_measure`) to every specialist and name `tools$commons_measure` as
+the trusted tool in `TrustedResults(measure = tools$commons_measure)`.
+`tools_commons()` never exposes arbitrary SQL or R execution, and sharing one
+bundle ensures every specialist runs the same producer object (a same-named
+substitute tool is rejected). You remain responsible for authorizing the
+`commons` object and its measures for the current viewer. Because public
+Commons methods return R values rather than the native tool evidence that
+`commons::agent()` attaches to its own tool calls (such as compiled SQL, bound
+parameters, or `commons_tag`), Deputy records bounded displays and
+trusted-result receipts for what it can verify without fabricating query
+metadata or claiming native Commons card parity. The `commons-subagents`
+example, in
 `system.file("examples/commons-subagents", package = "deputy")`, sets this up
 for three specialists in a Shiny app.
 

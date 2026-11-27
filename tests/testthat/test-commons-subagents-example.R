@@ -20,7 +20,7 @@ commons_example_environment <- function() {
 }
 
 commons_example_skip <- function() {
-  skip_if_commons_refuses()
+  skip_if_no_commons()
   skip_if_not_installed("callr")
   skip_if_not_installed("httpuv")
   skip_if_not(capabilities("png"), "PNG graphics are unavailable")
@@ -125,8 +125,12 @@ test_that("concurrent Commons specialists, a grandchild and a failure share one 
   from <- vapply(events, function(e) e$agent_name, character(1))
   expect_setequal(from, c("sales", "sales", "ops", "auditor"))
   expect_identical(
+    unique(vapply(events, function(e) e$tool_name, "")),
+    "commons_measure"
+  )
+  expect_identical(
     unique(vapply(events, function(e) e$tool_fingerprint, "")),
-    approval_tool_fingerprint(workflow$tools$call_measure)
+    approval_tool_fingerprint(workflow$tools$commons_measure)
   )
   auditor <- events[[which(from == "auditor")]]
   expect_identical(auditor$parent_agent_id, workflow$agents$sales$agent_id)
@@ -135,8 +139,8 @@ test_that("concurrent Commons specialists, a grandchild and a failure share one 
     c("on_time_rate", "revenue_by_region", "revenue_chart", "total_revenue")
   )
 
-  # The cards: who made each call, paired, with Commons' displays intact
-  # and inert.
+  # The cards: who made each call, paired, with bounded displays intact
+  # and inert, and without fabricated Commons query metadata.
   cards <- commons_cards(seen)
   results <- commons_results_by_label(cards)
   expect_setequal(names(results), c("sales", "ops", "auditor (via sales)"))
@@ -162,6 +166,7 @@ test_that("concurrent Commons specialists, a grandchild and a failure share one 
   )
   expect_true(any(grepl("<table", html, fixed = TRUE)))
   expect_true(any(grepl("East", html, fixed = TRUE)))
+  expect_true(any(grepl("revenue_by_region", html, fixed = TRUE)))
   expect_true(any(grepl(
     "<img src=\"data:image/png;base64,",
     html,
@@ -175,14 +180,15 @@ test_that("concurrent Commons specialists, a grandchild and a failure share one 
     expect_no_match(shown, "<script|\\son[a-z]+=|https?://")
   }
   measures <- Filter(
-    function(card) identical(card@request@name, "call_measure"),
+    function(card) identical(card@request@name, "commons_measure"),
     Filter(function(card) inherits(card, "ellmer::ContentToolResult"), cards)
   )
   expect_length(measures, 4L)
-  expect_identical(
-    unique(vapply(measures, function(card) card@extra$commons_tag, "")),
-    "A"
-  )
+  for (card in measures) {
+    expect_null(card@extra$commons_tag)
+    expect_null(card@extra$sql)
+    expect_null(card@extra$bindings)
+  }
   lineage <- results[["auditor (via sales)"]][[1L]]@extra$deputy_activity
   rows <- root$list_subagents()
   expect_identical(lineage$depth, 2L)
@@ -200,6 +206,34 @@ test_that("concurrent Commons specialists, a grandchild and a failure share one 
     is_activity_content,
     logical(1)
   )))
+})
+
+test_that("an unsupported question reports that no approved calculation covers it", {
+  commons_example_skip()
+  local <- commons_example_local()
+  workflow <- local$workflow
+  root <- workflow$root
+  activity_enable(root, function() "demo-user", 0.02)
+
+  seen <- commons_collect(root, "What is our inventory turnover?")
+  cards <- commons_cards(seen)
+  results <- Filter(
+    function(card) inherits(card, "ellmer::ContentToolResult"),
+    cards
+  )
+  expect_length(results, 1L)
+  expect_identical(results[[1L]]@request@name, "commons_search")
+  expect_identical(commons_label(results[[1L]]), "ops")
+  expect_match(
+    results[[1L]]@value,
+    "No approved calculation covers this question"
+  )
+  expect_match(
+    root$last_turn()@text,
+    "No approved calculation covers inventory turnover"
+  )
+  expect_identical(workflow$effects$runs, 0L)
+  expect_length(workflow$delivered$events, 0L)
 })
 
 test_that("a second delegation to the same Commons specialist is numbered", {
@@ -257,7 +291,7 @@ test_that("cancelling a slow Commons specialist stops only that work", {
   expect_match(root$last_turn()@text, "stopped before it finished")
 })
 
-test_that("a reopened conversation shows the same cards and records and runs nothing", {
+test_that("a reopened conversation shows the same receipt links, cards, and records and runs nothing", {
   commons_example_skip()
   skip_if_not_installed("shiny")
   skip_if_not_installed("shinychat", "0.5.0")
@@ -275,7 +309,7 @@ test_that("a reopened conversation shows the same cards and records and runs not
     scope = "demo",
     title = NULL
   )
-  session_with <- function(workflow, body) {
+  session_with <- function(workflow, trusted, body) {
     shiny::testServer(
       function(input, output, session) {
         root <- workflow$root
@@ -287,10 +321,20 @@ test_that("a reopened conversation shows the same cards and records and runs not
           root,
           function() "demo-user"
         )
+        session$userData$receipts <- example$commons_example_receipt_history(
+          chat,
+          root,
+          trusted
+        )
       },
       {
         session$flushReact()
-        body(session, session$userData$chat, session$userData$saved)
+        body(
+          session,
+          session$userData$chat,
+          session$userData$saved,
+          session$userData$receipts
+        )
       }
     )
   }
@@ -310,13 +354,15 @@ test_that("a reopened conversation shows the same cards and records and runs not
     effects,
     on_result = trusted$on_result
   )
+  trusted$bind_root(first$root)
   withr::defer(example$commons_example_release(first))
   conversation <- NULL
   live <- NULL
   live_turns <- NULL
+  live_receipts <- NULL
   warnings <- character()
   withCallingHandlers(
-    session_with(first, function(session, chat, saved) {
+    session_with(first, trusted, function(session, chat, saved, receipts) {
       session$setInputs(
         chat_user_input = "Report revenue by region and on-time delivery."
       )
@@ -335,6 +381,7 @@ test_that("a reopened conversation shows the same cards and records and runs not
       conversation <<- shiny::isolate(chat$history$conversation_id())
       live <<- recorded_cards(first$root)
       live_turns <<- lapply(first$root$get_turns(), ellmer::contents_record)
+      live_receipts <<- trusted$for_conversation(conversation)
     }),
     warning = function(warning) {
       warnings <<- c(warnings, conditionMessage(warning))
@@ -346,6 +393,7 @@ test_that("a reopened conversation shows the same cards and records and runs not
   expect_length(live_turns, 4L)
   # Every measure reached the app's list once, so every call succeeded.
   expect_length(shiny::isolate(trusted$results()), 4L)
+  expect_length(live_receipts, 4L)
   shown <- Filter(
     function(card) identical(card$class, "ellmer::ContentToolResult"),
     live
@@ -361,46 +409,75 @@ test_that("a reopened conversation shows the same cards and records and runs not
   expect_identical(runs, 4L)
 
   # A new session with new agents opens the saved conversation.
-  second <- example$commons_example_workflow(fixture, effects)
+  second_trusted <- example$commons_example_results()
+  second <- example$commons_example_workflow(
+    fixture,
+    effects,
+    on_result = second_trusted$on_result
+  )
+  second_trusted$bind_root(second$root)
   withr::defer(example$commons_example_release(second))
   # Reading the saved conversation back raises no warnings either.
-  expect_no_warning(session_with(second, function(session, chat, saved) {
-    session$setInputs(chat_history_select = list(id = conversation))
-    session$flushReact()
-    # Every turn comes back, the failed delegation's tool error included.
-    expect_identical(
-      lapply(second$root$get_turns(), ellmer::contents_record),
-      live_turns
-    )
-    expect_identical(recorded_cards(second$root), live)
-    views <- saved$restored(transcript = FALSE)
-    names <- vapply(views, function(view) view$outcome$runtime$agent_name, "")
-    expect_setequal(names, c("sales", "ops", "auditor"))
-    status <- vapply(views, function(view) view$outcome$runtime$status, "")
-    expect_identical(status[names == "ops"], "failed")
-    by_name <- stats::setNames(views, names)
-    expect_identical(
-      by_name$auditor$outcome$runtime$parent_delegation_id,
-      by_name$sales$outcome$runtime$delegation_id
-    )
-    sales <- saved$restored()[[which(names == "sales")]]
-    shown <- unlist(lapply(sales$turns, function(turn) turn@contents))
-    displays <- Filter(
-      function(content) inherits(content, "ellmer::ContentToolResult"),
-      shown
-    )
-    expect_true(any(vapply(
-      displays,
-      function(content) {
-        grepl("data:image/png;base64,", content@extra$display$html %||% "")
-      },
-      logical(1)
-    )))
-  }))
+  expect_no_warning(session_with(
+    second,
+    second_trusted,
+    function(session, chat, saved, receipts) {
+      session$setInputs(chat_history_select = list(id = conversation))
+      session$flushReact()
+      # Every turn comes back, the failed delegation's tool error included.
+      expect_identical(
+        lapply(second$root$get_turns(), ellmer::contents_record),
+        live_turns
+      )
+      expect_identical(recorded_cards(second$root), live)
+      # Restored receipt links match the original deliveries identically.
+      restored_links <- shiny::isolate(receipts$restored())
+      expect_identical(restored_links, live_receipts)
+      views <- saved$restored(transcript = FALSE)
+      names <- vapply(
+        views,
+        function(view) view$outcome$runtime$agent_name,
+        ""
+      )
+      expect_setequal(names, c("sales", "ops", "auditor"))
+      status <- vapply(views, function(view) view$outcome$runtime$status, "")
+      expect_identical(status[names == "ops"], "failed")
+      by_name <- stats::setNames(views, names)
+      expect_identical(
+        by_name$auditor$outcome$runtime$parent_delegation_id,
+        by_name$sales$outcome$runtime$delegation_id
+      )
+      # Every restored receipt links to its restored delegation.
+      restored_delegation_ids <- vapply(
+        views,
+        function(view) view$outcome$runtime$delegation_id,
+        ""
+      )
+      expect_true(all(vapply(
+        restored_links,
+        function(link) link$delegation_id %in% restored_delegation_ids,
+        logical(1)
+      )))
+      sales <- saved$restored()[[which(names == "sales")]]
+      shown <- unlist(lapply(sales$turns, function(turn) turn@contents))
+      displays <- Filter(
+        function(content) inherits(content, "ellmer::ContentToolResult"),
+        shown
+      )
+      expect_true(any(vapply(
+        displays,
+        function(content) {
+          grepl("data:image/png;base64,", content@extra$display$html %||% "")
+        },
+        logical(1)
+      )))
+    }
+  ))
   # Reopening ran nothing and delivered nothing again.
   expect_identical(effects$runs, runs)
   expect_identical(length(fixture$requests()), requests)
   expect_length(second$delivered$events, 0L)
+  expect_length(shiny::isolate(second_trusted$results()), 0L)
   expect_length(second$root$list_subagents()$delegation_id, 0L)
 })
 
@@ -422,7 +499,7 @@ test_that("a failed delivery reaches each Commons specialist as a tool error", {
   measures <- Filter(
     function(card) {
       inherits(card, "ellmer::ContentToolResult") &&
-        identical(card@request@name, "call_measure")
+        identical(card@request@name, "commons_measure")
     },
     commons_cards(seen)
   )
@@ -442,11 +519,11 @@ test_that("Commons specialists outside the strict configuration are refused", {
     data,
     example$commons_example_effects()
   )
-  pool <- example$commons_example_chat(fixture, "pool", data, layer)
-  tools <- example$commons_strict_tools(pool)
+  commons_obj <- example$commons_example_object(data, layer)
+  tools <- tools_commons(commons_obj)
   root <- Agent$new(
     fixture$chat("root"),
-    trusted_results = TrustedResults(measure = tools$call_measure)
+    trusted_results = TrustedResults(measure = tools$commons_measure)
   )
   graph <- function(specialist) {
     root$retain_agent_graph(
@@ -466,21 +543,53 @@ test_that("Commons specialists outside the strict configuration are refused", {
       max_concurrency = 1L
     )
   }
-  # Commons as it ships: its SQL and R tools could compute anything.
-  ordinary <- Agent$new(example$commons_example_chat(
-    fixture,
-    "sales",
-    data,
-    layer
-  ))
-  expect_error(graph(ordinary), class = "deputy_tool_registration")
-  # Strict, but with its own call_measure rather than the pool's.
-  own <- example$commons_example_chat(fixture, "sales", data, layer)
-  own$set_tools(example$commons_strict_tools(own))
+  # A second tools_commons() bundle creates a distinct tool object and cannot
+  # stand in for the root's designated commons_measure.
+  separate_bundle <- tools_commons(commons_obj)
   expect_error(
-    graph(Agent$new(own)),
+    graph(Agent$new(fixture$chat("sales"), tools = separate_bundle)),
     "must be the tool named in the policy"
   )
+  # A same-named substitute producer is also rejected.
+  substitute_measure <- ellmer::tool(
+    fun = function(name, arguments = "{}") "0",
+    name = "commons_measure",
+    description = "Substitute.",
+    arguments = list(
+      name = ellmer::type_string("Name."),
+      arguments = ellmer::type_string("Args.", required = FALSE)
+    ),
+    convert = FALSE,
+    annotations = ellmer::tool_annotations(
+      read_only_hint = TRUE,
+      destructive_hint = FALSE,
+      open_world_hint = FALSE,
+      idempotent_hint = TRUE
+    )
+  )
+  expect_error(
+    graph(Agent$new(
+      fixture$chat("sales"),
+      tools = list(tools$commons_search, substitute_measure)
+    )),
+    "must be the tool named in the policy"
+  )
+  # Adding arbitrary code execution alongside tools_commons is rejected.
+  expect_error(
+    graph(Agent$new(
+      fixture$chat("sales"),
+      tools = c(tools, list(tool_run_r_code))
+    )),
+    class = "deputy_tool_registration"
+  )
+  # Raw commons::agent() chat keeps run_sql/run_r and is refused when sandboxed.
+  if (is.null(commons_refusal())) {
+    ordinary <- Agent$new(commons::agent(
+      fixture$chat("sales"),
+      commons = commons_obj
+    ))
+    expect_error(graph(ordinary), class = "deputy_tool_registration")
+  }
   expect_length(root$get_tools(), 0L)
   expect_length(root$.__enclos_env__$private$owned_conversations, 0L)
 })

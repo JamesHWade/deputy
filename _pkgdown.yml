@@ -185,6 +185,7 @@ reference:
   contents:
   - TrustedResults
   - result_trusted_results
+  - tools_commons
 
 - title: Hooks
   desc: Run R code at fixed points in an agent's lifecycle.

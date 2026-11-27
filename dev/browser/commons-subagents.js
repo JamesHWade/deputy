@@ -95,6 +95,8 @@ const expandAll = async (page) => {
   await b.waitForTimeout(3000);
   check('B: reopening ran nothing (requests and measure runs unchanged)', (await metrics(b)) === mA, [mA, await metrics(b)]);
   check('B: no trusted result delivered in the reopening session', (await b.textContent('#trusted')).includes('No trusted measure has run'));
+  const savedReceipts = await b.$$eval('#saved-receipts tbody tr', rows => rows.map(r => [...r.cells].map(c => c.textContent.trim())));
+  check('B: saved receipt links restored read-only', savedReceipts.length === 5 && new Set(savedReceipts.map(r => r[2])).size === 5, savedReceipts);
   const panelB = (await b.textContent('#subagents-activity').catch(() => '')) || (await b.textContent('#subagents'));
   check('B: subagent panel lists the saved subagents', /sales/.test(panelB) && /ops/.test(panelB) && /auditor/.test(panelB), panelB.replace(/\s+/g, ' ').slice(0, 300));
   const options = await b.$$eval('#subagents-choice option', os => os.map(o => ({ v: o.value, t: o.textContent.trim() })));
@@ -105,7 +107,7 @@ const expandAll = async (page) => {
     const visible = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
     return { text: t ? t.textContent.replace(/\s+/g, ' ').slice(0, 300) : '', visibleInputs: t ? [...t.querySelectorAll('[contenteditable="true"], textarea')].filter(visible).length : -1 };
   });
-  check('B: a saved subagent conversation opens read-only', /call_measure|revenue|Ran a trusted calculation/i.test(transcript.text) && transcript.visibleInputs === 0, transcript);
+  check('B: a saved subagent conversation opens read-only', /commons_measure|revenue|Ran a trusted calculation/i.test(transcript.text) && transcript.visibleInputs === 0, transcript);
   await b.screenshot({ path: SP + '/shot-B.png', fullPage: true });
   check('B: still nothing ran', (await metrics(b)) === mA, [mA, await metrics(b)]);
   await b.close();

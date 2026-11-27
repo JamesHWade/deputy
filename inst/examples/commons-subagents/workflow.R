@@ -122,9 +122,9 @@ commons_example_layer <- function(data, effects) {
   )
 }
 
-commons_example_chat <- function(fixture, role, data, layer) {
+# Build the model-free Commons 0.2.0 object once for the viewer.
+commons_example_object <- function(data, layer) {
   commons::commons(
-    fixture$chat(role),
     data_sources = commons::data_source(
       sales = data$sales,
       shipments = data$shipments
@@ -133,25 +133,17 @@ commons_example_chat <- function(fixture, role, data, layer) {
   )
 }
 
-# Commons as it ships also has `run_sql` and `run_r`, which compute anything
-# the model asks for and so could stand in for a trusted measure. Keep only
-# the pool search and the measures, and mark them closed-world: they read the
-# data frames given to Commons and nothing else.
-commons_strict_tools <- function(pool) {
-  tools <- pool$get_tools()[c("search_pool", "call_measure")]
-  lapply(tools, function(tool) {
-    tool@annotations$open_world_hint <- FALSE
-    tool
-  })
-}
-
-# A Commons specialist: an actual Commons chat, given the shared strict tools
-# so that every specialist runs the same `call_measure`.
-commons_specialist <- function(fixture, role, data, layer, tools, routes) {
-  chat <- commons_example_chat(fixture, role, data, layer)
-  chat$set_tools(tools)
+# A specialist given the shared Commons tools so every specialist runs the
+# same `commons_measure` producer and never sees arbitrary SQL or R tools.
+commons_specialist <- function(fixture, role, tools, routes) {
   deputy::Agent$new(
-    chat,
+    fixture$chat(role),
+    system_prompt = paste(
+      "Answer questions using only the approved Commons measures found with",
+      "commons_search and run with commons_measure. If no approved calculation",
+      "covers the question, report that no approved calculation covers it."
+    ),
+    tools = tools,
     permissions = deputy::Permissions(
       mode = "readonly",
       tool_allowlist = c(names(tools), routes)
@@ -169,10 +161,10 @@ commons_example_workflow <- function(
 ) {
   data <- commons_example_data()
   layer <- commons_example_layer(data, effects)
-  # The pool defines the one `call_measure` every specialist uses; it never
-  # answers a question itself.
-  pool <- commons_example_chat(fixture, "pool", data, layer)
-  tools <- commons_strict_tools(pool)
+  # Build the Commons object and its tool bundle once so every specialist
+  # shares the exact `commons_measure` tool named in TrustedResults().
+  commons_obj <- commons_example_object(data, layer)
+  tools <- deputy::tools_commons(commons_obj)
   disclosure <- deputy::DelegationDisclosure(
     authorize = function(candidate, scope) {
       identical(candidate, requester) &&
@@ -185,7 +177,8 @@ commons_example_workflow <- function(
     fixture$chat("root"),
     system_prompt = paste(
       "COMMONS_ROOT: answer questions about sales and operations by asking",
-      "the specialists, then summarize what they report."
+      "the specialists, then summarize what they report. If no approved",
+      "calculation covers a question, say so."
     ),
     # Every call in the graph is also checked against the root's permissions,
     # so the root allows the specialists' tools as well as its own routes.
@@ -201,7 +194,7 @@ commons_example_workflow <- function(
     delegation_scope = list(owner_id = requester),
     delegation_disclosure = disclosure,
     trusted_results = deputy::TrustedResults(
-      measure = tools$call_measure,
+      measure = tools$commons_measure,
       on_result = function(event) {
         delivered$events[[length(delivered$events) + 1L]] <- event
         on_result(event)
@@ -209,23 +202,9 @@ commons_example_workflow <- function(
     )
   )
   agents <- list(
-    sales = commons_specialist(
-      fixture,
-      "sales",
-      data,
-      layer,
-      tools,
-      "ask_auditor"
-    ),
-    ops = commons_specialist(fixture, "ops", data, layer, tools, character()),
-    auditor = commons_specialist(
-      fixture,
-      "auditor",
-      data,
-      layer,
-      tools,
-      character()
-    )
+    sales = commons_specialist(fixture, "sales", tools, "ask_auditor"),
+    ops = commons_specialist(fixture, "ops", tools, character()),
+    auditor = commons_specialist(fixture, "auditor", tools, character())
   )
   route <- function(target, description) {
     list(
@@ -257,7 +236,7 @@ commons_example_workflow <- function(
     root = root,
     agents = agents,
     handles = handles,
-    pool = pool,
+    commons = commons_obj,
     tools = tools,
     data = data,
     effects = effects,
@@ -266,17 +245,121 @@ commons_example_workflow <- function(
   )
 }
 
+# Short summary of what a measure returned, for the trusted-results table.
+commons_example_trusted_value <- function(value) {
+  if (inherits(value, "ellmer::ContentToolResult")) {
+    value <- value@value
+  }
+  text <- paste(format(value), collapse = "\n")
+  first <- trimws(sub("\n.*", "", text))
+  substr(first, 1L, 80L)
+}
+
+commons_example_receipt_link <- function(event) {
+  list(
+    result_id = event$result_id %||% "",
+    measure = event$arguments$name %||% event$tool_name %||% "",
+    agent_name = event$agent_name %||% "root",
+    delegation_id = event$delegation_id %||% "",
+    tool_fingerprint = event$tool_fingerprint %||% "",
+    value = commons_example_trusted_value(event$value)
+  )
+}
+
 # The app's list of trusted results. The root's `on_result` runs outside any
 # reactive context, so it reads the current list with `isolate()`; reading it
 # directly would fail, and a failed delivery fails the tool call.
-commons_example_results <- function() {
+commons_example_results <- function(root = NULL) {
   results <- shiny::reactiveVal(list())
+  records <- new.env(parent = emptyenv())
+  records$root <- root
+  records$by_conversation <- list()
   list(
     results = results,
+    bind_root = function(agent) {
+      records$root <- agent
+      invisible(agent)
+    },
     on_result = function(event) {
       results(c(shiny::isolate(results()), list(event)))
+      conv_id <- if (!is.null(records$root)) {
+        records$root$conversation_id
+      } else {
+        NULL
+      }
+      if (is.character(conv_id) && length(conv_id) == 1L && nzchar(conv_id)) {
+        existing <- records$by_conversation[[conv_id]] %||% list()
+        records$by_conversation[[conv_id]] <- c(
+          existing,
+          list(commons_example_receipt_link(event))
+        )
+      }
+    },
+    for_conversation = function(conv_id) {
+      if (!is.character(conv_id) || length(conv_id) != 1L || !nzchar(conv_id)) {
+        return(list())
+      }
+      records$by_conversation[[conv_id]] %||% list()
     }
   )
+}
+
+# Save and restore read-only receipt links alongside a shinychat conversation
+# so reopening shows the same receipt IDs and producer links without running
+# any model, measure, or delivery callback.
+commons_example_receipt_history <- function(chat, root, trusted) {
+  restored <- shiny::reactiveVal(list())
+  state <- new.env(parent = emptyenv())
+  state$restored <- list()
+  state$conversation_id <- NULL
+
+  merge_receipts <- function(existing, added) {
+    combined <- c(existing, added)
+    if (!length(combined)) {
+      return(list())
+    }
+    ids <- vapply(
+      combined,
+      function(item) item$result_id %||% "",
+      character(1)
+    )
+    combined[!duplicated(ids)]
+  }
+
+  chat$history$on_save(function(values) {
+    conv_id <- root$conversation_id
+    prior <- if (identical(state$conversation_id, conv_id)) {
+      state$restored
+    } else {
+      list()
+    }
+    links <- merge_receipts(prior, trusted$for_conversation(conv_id))
+    values$commons_receipt_links <- as.character(jsonlite::toJSON(
+      links,
+      auto_unbox = TRUE
+    ))
+    values
+  })
+
+  chat$history$on_restore(function(values) {
+    raw <- values$commons_receipt_links
+    links <- if (is.character(raw) && length(raw) == 1L && nzchar(raw)) {
+      tryCatch(
+        jsonlite::fromJSON(raw, simplifyVector = FALSE),
+        error = function(error) list()
+      )
+    } else {
+      list()
+    }
+    if (!is.list(links)) {
+      links <- list()
+    }
+    state$conversation_id <- root$conversation_id
+    state$restored <- links
+    restored(links)
+  })
+
+  list(restored = restored)
 }
 
 commons_example_release <- function(workflow) {

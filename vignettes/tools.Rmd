@@ -218,6 +218,9 @@ load only skills you trust. `skills_list()` lists the skills in a directory.
 
 ## More tools
 
+- [Trusted mini-agents](trusted-mini-agents.html): `tools_commons()` wraps the
+  public search and measure methods of a `commons::commons()` object (Commons
+  0.2.0 or later) for sharing across a lead agent and specialists.
 - [Running R code](code-execution.html): trusted R execution, persistent R
   sessions, and sandboxed R, Python and SQL execution through MCP Console.
 - [MCP servers](mcp.html): tools, resources and prompts from Model Context

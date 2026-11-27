@@ -22,6 +22,7 @@ greeting <- paste(
   "* <span class=\"suggestion\">Report revenue by region and on-time",
   "delivery.</span>\n",
   "* <span class=\"suggestion\">Ask sales again.</span>\n",
+  "* <span class=\"suggestion\">What is our inventory turnover?</span>\n",
   "* <span class=\"suggestion\">Run a slow operations check.</span>"
 )
 
@@ -43,6 +44,7 @@ ui <- page_fillable(
       card(
         card_header("Trusted results this session"),
         uiOutput("trusted"),
+        uiOutput("saved_receipts"),
         fill = FALSE
       ),
       card(
@@ -59,20 +61,6 @@ ui <- page_fillable(
   )
 )
 
-# The first line of what the measure returned. Commons tells the model that a
-# table or chart is already on screen; here that card is in the conversation.
-trusted_value <- function(value) {
-  if (inherits(value, "ellmer::ContentToolResult")) {
-    value <- value@value
-  }
-  text <- paste(format(value), collapse = "\n")
-  first <- trimws(sub("\n.*", "", text))
-  if (startsWith(first, "This measure result is already visible")) {
-    return("Shown in the conversation")
-  }
-  substr(first, 1L, 80L)
-}
-
 server <- function(input, output, session) {
   requester <- "demo-user"
   user <- function() requester
@@ -84,6 +72,7 @@ server <- function(input, output, session) {
     requester = requester
   )
   root <- workflow$root
+  trusted$bind_root(root)
 
   chat <- chat_server(
     "chat",
@@ -93,6 +82,7 @@ server <- function(input, output, session) {
   )
   subagent_chat_activity(chat, root, user)
   saved <- subagent_chat_history(chat, root, user)
+  receipts <- commons_example_receipt_history(chat, root, trusted)
   subagent_chat_server(
     "subagents",
     root,
@@ -117,7 +107,8 @@ server <- function(input, output, session) {
       tags$tr(
         tags$td(event$arguments$name %||% event$tool_name),
         tags$td(event$agent_name %||% "root"),
-        tags$td(trusted_value(event$value))
+        tags$td(tags$code(event$result_id %||% "")),
+        tags$td(commons_example_trusted_value(event$value))
       )
     })
     tags$table(
@@ -126,9 +117,38 @@ server <- function(input, output, session) {
       tags$thead(tags$tr(
         tags$th("Measure"),
         tags$th("From"),
+        tags$th("Receipt"),
         tags$th("Value")
       )),
       tags$tbody(rows)
+    )
+  })
+  output$saved_receipts <- renderUI({
+    links <- receipts$restored()
+    if (!length(links)) {
+      return(NULL)
+    }
+    rows <- lapply(links, function(link) {
+      tags$tr(
+        tags$td(link$measure %||% ""),
+        tags$td(link$agent_name %||% "root"),
+        tags$td(tags$code(link$result_id %||% "")),
+        tags$td(link$value %||% "")
+      )
+    })
+    tags$div(
+      id = "saved-receipts",
+      tags$h6("Saved receipts for this conversation", class = "mt-2"),
+      tags$table(
+        class = "table table-sm",
+        tags$thead(tags$tr(
+          tags$th("Measure"),
+          tags$th("From"),
+          tags$th("Receipt"),
+          tags$th("Value")
+        )),
+        tags$tbody(rows)
+      )
     )
   })
   output$metrics <- renderText({

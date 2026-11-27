@@ -1259,23 +1259,21 @@ test_that("members sharing one callback function each get their delivery", {
 })
 
 test_that("Commons specialists qualify only when constrained", {
-  skip_if_commons_refuses()
+  skip_if_no_commons()
   sales <- data.frame(region = c("north", "south"), revenue = c(25, 35))
-  commons_chat <- function(server) {
-    commons::commons(
-      runtime_chat(server),
-      data_sources = commons::data_source(sales = sales),
-      semantic_layer = commons::semantic_layer(commons::measure(
-        "total_revenue",
-        "Total revenue across regions.",
-        function() sum(sales$revenue),
-        arguments = list()
-      ))
-    )
-  }
+  commons_obj <- commons::commons(
+    data_sources = commons::data_source(sales = sales),
+    semantic_layer = commons::semantic_layer(commons::measure(
+      "total_revenue",
+      "Total revenue across regions.",
+      function() sum(sales$revenue),
+      arguments = list()
+    ))
+  )
+  tools <- tools_commons(commons_obj)
   permissions <- Permissions(
     mode = "readonly",
-    tool_allowlist = c("search_pool", "call_measure")
+    tool_allowlist = names(tools)
   )
   adopt <- function(chat, root) {
     adopt_chat(
@@ -1288,34 +1286,37 @@ test_that("Commons specialists qualify only when constrained", {
       name = "sales"
     )
   }
-  # As Commons ships, its SQL and R fallbacks could compute any number.
-  ordinary <- commons_chat(list(url = "http://127.0.0.1:9/v1"))
-  expect_true(all(c("run_sql", "run_r") %in% names(ordinary$get_tools())))
-  root <- routes_root(
-    routes_offline_chat(),
-    ordinary$get_tools()$call_measure,
-    routes_deliveries()
-  )
-  expect_error(adopt(ordinary, root), class = "deputy_tool_registration")
-  expect_length(root$.__enclos_env__$private$owned_conversations, 0L)
+  # As Commons' own agent chat ships, its SQL and R fallbacks could compute any
+  # number and are refused by TrustedResults.
+  if (is.null(commons_refusal())) {
+    ordinary <- commons::agent(
+      runtime_chat(list(url = "http://127.0.0.1:9/v1")),
+      commons = commons_obj
+    )
+    expect_true(all(c("run_sql", "run_r") %in% names(ordinary$get_tools())))
+    root_ordinary <- routes_root(
+      routes_offline_chat(),
+      tools$commons_measure,
+      routes_deliveries()
+    )
+    expect_error(
+      adopt(ordinary, root_ordinary),
+      class = "deputy_tool_registration"
+    )
+    expect_length(root_ordinary$.__enclos_env__$private$owned_conversations, 0L)
+  }
 
-  # Constrained: no fallbacks, closed-world tools, call_measure as producer.
+  # Supported Commons 0.2.0 setup: shared tools_commons() bundle, no fallbacks,
+  # commons_measure as the designated producer.
   sales_server <- local_runtime_server(list(
     runtime_reply(
-      tool = "call_measure",
+      tool = "commons_measure",
       arguments = list(name = "total_revenue", arguments = "{}")
     ),
     runtime_reply("Total revenue is 60.")
   ))
-  analyst <- commons_chat(sales_server)
-  kept <- lapply(
-    analyst$get_tools()[c("search_pool", "call_measure")],
-    function(tool) {
-      tool@annotations$open_world_hint <- FALSE
-      tool
-    }
-  )
-  analyst$set_tools(kept)
+  analyst <- runtime_chat(sales_server)
+  analyst$set_tools(tools)
   deliveries <- routes_deliveries()
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "ask_sales", arguments = list(task = "Revenue?")),
@@ -1323,7 +1324,7 @@ test_that("Commons specialists qualify only when constrained", {
   ))
   root <- routes_root(
     runtime_chat(root_server),
-    analyst$get_tools()$call_measure,
+    tools$commons_measure,
     deliveries
   )
   handle <- adopt(analyst, root)
@@ -1332,9 +1333,9 @@ test_that("Commons specialists qualify only when constrained", {
   expect_length(deliveries$events, 1L)
   event <- deliveries$events[[1L]]
   expect_identical(event$result_type, "measure")
-  expect_identical(event$tool_name, "call_measure")
+  expect_identical(event$tool_name, "commons_measure")
   expect_identical(event$arguments$name, "total_revenue")
-  expect_identical(event$value@extra$commons_tag, "A")
+  expect_null(event$value@extra$commons_tag)
   expect_match(paste(format(event$value@value), collapse = ""), "60")
   expect_length(result_trusted_results(result), 1L)
 })

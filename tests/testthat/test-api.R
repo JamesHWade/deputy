@@ -110,6 +110,7 @@ test_that("public API is deliberate", {
     "tools_all",
     "tools_preset",
     "tools_interactive",
+    "tools_commons",
     "tools_mcp",
     "mcp_console_connection",
     "mcp_console_control",
