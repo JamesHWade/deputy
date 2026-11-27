@@ -1,3 +1,26 @@
+create_checkpoint_callback_chat <- function() {
+  chat <- create_mock_chat("done")
+  request_callback <- NULL
+  result_callback <- NULL
+  original_request_callback <- chat$on_tool_request
+  original_result_callback <- chat$on_tool_result
+
+  chat$on_tool_request <- function(callback) {
+    request_callback <<- callback
+    original_request_callback(callback)
+  }
+  chat$on_tool_result <- function(callback) {
+    result_callback <<- callback
+    original_result_callback(callback)
+  }
+
+  list(
+    chat = chat,
+    request_callback = function() request_callback,
+    result_callback = function() result_callback
+  )
+}
+
 test_that("Agent checkpoints journal successful mutating tool calls", {
   root <- withr::local_tempdir(pattern = "deputy-agent-checkpoint-")
   path <- file.path(root, "note.txt")

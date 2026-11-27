@@ -1034,7 +1034,6 @@ test_that("native tool paths resolve against the Agent workspace", {
 
 test_that("R code tools execute from the Agent workspace", {
   skip_on_cran()
-  skip_if_not_installed("callr")
   root <- withr::local_tempdir(pattern = "deputy-r-workspace-")
   outside <- withr::local_tempdir(pattern = "deputy-r-outside-")
   agent <- Agent$new(

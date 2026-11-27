@@ -234,9 +234,6 @@ test_that("a stream made after an interrupt starts as usual", {
 })
 
 test_that("an interrupt during a run also stops a stream that is waiting to start", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   chat <- create_mock_chat(list("unused"))
   dispatched <- 0L
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {

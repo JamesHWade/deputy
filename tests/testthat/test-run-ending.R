@@ -246,9 +246,6 @@ test_that("a caller who interrupts with the parent's word is still the one who s
 })
 
 test_that("a child stopped because its parent's run ended is stopped by the parent", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   root_server <- local_runtime_server(list(
     runtime_reply(tool = "launch"),
     runtime_reply("root finished")
@@ -336,9 +333,6 @@ test_that("a run the provider cuts short ends cut off", {
 })
 
 test_that("a run that fails ends failed, with its error and phase", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
     coro::async_generator(function() {

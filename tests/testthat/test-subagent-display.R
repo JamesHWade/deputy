@@ -1,5 +1,4 @@
 skip_if_not_installed("xml2")
-skip_if_not_installed("htmltools")
 
 test_that("display HTML keeps structure and drops active content", {
   html <- paste0(

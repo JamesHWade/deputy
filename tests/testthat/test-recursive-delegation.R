@@ -212,9 +212,6 @@ test_that("ancestor hooks cannot be bypassed by a nearer explicit allow", {
 })
 
 test_that("ancestor hooks that answer with a promise cannot be bypassed either", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   effects <- 0L
   tool <- ellmer::tool(
     function() {

@@ -21,9 +21,7 @@ background_example_environment <- function() {
 }
 
 background_example_skip <- function() {
-  skip_if_not_installed("callr")
   skip_if_not_installed("httpuv")
-  skip_if_not_installed("jsonlite")
 }
 
 test_that("the background tasks script runs and prints what a host sees", {

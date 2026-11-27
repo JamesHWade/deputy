@@ -64,9 +64,6 @@ test_that("Stop and SessionEnd fire once each, in order, with the reason, usage 
 })
 
 test_that("a stream waits for a Stop hook's promise before it ends", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   log <- character()
   note <- function(x) log <<- c(log, x)
   agent <- Agent$new(chat = run_end_chat())
@@ -98,9 +95,6 @@ test_that("a stream waits for a Stop hook's promise before it ends", {
 })
 
 test_that("a stream waits for a SessionEnd hook's promise before it ends", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   log <- character()
   note <- function(x) log <<- c(log, x)
   agent <- Agent$new(chat = run_end_chat())
@@ -119,9 +113,6 @@ test_that("a stream waits for a SessionEnd hook's promise before it ends", {
 })
 
 test_that("run_sync() waits for a Stop hook's promise", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   log <- character()
   note <- function(x) log <<- c(log, x)
   agent <- Agent$new(chat = run_end_chat())
@@ -139,9 +130,6 @@ test_that("run_sync() waits for a Stop hook's promise", {
 })
 
 test_that("an interrupt while a Stop hook is pending ends the run stopped", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   reasons <- list()
   agent <- Agent$new(chat = run_end_chat())
   agent$hooks$add(HookMatcher(
@@ -170,9 +158,6 @@ test_that("an interrupt while a Stop hook is pending ends the run stopped", {
 })
 
 test_that("a Stop hook whose promise does not settle in time lets the run end", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   agent <- Agent$new(chat = run_end_chat())
   agent$hooks$add(HookMatcher(
     event = "Stop",
@@ -196,9 +181,6 @@ test_that("a Stop hook whose promise does not settle in time lets the run end", 
 })
 
 test_that("a run that errors fires Stop and SessionEnd once, without waiting", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   log <- character()
   note <- function(x) log <<- c(log, x)
   chat <- create_mock_chat()
@@ -244,9 +226,6 @@ test_that("a run that errors fires Stop and SessionEnd once, without waiting", {
 })
 
 test_that("an abandoned stream still fires Stop and SessionEnd", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   counts <- c(Stop = 0L, SessionEnd = 0L)
   mock_chat <- create_mock_chat()
   mock_chat$stream_async <- function(
@@ -284,9 +263,6 @@ test_that("an abandoned stream still fires Stop and SessionEnd", {
 })
 
 test_that("a delegate batch fires Stop and SessionEnd once each, in order", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   state$hold_a_until_b <- FALSE
   lead <- parallel_test_lead(state)
@@ -315,9 +291,6 @@ test_that("a delegate batch fires Stop and SessionEnd once each, in order", {
 })
 
 test_that("a delegate batch waits for a Stop and a SessionEnd hook's promise", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   state$hold_a_until_b <- FALSE
   lead <- parallel_test_lead(state)
@@ -353,9 +326,6 @@ test_that("a delegate batch waits for a Stop and a SessionEnd hook's promise", {
 })
 
 test_that("an interrupt while a batch's Stop hook is pending ends the batch stopped", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   state$hold_a_until_b <- FALSE
   lead <- parallel_test_lead(state)
@@ -390,9 +360,6 @@ test_that("an interrupt while a batch's Stop hook is pending ends the batch stop
 })
 
 test_that("a Stop hook cannot send a delegate batch on", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   state$hold_a_until_b <- FALSE
   lead <- parallel_test_lead(state)
@@ -541,9 +508,6 @@ test_that("Stop and SessionEnd hooks that return plain values see the same order
 })
 
 test_that("an interrupt while a SessionEnd hook is pending does not change how the run ended", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   told <- list()
   agent <- Agent$new(chat = run_end_chat())
   agent$hooks$add(HookMatcher(

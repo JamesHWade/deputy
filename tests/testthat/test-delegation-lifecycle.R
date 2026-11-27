@@ -373,9 +373,6 @@ test_that("direct delegation can be interrupted without an active lead run", {
 })
 
 test_that("an interrupt while a SubagentStart hook is pending keeps the child from starting", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   lead <- parallel_test_lead(state)
   lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
@@ -404,9 +401,6 @@ test_that("direct start-hook cancellation prevents the first Subagent request", 
 })
 
 test_that("a delegated run waits for a SubagentStart hook's promise before the child starts", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   lead <- parallel_test_lead(state)
   started_when_resolved <- NULL
@@ -430,9 +424,6 @@ test_that("a delegated run waits for a SubagentStart hook's promise before the c
 })
 
 test_that("a delegation waits for a SubagentStop hook's promise before it returns", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   lead <- parallel_test_lead(state)
   moments <- character()
@@ -459,9 +450,6 @@ test_that("a delegation waits for a SubagentStop hook's promise before it return
 })
 
 test_that("a rejected SubagentStart promise is kept with the delegation", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   lead <- parallel_test_lead(state)
   lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
@@ -484,9 +472,6 @@ test_that("a rejected SubagentStart promise is kept with the delegation", {
 })
 
 test_that("a SubagentStart hook's error is kept once when a later hook answers with a promise", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   lead <- parallel_test_lead(state)
   lead$add_hook(HookMatcher("SubagentStart", callback = function(...) {
@@ -510,9 +495,6 @@ test_that("a SubagentStart hook's error is kept once when a later hook answers w
 })
 
 test_that("a rejected SubagentStart promise is kept with its own delegation, not its sibling's", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   state <- new.env(parent = emptyenv())
   lead <- parallel_test_lead(state)
   lead$add_hook(HookMatcher(

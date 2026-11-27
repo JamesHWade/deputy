@@ -7,9 +7,6 @@ test_that("stream_result() rejects anything that is not a stream from stream_asy
 })
 
 test_that("stream_result() resolves with the run's result once the stream is drained", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   agent <- Agent$new(chat = create_mock_chat(responses = list("Hello!")))
   stream <- agent$stream_async("hi")
   promise <- stream_result(stream)
@@ -23,9 +20,6 @@ test_that("stream_result() resolves with the run's result once the stream is dra
 })
 
 test_that("stream_result() asked after the run has finished resolves at once", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   agent <- Agent$new(chat = create_mock_chat(responses = list("Hello!")))
   stream <- agent$stream_async("hi")
   collect_async_stream(stream)
@@ -38,9 +32,6 @@ test_that("stream_result() asked after the run has finished resolves at once", {
 })
 
 test_that("stream_result() gives the same promise each time it is asked", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   agent <- Agent$new(chat = create_mock_chat(responses = list("Hello!")))
   stream <- agent$stream_async("hi")
 
@@ -53,9 +44,6 @@ test_that("stream_result() gives the same promise each time it is asked", {
 })
 
 test_that("stream_result() resolves for a run that was stopped", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   agent <- NULL
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
@@ -77,9 +65,6 @@ test_that("stream_result() resolves for a run that was stopped", {
 })
 
 test_that("stream_result() resolves for a run that failed, though the stream rejects", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   mock_chat <- create_mock_chat()
   mock_chat$stream_async <- function(
     prompt,
@@ -102,9 +87,6 @@ test_that("stream_result() resolves for a run that failed, though the stream rej
 })
 
 test_that("stream_result() resolves when the agent is free again", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   agent <- Agent$new(
     chat = create_mock_chat(responses = list("Hello!", "Again!"))
   )
@@ -123,9 +105,6 @@ test_that("stream_result() resolves when the agent is free again", {
 })
 
 test_that("a stream wrapped for subagent activity still gives its result", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   # The mock's default content stream yields bare strings, which the activity
   # wrapper cannot take; content objects are what a provider streams.
   chat <- create_mock_chat(responses = list("Hello!"))
@@ -148,9 +127,6 @@ test_that("a stream wrapped for subagent activity still gives its result", {
 })
 
 test_that("two streams made one after the other each give their own result", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   agent <- Agent$new(
     chat = create_mock_chat(responses = list("First!", "Second!"))
   )
@@ -184,9 +160,6 @@ slow_stream_chat <- function() {
 }
 
 test_that("stream_result() is rejected for a stream refused because its agent is running", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   agent <- Agent$new(chat = slow_stream_chat())
   first <- agent$stream_async("one")
   second <- agent$stream_async("two")
@@ -212,9 +185,6 @@ test_that("stream_result() is rejected for a stream refused because its agent is
 })
 
 test_that("stream_result() asked after its stream was refused is rejected at once", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   agent <- Agent$new(chat = slow_stream_chat())
   first <- agent$stream_async("one")
   second <- agent$stream_async("two")
@@ -230,9 +200,6 @@ test_that("stream_result() asked after its stream was refused is rejected at onc
 })
 
 test_that("stream_result() is rejected for a stream refused because another Agent holds its Chat", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   chat <- slow_stream_chat()
   holder <- Agent$new(chat = chat)
   other <- Agent$new(chat = chat)

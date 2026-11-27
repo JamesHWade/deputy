@@ -84,9 +84,6 @@ test_that("Agent exposes stream_async instead of a separate Shiny bridge", {
 })
 
 test_that("stream_async returns content and resets counters on each call", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   mock_chat <- create_mock_chat()
   observed <- new.env(parent = emptyenv())
 
@@ -121,9 +118,6 @@ test_that("stream_async returns content and resets counters on each call", {
 })
 
 test_that("stream_async isolates and clears run-scoped state", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   mock_chat <- create_mock_chat()
   observed <- new.env(parent = emptyenv())
   mock_chat$stream_async <- function(prompt, stream = "content") {
@@ -168,8 +162,6 @@ test_that("stream_async isolates and clears run-scoped state", {
 })
 
 test_that("stream_async releases state when stream setup fails", {
-  skip_if_not_installed("promises")
-
   mock_chat <- create_mock_chat()
   mock_chat$stream_async <- function(prompt, stream = "content") {
     stop("setup failed")
@@ -184,9 +176,6 @@ test_that("stream_async releases state when stream setup fails", {
 })
 
 test_that("stream_async uses max_tool_calls from Agent limits", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   mock_chat <- create_mock_chat()
   observed_limit <- NULL
   mock_chat$stream_async <- function(prompt, stream = "content") {
@@ -210,9 +199,6 @@ test_that("stream_async uses max_tool_calls from Agent limits", {
 })
 
 test_that("stream_async fires Stop and SessionEnd hooks on completion", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   mock_chat <- create_mock_chat()
   mock_chat$stream_async <- function(prompt, stream = "content") {
     coro::generator(function() {
@@ -253,9 +239,6 @@ test_that("stream_async fires Stop and SessionEnd hooks on completion", {
 })
 
 test_that("stream_async cleans up and reports stream errors", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   mock_chat <- create_mock_chat()
   mock_chat$stream_async <- function(prompt, stream = "content") {
     coro::async_generator(function() {
@@ -295,9 +278,6 @@ test_that("stream_async cleans up and reports stream errors", {
 })
 
 test_that("stream_async checkpoints rooted file writes", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   root <- withr::local_tempdir(pattern = "deputy-shiny-checkpoint-")
   path <- file.path(root, "created.txt")
   mock <- create_shiny_tool_chat(
@@ -333,8 +313,6 @@ test_that("stream_async checkpoints rooted file writes", {
 })
 
 test_that("stream_async rejects dangling symlinks targeting outside", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
   skip_on_os("windows")
 
   sandbox <- withr::local_tempdir(pattern = "deputy-shiny-link-")
@@ -368,9 +346,6 @@ test_that("stream_async rejects dangling symlinks targeting outside", {
 })
 
 test_that("abandoned stream_async streams release the exact active run", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   mock_chat <- create_mock_chat()
   mock_chat$stream_async <- function(
     prompt,
@@ -397,9 +372,6 @@ test_that("abandoned stream_async streams release the exact active run", {
 })
 
 test_that("stream_async reports clean cancellation instead of completion", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   stop_reason <- NULL
   agent <- NULL
   chat <- create_mock_chat()
@@ -427,9 +399,6 @@ test_that("stream_async reports clean cancellation instead of completion", {
 })
 
 test_that("stream_async reports terminal cost limits without tool calls", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   cost <- 0
   output_tokens <- 0
   stop_reason <- NULL
@@ -468,9 +437,6 @@ test_that("stream_async reports terminal cost limits without tool calls", {
 })
 
 test_that("stream_async() takes usage_limits for one run, merged over the agent's", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   cost <- 0
   output_tokens <- 0
   stop_reasons <- character()
@@ -535,9 +501,6 @@ test_that("stream() takes usage_limits for one run", {
 })
 
 test_that("stream_async enforces Agent usage_limits", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   cost <- 0
   stop_reason <- NULL
   observed_limits <- NULL
@@ -587,9 +550,6 @@ test_that("stream_async enforces Agent usage_limits", {
 })
 
 test_that("stream_async stops when a cost limit cannot be measured", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   cost <- 0
   stop_reason <- NULL
   chat <- create_mock_chat()
@@ -623,9 +583,6 @@ test_that("stream_async stops when a cost limit cannot be measured", {
 })
 
 test_that("a stream with a cost limit and on_unknown_cost = 'continue' finishes when the cost is unknown", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   cost <- 0
   stop_reason <- NULL
   chat <- create_mock_chat()
@@ -659,9 +616,6 @@ test_that("a stream with a cost limit and on_unknown_cost = 'continue' finishes 
 })
 
 test_that("stream_async does not start with no request budget", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   provider_calls <- 0L
   stop_reason <- NULL
   chat <- create_mock_chat()
@@ -690,9 +644,6 @@ test_that("stream_async does not start with no request budget", {
 })
 
 test_that("stream_async reports incomplete tool calls as provider errors", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   stop_reason <- NULL
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {

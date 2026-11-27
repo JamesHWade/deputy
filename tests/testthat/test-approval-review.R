@@ -572,7 +572,6 @@ test_that("multiline strings keep their line breaks", {
 
 test_that("asynchronous decisions refresh on success and allow retry on failure", {
   skip_if_not_installed("shiny")
-  skip_if_not_installed("later")
   directory <- withr::local_tempdir()
   server <- local_runtime_server(list(
     runtime_reply(tool = "measure", arguments = list(n = 1L, x = 2)),

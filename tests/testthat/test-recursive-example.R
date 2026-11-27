@@ -20,9 +20,7 @@ recursive_example_environment <- function() {
 }
 
 test_that("the recursive example runs three real streaming levels", {
-  skip_if_not_installed("callr")
   skip_if_not_installed("httpuv")
-  skip_if_not_installed("jsonlite")
 
   example <- recursive_example_environment()
   fixture <- example$recursive_local_fixture(delay = 0.01)
@@ -110,9 +108,7 @@ test_that("the recursive example runs three real streaming levels", {
 })
 
 test_that("the recursive example keeps graph budgets across retained follow-ups", {
-  skip_if_not_installed("callr")
   skip_if_not_installed("httpuv")
-  skip_if_not_installed("jsonlite")
 
   example <- recursive_example_environment()
   fixture <- example$recursive_local_fixture(delay = 0.01)
@@ -162,10 +158,7 @@ test_that("the recursive example keeps graph budgets across retained follow-ups"
 })
 
 test_that("the local fixture emits tool arguments as a JSON string", {
-  skip_if_not_installed("callr")
   skip_if_not_installed("httpuv")
-  skip_if_not_installed("httr2")
-  skip_if_not_installed("jsonlite")
 
   example <- recursive_example_environment()
   fixture <- example$recursive_local_fixture(delay = 0.01)
@@ -202,9 +195,7 @@ test_that("the local fixture emits tool arguments as a JSON string", {
 })
 
 test_that("a repeated root run admits a fresh route before the graph cap", {
-  skip_if_not_installed("callr")
   skip_if_not_installed("httpuv")
-  skip_if_not_installed("jsonlite")
 
   example <- recursive_example_environment()
   fixture <- example$recursive_local_fixture(delay = 0.01)

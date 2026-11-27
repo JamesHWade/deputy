@@ -63,16 +63,7 @@ job_process_test_load <- (function() {
 })()
 
 job_process_test_wait_until <- function(predicate, label, timeout = 60) {
-  deadline <- Sys.time() + timeout
-  repeat {
-    if (isTRUE(predicate())) {
-      return(invisible(TRUE))
-    }
-    if (Sys.time() >= deadline) {
-      cli::cli_abort("Timed out waiting for {label}.")
-    }
-    Sys.sleep(0.02)
-  }
+  wait_until(predicate, timeout = timeout, label = label, interval = 0.02)
 }
 
 job_process_test_record_field <- function(record, name) {
@@ -104,10 +95,8 @@ job_process_test_usage <- function(record) {
 }
 
 job_process_test_requirements <- function() {
-  skip_if_not_installed("callr")
   skip_if_not_installed("pkgload")
   skip_if_not_installed("httpuv")
-  skip_if_not_installed("jsonlite")
 }
 
 job_process_tool_reply <- function(value) {

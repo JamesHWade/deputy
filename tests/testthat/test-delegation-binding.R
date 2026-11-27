@@ -663,9 +663,6 @@ test_that("forwarded governance failures are retained with their delegation", {
 })
 
 test_that("a forwarded hook's rejected promise is retained with its delegation", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
-
   server <- local_runtime_server(list(
     runtime_reply(tool = "effect"),
     runtime_reply("done")

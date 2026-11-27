@@ -1,6 +1,5 @@
 job_graph_test_requirements <- function() {
   skip_if_not_installed("httpuv")
-  skip_if_not_installed("jsonlite")
 }
 
 job_graph_test_agent <- function(

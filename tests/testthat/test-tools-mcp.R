@@ -32,8 +32,6 @@ test_that("tools_mcp with config parameter returns list", {
 })
 
 test_that("Agent$mcp_tools returns empty vector initially", {
-  skip_if_not_installed("ellmer")
-
   chat <- ellmer::chat_vllm(
     base_url = "http://localhost:9999",
     model = "test-model"
@@ -47,7 +45,6 @@ test_that("Agent$mcp_tools returns empty vector initially", {
 
 test_that("Agent$load_mcp handles missing mcptools gracefully", {
   skip_if(mcp_available(), "mcptools is installed")
-  skip_if_not_installed("ellmer")
 
   chat <- ellmer::chat_vllm(
     base_url = "http://localhost:9999",
@@ -72,7 +69,6 @@ test_that("Agent$load_mcp handles missing mcptools gracefully", {
 
 test_that("Agent$load_mcp is chainable", {
   skip_if(mcp_available(), "mcptools is installed")
-  skip_if_not_installed("ellmer")
 
   chat <- ellmer::chat_vllm(
     base_url = "http://localhost:9999",

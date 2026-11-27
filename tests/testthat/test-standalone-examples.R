@@ -18,7 +18,6 @@ run_standalone_example <- function(
 }
 
 test_that("basic, structured, session and skill scripts execute independently", {
-  skip_if_not_installed("jsonlite")
   skip_if_not_installed("yaml")
   withr::local_envvar(DEPUTY_EXAMPLE_MODEL = NA_character_)
   basic <- run_standalone_example(

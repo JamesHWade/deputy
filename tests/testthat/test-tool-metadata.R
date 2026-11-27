@@ -789,8 +789,6 @@ test_that("direct policy queries keep name-based classification", {
 })
 
 test_that("an Agent denies a host tool named read_file in readonly mode", {
-  skip_if_not_installed("promises")
-  skip_if_not_installed("later")
   dir <- withr::local_tempdir()
   writeLines("hello", file.path(dir, "note.txt"))
   for (native in c(TRUE, FALSE)) {
