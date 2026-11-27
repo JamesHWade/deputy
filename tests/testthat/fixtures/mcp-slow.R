@@ -37,14 +37,6 @@ tools <- list(
     name = "empty",
     description = "Return a result with no content.",
     inputSchema = schema(object, character())
-  ),
-  list(
-    name = "repl",
-    description = "Emulate mcp-repl's bounded wait.",
-    inputSchema = schema(
-      list(input = list(type = "string"), timeout_ms = list(type = "number")),
-      "input"
-    )
   )
 )
 text <- function(value) list(content = list(list(type = "text", text = value)))
@@ -87,24 +79,7 @@ repeat {
         id <- id + 100L
         text("an answer to another request")
       },
-      empty = list(content = list()),
-      repl = {
-        # mcp-repl returns shortly before timeout_ms (60 s when omitted) and
-        # reports a busy interpreter while the work continues.
-        work <- suppressWarnings(as.numeric(sub(
-          "^sleep ",
-          "",
-          arguments$input
-        )))
-        work <- if (is.na(work)) 0 else work
-        limit <- if (is.null(arguments$timeout_ms)) {
-          60
-        } else {
-          arguments$timeout_ms / 1000
-        }
-        Sys.sleep(min(work, limit * 0.95))
-        text(if (work > limit) "<<repl status: busy>>" else "done")
-      }
+      empty = list(content = list())
     ),
     object
   )

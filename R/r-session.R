@@ -170,7 +170,10 @@ RSession <- R6::R6Class(
         "plot_width",
         "plot_height"
       )) {
-        value <- context_policy_whole_number(get(name), name)
+        value <- tryCatch(
+          context_policy_whole_number(get(name), name),
+          error = function(e) NULL
+        )
         if (is.null(value)) {
           abort_deputy(
             "{.arg {name}} must be a positive whole number.",
@@ -941,8 +944,6 @@ RSession <- R6::R6Class(
             job$mailbox_dir <- private$bridge_directory(job)
           }
           private$active <- job
-          private$active$fresh <- fresh
-          private$active$generation <- private$generation
           private$active$reset_reason <- if (fresh) private$last_reset else NULL
           private$state <- if (fresh) "starting" else "running"
           began <- unname(proc.time()[["elapsed"]])

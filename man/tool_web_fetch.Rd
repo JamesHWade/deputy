@@ -17,8 +17,8 @@ The page content as one string, cut at 50,000 characters.
 }
 \description{
 A tool that downloads a web page and returns its content as text or
-Markdown. Needs the httr2 package. For pages rendered with JavaScript, write
-your own tool with chromote.
+Markdown. For pages rendered with JavaScript, write your own tool with
+chromote.
 }
 \details{
 Requests follow redirects and time out after 30 seconds. With rvest and xml2

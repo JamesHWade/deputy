@@ -23,8 +23,8 @@
 #' [trusted mini-agent](https://trustedminiagents.dev/definition.html) pattern:
 #' a person checks the model-generated inputs before a trusted tool runs.
 #'
-#' The server adds a `Stop` hook to `agent` so the review refreshes when a run
-#' pauses. Call it once per agent, while no run is active.
+#' The server adds a `SessionEnd` hook to `agent` so the review refreshes when a
+#' run finishes or pauses. Call it once per agent, while no run is active.
 #'
 #' @param id Shiny module ID.
 #' @param agent An [Agent] configured with `approval_dir`.

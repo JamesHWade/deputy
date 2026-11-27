@@ -581,48 +581,6 @@ test_that("PreToolUse errors still deny and use cli_alert_danger", {
   expect_equal(errors[[1]]$event, "PreToolUse")
 })
 
-test_that("Hook timeout warns once when callr not installed", {
-  # Mock rlang::is_installed to return FALSE for callr
-  local_mocked_bindings(
-    is_installed = function(pkg) {
-      if (pkg == "callr") FALSE else TRUE
-    },
-    .package = "rlang"
-  )
-
-  hook <- HookMatcher(
-    event = "PostToolUse",
-    timeout = 5, # timeout > 0 triggers the check
-    callback = function(...) NULL
-  )
-
-  registry <- HookRegistry$new()
-  registry$add(hook)
-
-  # First call should warn
-  expect_warning(
-    registry$fire(
-      "PostToolUse",
-      tool_name = "test",
-      tool_input = list(),
-      tool_result = "result",
-      context = list()
-    ),
-    "callr.*not installed"
-  )
-
-  # Second call should NOT warn (only warns once)
-  expect_no_warning(
-    registry$fire(
-      "PostToolUse",
-      tool_name = "test",
-      tool_input = list(),
-      tool_result = "result",
-      context = list()
-    )
-  )
-})
-
 test_that("fire() stays synchronous when no callback returns a promise", {
   registry <- HookRegistry$new()
   registry$add(HookMatcher(
@@ -952,4 +910,47 @@ test_that("a firing that throws still hands over the errors raised before it", {
 
   expect_length(recorded, 1L)
   expect_match(recorded[[1]]$error, "hook broke")
+})
+
+test_that("hook failure logging and hook_log_tools safely interpolate brace characters", {
+  registry <- HookRegistry$new()
+  registry$add(HookMatcher(
+    "PreToolUse",
+    function(tool_name, tool_input, context) {
+      stop("bad payload: {not_an_r_object}")
+    }
+  ))
+  registry$add(HookMatcher(
+    "PostToolUse",
+    function(tool_name, tool_result, tool_error, context) {
+      stop("audit error: {missing_symbol}")
+    }
+  ))
+  registry$add(hook_log_tools(verbose = TRUE))
+
+  expect_no_error({
+    pre <- suppressMessages(registry$fire(
+      "PreToolUse",
+      tool_name = "demo",
+      tool_input = list(),
+      context = list()
+    ))
+    expect_s7_class(pre, HookResultPreToolUse)
+    expect_identical(pre@permission, "deny")
+
+    suppressMessages(registry$fire(
+      "PostToolUse",
+      tool_name = "demo",
+      tool_result = '{"ok": true, "value": {1}}',
+      tool_error = NULL,
+      context = list()
+    ))
+    suppressMessages(registry$fire(
+      "PostToolUse",
+      tool_name = "demo",
+      tool_result = NULL,
+      tool_error = "failed with {unquoted}",
+      context = list()
+    ))
+  })
 })

@@ -38,8 +38,6 @@ run_r_code_impl <- function(
   working_dir = getwd(),
   env = NULL
 ) {
-  rlang::check_installed("callr", reason = "to execute R code in a subprocess")
-
   result <- tryCatch(
     callr::r(
       # The code sees the child's attached packages, as at an R prompt.
@@ -168,59 +166,37 @@ run_bash_impl <- function(
   working_dir = getwd(),
   env = NULL
 ) {
-  # Use callr for reliable timeout enforcement if available
-  if (rlang::is_installed("callr")) {
-    # The shell inherits the child's stderr, so this file captures its errors.
-    stderr_file <- tempfile("deputy-bash-", fileext = ".txt")
-    on.exit(unlink(stderr_file), add = TRUE)
-    result <- tryCatch(
-      callr::r(
-        child_function(run_bash_child),
-        args = list(cmd = command),
-        timeout = timeout,
-        wd = working_dir,
-        stderr = stderr_file,
-        env = subprocess_env(env)
-      ),
-      error = function(e) {
-        if (inherits(e, "callr_timeout_error")) {
-          ellmer::tool_reject(sprintf(
-            "Command timed out after %s seconds",
-            format(timeout, trim = TRUE)
-          ))
-        }
-        ellmer::tool_reject(paste(
-          "Command failed:",
-          conditionMessage(e)
+  # The shell inherits the child's stderr, so this file captures its errors.
+  stderr_file <- tempfile("deputy-bash-", fileext = ".txt")
+  on.exit(unlink(stderr_file), add = TRUE)
+  result <- tryCatch(
+    callr::r(
+      child_function(run_bash_child),
+      args = list(cmd = command),
+      timeout = timeout,
+      wd = working_dir,
+      stderr = stderr_file,
+      env = subprocess_env(env)
+    ),
+    error = function(e) {
+      if (inherits(e, "callr_timeout_error")) {
+        ellmer::tool_reject(sprintf(
+          "Command timed out after %s seconds",
+          format(timeout, trim = TRUE)
         ))
       }
-    )
-    errors <- if (file.exists(stderr_file)) {
-      readLines(stderr_file, warn = FALSE)
-    } else {
-      character()
+      ellmer::tool_reject(paste(
+        "Command failed:",
+        conditionMessage(e)
+      ))
     }
-    bash_result(result$output, errors, result$status)
+  )
+  errors <- if (file.exists(stderr_file)) {
+    readLines(stderr_file, warn = FALSE)
   } else {
-    # Keep the host process directory unchanged in the fallback path.
-    command <- paste("cd", shQuote(working_dir), "&&", command)
-    tryCatch(
-      {
-        result <- system(command, intern = TRUE, timeout = timeout)
-        if (length(result) == 0) {
-          "Command executed successfully (no output)"
-        } else {
-          paste(result, collapse = "\n")
-        }
-      },
-      error = function(e) {
-        ellmer::tool_reject(paste("Command failed:", e$message))
-      },
-      warning = function(w) {
-        paste("Warning:", w$message)
-      }
-    )
+    character()
   }
+  bash_result(result$output, errors, result$status)
 }
 
 new_tool_run_bash <- function(env = NULL) {

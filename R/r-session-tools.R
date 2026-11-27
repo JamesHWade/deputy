@@ -452,7 +452,7 @@ r_session_tool_validate_request <- function(
     )
   }
   tool_name <- r_session_tool_scalar(request$tool_name, "tool_name")
-  if (!identical(tool_name, request$tool_name) || !tool_name %in% tool_names) {
+  if (!tool_name %in% tool_names) {
     abort_deputy(
       "R session tool request names an unselected tool.",
       class = "r_session_tool_protocol"

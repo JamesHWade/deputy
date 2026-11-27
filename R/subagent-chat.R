@@ -1050,7 +1050,7 @@ subagent_chat_limit_text <- function(text, max_bytes = 512L) {
   if (!length(text) || is.na(text[[1L]])) {
     text <- ""
   } else {
-    text <- text[[1L]]
+    text <- enc2utf8(text[[1L]])
   }
   if (nchar(text, type = "bytes") <= max_bytes) {
     return(text)

@@ -4,8 +4,8 @@
 #'
 #' @description
 #' A tool that downloads a web page and returns its content as text or
-#' Markdown. Needs the httr2 package. For pages rendered with JavaScript, write
-#' your own tool with chromote.
+#' Markdown. For pages rendered with JavaScript, write your own tool with
+#' chromote.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
 #' @return The page content as one string, cut at 50,000 characters.
@@ -32,8 +32,6 @@
 #' @export
 tool_web_fetch <- ellmer::tool(
   fun = function(url) {
-    rlang::check_installed("httr2", reason = "to fetch web content")
-
     tryCatch(
       {
         # Fetch the page
@@ -98,9 +96,8 @@ tool_web_fetch <- ellmer::tool(
 #'
 #' @description
 #' A tool that searches the web with DuckDuckGo's HTML search page and returns
-#' the title, URL and snippet of each result. Needs the httr2 package. For
-#' better results, use a provider's own search tool (see [tools_web()]) or a
-#' dedicated search API.
+#' the title, URL and snippet of each result. For better results, use a
+#' provider's own search tool (see [tools_web()]) or a dedicated search API.
 #'
 #' @format A tool definition created with `ellmer::tool()`.
 #' @return The numbered results as one string.
@@ -121,8 +118,6 @@ tool_web_fetch <- ellmer::tool(
 #' @export
 tool_web_search <- ellmer::tool(
   fun = function(query, num_results = 10) {
-    rlang::check_installed("httr2", reason = "to search the web")
-
     tryCatch(
       {
         # Use DuckDuckGo HTML search

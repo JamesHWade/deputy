@@ -54,7 +54,6 @@ remain stable as these internal modules evolve.
 | Model-facing native text and image bounds | `R/tool-rich-results.R` |
 | Host-owned MCP connection and immutable admission lists | `R/mcp-connection.R` |
 | Qualified mcptools worker boundary and owner validation | `R/mcp-worker.R` |
-| Sandboxed mcp-repl connection and upstream control input | `R/mcp-repl.R` |
 | Sandboxed MCP Console connection, launch policy and controls | `R/mcp-console.R` |
 
 R6 method-list factories are internal source organization: R6 still binds their
@@ -106,14 +105,21 @@ and delegated permission/budget policy. Whole test cases move along those
 boundaries and continue to use shared helper files.
 
 These files have since grown past 1,000 lines and have no agreed exception
-(line counts on 2026-09-28):
+(line counts on 2026-11-26; tracked in cleanup issues #274–#277):
 
 | Source | Lines |
 | --- | --- |
 | `R/agent-job.R` | 2,405 |
-| `R/subagent-chat.R` | 1,296 |
-| `R/agent-context.R` | 1,131 |
-| `R/delegation-inspection.R` | 1,020 |
+| `R/subagent-chat.R` | 1,514 |
+| `R/subagent-history.R` | 1,315 |
+| `R/delegation-activity.R` | 1,279 |
+| `R/agent-stream.R` | 1,162 |
+| `R/trusted-results.R` | 1,161 |
+| `R/agent-context.R` | 1,132 |
+| `R/agents-multi.R` | 1,126 |
+| `R/tool-runtime.R` | 1,097 |
+| `R/delegation-inspection.R` | 1,078 |
+| `R/r-session.R` | 1,071 |
 
 Split each along its responsibility boundaries, or record an exception here
 with the reason, as for `R/agent.R`. Count with `wc -l R/*.R | sort -n`.

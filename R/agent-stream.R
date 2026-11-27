@@ -691,6 +691,7 @@ deputy_agent_stream_methods <- function(self = NULL, private = NULL) {
       private$tool_started_at <- list()
       private$tool_event_overrides <- list()
       private$tool_call_records <- list()
+      private$trusted_arguments <- list()
       private$pending_delegations <- list()
       private$held_hooks <- list()
       private$original_tool_results <- list()
@@ -957,7 +958,9 @@ governed_run_stream <- coro::async_generator(function(
           next
         }
         if (agent$.__enclos_env__$private$should_stop) {
-          stream_state$reason <- agent$.__enclos_env__$private$stop_reason_from_hook
+          stream_state$reason <-
+            agent$.__enclos_env__$private$stop_reason_from_hook %||%
+            "interrupted"
           break
         }
         stream_state$reason <- "error"
@@ -1026,10 +1029,7 @@ governed_run_stream <- coro::async_generator(function(
             is_complete = FALSE
           )
         )
-      } else if (
-        !inherits(chunk, "ellmer::ContentToolRequest") &&
-          !inherits(chunk, "ellmer::ContentToolResult")
-      ) {
+      } else {
         agent$.__enclos_env__$private$record_run_event(
           AgentEvent(
             "content",

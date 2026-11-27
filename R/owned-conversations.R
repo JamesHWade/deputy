@@ -528,7 +528,13 @@ continue_conversation <- function(
   if (!isTRUE(op$run_active) && !length(op$active_subagents)) {
     op$should_stop <- FALSE
   }
-  cp$.delegation_observe <- function(event) lead_observe_event(owner, id, event)
+  cp$.delegation_observe <- function(event) {
+    tryCatch(
+      lead_observe_event(owner, id, event),
+      error = function(error) lead_observation_error(owner, id, error)
+    )
+    invisible(NULL)
+  }
   lead_bind_delegation(owner, id, child, entry$manifest)
   # Track work on the shared Chat too: another Agent wrapper must not adopt
   # this owner while its admitted child continuations are still outstanding.

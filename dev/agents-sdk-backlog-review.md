@@ -1,5 +1,10 @@
 # Deputy runtime priorities · 2026-11-17
 
+> **Historical snapshot:** Items 1 (#263), 2 (#144), 3 (upstream streaming
+> qualification), and 5 (#228) have since landed on `main`; remaining upstream
+> and release items (#48, #66, #86, #99, #187, #188, #200) are tracked in
+> GitHub Issues.
+
 I reviewed the nine issues open on Deputy main at `d669871` and compared its
 runtime with the OpenAI Agents SDK, LangGraph and PydanticAI. The first
 implementation is **portable recovery of selected R data**. A Shiny host can
