@@ -278,6 +278,81 @@ test_that("tools_commons escapes HTML in measure names, arguments, and values", 
   expect_match(html, "a &amp; b")
 })
 
+test_that("tools_commons preserves full numeric precision in measure values and tables", {
+  local_mocked_bindings(
+    commons_package_version = function() numeric_version("0.2.0")
+  )
+  stub <- structure(
+    list(
+      search = function(query) {
+        "### exact_revenue\nRun with `$measure(\"exact_revenue\")`."
+      },
+      measure = function(name, arguments = list()) {
+        switch(
+          name,
+          exact_scalar = 1234567.89,
+          exact_vector = c(1234567.89, 0.123456789012345, NA_real_, NaN, Inf),
+          exact_table = data.frame(
+            region = c("East", "West"),
+            revenue = c(1234567.89, 0.123456789012345)
+          ),
+          exact_list = list(revenue = 1234567.89, ratio = 0.123456789012345)
+        )
+      }
+    ),
+    class = "commons"
+  )
+  tools <- tools_commons(stub)
+
+  withr::with_options(list(digits = 3L), {
+    scalar <- tools$commons_measure("exact_scalar", '{"threshold": 1234567.89}')
+    expect_identical(scalar@value, "1234567.89")
+    expect_match(scalar@extra$display$html, "1234567\\.89")
+
+    vec <- tools$commons_measure("exact_vector")
+    expect_identical(
+      vec@value,
+      "1234567.89, 0.123456789012345, NA, NaN, Inf"
+    )
+
+    tbl <- tools$commons_measure("exact_table")
+    expect_match(tbl@value, "1234567\\.89")
+    expect_match(tbl@value, "0\\.123456789012345")
+    expect_match(tbl@extra$display$html, "<td>1234567\\.89</td>")
+    expect_match(tbl@extra$display$html, "<td>0\\.123456789012345</td>")
+
+    lst <- tools$commons_measure("exact_list")
+    expect_match(lst@value, "1234567\\.89")
+    expect_match(lst@value, "0\\.123456789012345")
+  })
+
+  # TrustedResults callback receives the unrounded scalar value.
+  server <- local_runtime_server(list(
+    runtime_reply(
+      tool = "commons_measure",
+      arguments = list(name = "exact_scalar", arguments = "{}")
+    ),
+    runtime_reply("Exact revenue is 1234567.89.")
+  ))
+  delivered <- list()
+  agent <- Agent$new(
+    runtime_chat(server),
+    tools = tools,
+    permissions = Permissions(mode = "readonly", tool_allowlist = names(tools)),
+    trusted_results = TrustedResults(
+      measure = tools$commons_measure,
+      on_result = function(event) {
+        delivered[[length(delivered) + 1L]] <<- event
+      }
+    )
+  )
+  withr::with_options(list(digits = 7L), {
+    agent$run_sync("What is exact revenue?")
+  })
+  expect_length(delivered, 1L)
+  expect_identical(delivered[[1L]]$value@value, "1234567.89")
+})
+
 test_that("tools_commons governs permissions, budgets, and trusted receipts without substitute bypass", {
   skip_if_no_commons()
   sales <- data.frame(region = c("North", "East"), revenue = c(100, 140))

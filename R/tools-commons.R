@@ -124,14 +124,24 @@ commons_parse_measure_args <- function(arguments) {
   parsed
 }
 
+commons_format_atomic <- function(value) {
+  if ((is.double(value) || is.complex(value)) && !is.object(value)) {
+    formatted <- as.character(value)
+  } else {
+    formatted <- trimws(format(value, trim = TRUE))
+  }
+  formatted[is.na(formatted)] <- "NA"
+  formatted
+}
+
 commons_format_arg_value <- function(value) {
   if (is.null(value)) {
     return("null")
   }
   if (is.atomic(value) && length(value) <= 20L) {
-    return(paste(format(value, trim = TRUE), collapse = ", "))
+    return(paste(commons_format_atomic(value), collapse = ", "))
   }
-  as.character(jsonlite::toJSON(value, auto_unbox = TRUE))
+  as.character(jsonlite::toJSON(value, auto_unbox = TRUE, digits = NA))
 }
 
 commons_measure_header_html <- function(name, args) {
@@ -177,8 +187,7 @@ commons_bound_text <- function(text, max_chars = commons_max_text_chars) {
 
 commons_format_df_cells <- function(df) {
   cols <- lapply(df, function(col) {
-    formatted <- trimws(format(col, trim = TRUE))
-    formatted[is.na(col)] <- "NA"
+    formatted <- commons_format_atomic(col)
     gsub("[\r\n]+", " ", formatted)
   })
   as.data.frame(cols, stringsAsFactors = FALSE, check.names = FALSE)
@@ -270,10 +279,12 @@ commons_format_value_text <- function(value) {
   }
   if (is.atomic(value) && length(value) <= 20L) {
     return(commons_bound_text(paste(
-      format(value, trim = TRUE),
+      commons_format_atomic(value),
       collapse = ", "
     )))
   }
+  old <- options(digits = 15L)
+  on.exit(options(old), add = TRUE)
   commons_bound_text(paste(
     utils::capture.output(print(value)),
     collapse = "\n"
