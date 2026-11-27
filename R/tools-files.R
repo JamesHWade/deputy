@@ -827,7 +827,14 @@ tool_read_csv <- ellmer::tool(
           paste("Columns:", ncol(df)),
           "",
           "Column types:",
-          paste(" ", names(df), ":", sapply(df, function(x) class(x)[1])),
+          if (ncol(df) > 0L) {
+            paste(
+              " ",
+              names(df),
+              ":",
+              vapply(df, function(x) class(x)[1L], character(1))
+            )
+          },
           "",
           paste("First", min(show_head, nrow(df)), "rows:"),
           utils::capture.output(print(utils::head(df, show_head)))

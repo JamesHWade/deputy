@@ -99,10 +99,10 @@ candidate helper model to measure, not an assumed quality-equivalent substitute.
 Do not add a second conversation database to run this comparison. Use an
 explicit caller-owned history fixture first. Continue implementation against
 host-supplied history under ADR-0003; the optional shinychat adapter tracked in
-#66 can follow when its public R contract is released. Removed
-turns remain unrecoverable through the current Deputy session snapshot unless
-the host retained them independently. Schema changes can target the current
-pre-CRAN format directly.
+#66 can follow when its public R contract is released. Snapshot schema 3
+(ADR-0017) now preserves removed turns as a portable prefix separately from the
+compacted model context, while hosts remain responsible for durable storage and
+branch identity.
 
 ## Design evidence
 

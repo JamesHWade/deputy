@@ -334,3 +334,18 @@ test_that("intermediate callr progress conditions preserve the worker and termin
   expect_match(r_session_text(r_session_await(session$run("x"))), "41")
   expect_identical(session$status()$generation, 1L)
 })
+
+test_that("RSession rejects invalid integer options with deputy_r_session", {
+  agent <- Agent$new(
+    chat = create_mock_chat(),
+    working_dir = withr::local_tempdir()
+  )
+  expect_error(
+    RSession$new(agent, queue_limit = -1),
+    class = "deputy_r_session"
+  )
+  expect_error(
+    RSession$new(agent, plot_width = "wide"),
+    class = "deputy_r_session"
+  )
+})

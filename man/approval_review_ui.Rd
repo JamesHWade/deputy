@@ -60,8 +60,8 @@ This is the input review step of Will Landau and Sam Parmar's
 \href{https://trustedminiagents.dev/definition.html}{trusted mini-agent} pattern:
 a person checks the model-generated inputs before a trusted tool runs.
 
-The server adds a \code{Stop} hook to \code{agent} so the review refreshes when a run
-pauses. Call it once per agent, while no run is active.
+The server adds a \code{SessionEnd} hook to \code{agent} so the review refreshes when a
+run finishes or pauses. Call it once per agent, while no run is active.
 }
 \examples{
 if (interactive() && rlang::is_installed("bslib")) {

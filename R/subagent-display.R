@@ -340,7 +340,6 @@ subagent_display_style_element <- function(css, ids, prefix) {
   ) {
     return("")
   }
-  rules <- character()
   scan_blocks <- function(text) {
     out <- list()
     position <- 1L

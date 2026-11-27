@@ -106,65 +106,13 @@ coverage retains the YAML registry and delegation journey. Qualification against
 a large external catalogue and replacement with released public APIs remain
 tracked in #48 and #99; a small producer is not evidence for catalogue scaling.
 
-## Persistent execution with mcp-repl
-
-`mcp_repl_connection()` freezes the selected configuration before checking and
-connecting it. It requires an explicit supported `--sandbox` policy and the
-`repl(input, timeout_ms)` tool contract. A `--config sandbox_mode` override is
-rejected, including when it occurs after an otherwise valid sandbox flag.
-URL entries are rejected because mcptools would choose HTTP instead of the
-validated local executable even when both fields appear in the configuration.
-Other transport/authentication configuration stays with mcptools; upstream
-sandbox configuration remains the host's responsibility.
-
-The qualified producer is mcp-repl 0.3.0 with mcptools 1.0.2 or 1.0.3. The convenience
-function validates the tool shape, not the binary version. Its R journey on
-macOS demonstrates persistent values, isolation across two Agents using the
-same server name, ellmer image content, bounded output with a full transcript
-artifact, busy-interpreter output, a successful state-preserving Ctrl-C,
-Ctrl-D reset, interpreter exit/state loss, and cleanup with invalid old handles.
-`tests/testthat/test-mcp-repl-lifecycle.R` runs that journey when
-`DEPUTY_MCP_REPL_BIN` names the qualified executable. Ordinary CI retains the
-deterministic real MCP producer without requiring an installed REPL binary.
-
-The `repl` tool forwards `timeout_ms` capped at 3000 ms, and sends 3000 ms
-when the caller omits it (mcp-repl's own default is 60 s). mcp-repl answers
-shortly before that deadline with its busy status while the work continues,
-which keeps the reply inside the transport window. A later call with empty
-`input` retrieves the remaining output. The registered tool description says
-so. `tools_mcp_repl()` applies the same bound.
-
-`mcp_repl_control()` sends the documented Ctrl-C or Ctrl-D input and returns
-the actual upstream result. It does not infer success from dispatch, invent a
-generic lifecycle API, or run a second interpreter. Controls require an idle
-client connection, although the upstream interpreter may still be executing
-after a busy result. A control request is a direct host operation; model-issued
-control input goes through the registered `repl` tool's normal governance.
-
-Agent interruption and internal stream stops cancel that Agent's active owned
-MCP requests. Pending executions retain their cancellation binding when the host
-removes or replaces registered tools; those bindings are released when the call
-settles. Cloning an Agent does not copy its pending executions. Cancellation
-checks the stopping Agent's effective ownership, closes matching busy connections
-and discards their state. Idle connections remain available. A server process exit also invalidates the
-connection. An interpreter exit can instead be reported by a surviving
-mcp-repl server, followed by a fresh interpreter on the next request. Preserve
-that state-loss message; a stable connection ID is not an interpreter-state
-receipt.
-
-The R client worker only runs mcptools. mcp-repl owns execution, interruption,
-reset, OS confinement, preview truncation and spill artifacts. ellmer owns
-ordered text/image content. Deputy's usual offloading can bound a resulting
-Agent context without copying the upstream artifact store. The host owns any
-durable artifact retention before the upstream session is closed.
-
 ## Persistent workbench with MCP Console
 
-`mcp_console_connection()` follows the mcp-repl pattern with an explicit
-executable instead of a configuration entry (ADR-0029). It checks the
-executable's `--version` against `mcp_console_qualified_versions` (0.0.4)
-before launch, builds `serve` and the admitted arguments itself, and writes a
-private frozen configuration for one server named `console`. The server
+`mcp_console_connection()` connects to an explicit `posit-dev/mcp-console`
+executable (ADR-0029; the earlier `mcp-repl` helpers were removed in #267). It
+checks the executable's `--version` against `mcp_console_qualified_versions`
+(0.4.0) before launch, builds `serve` and the admitted arguments itself, and
+writes a private frozen configuration for one server named `console`. The server
 starts in the Agent's working directory, which is its sandbox workspace,
 project-configuration location and recording location. A
 `.agents/console/config.yaml` there blocks launch unless the host opts in.
@@ -177,7 +125,15 @@ uses it to bound `send` arguments and extend the description, `status()` and
 tool metadata report its `execution` record (backend, version, sandbox
 profile, dependency decision, workspace and recordings path), and `close()`
 closes the server's input and waits up to 2 seconds before mcptools kills the
-process. mcp-repl uses the same adapter hook for `repl`.
+process.
+
+Agent interruption and internal stream stops cancel that Agent's active owned
+MCP requests. Pending executions retain their cancellation binding when the host
+removes or replaces registered tools; those bindings are released when the call
+settles. Cloning an Agent does not copy its pending executions. Cancellation
+checks the stopping Agent's effective ownership, closes matching busy connections
+and discards their state. Idle connections remain available. A server process
+exit also invalidates the connection.
 
 `send` forwards `timeout_ms` capped at 2500 ms (also when omitted). MCP Console
 starts that wait after admission, and interrupt adds a 100 ms grace, so replies
@@ -195,6 +151,6 @@ and readonly and plan modes deny `send`. The connection's `dependencies`
 setting is enforced before dispatch whatever the permission mode.
 
 `tests/testthat/test-mcp-console.R` runs against a stdio fixture that serves
-the released 0.0.4 `tools/list` result (`fixtures/mcp-console-tools.json`) and
+the released 0.4.0 `tools/list` result (`fixtures/mcp-console-tools.json`) and
 emulates polling, interrupt, restart and plot output. The live journey runs
 when `DEPUTY_MCP_CONSOLE_BIN` names a qualified executable.

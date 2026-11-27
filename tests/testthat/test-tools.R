@@ -504,19 +504,6 @@ test_that("the R and shell tools' processes don't load deputy", {
   )
 })
 
-test_that("tool_run_r_code requires callr for process isolation", {
-  check_installed <- rlang::check_installed
-  local_mocked_bindings(is_interactive = function() FALSE, .package = "rlang")
-  local_mocked_bindings(
-    check_installed = function(pkg, reason) {
-      check_installed(pkg, reason = reason, version = "9999")
-    },
-    .package = "rlang"
-  )
-
-  expect_snapshot(error = TRUE, tool_run_r_code("1 + 1"))
-})
-
 # Tool preset tests
 
 test_that("ToolPresets contains expected presets", {

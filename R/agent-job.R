@@ -1351,9 +1351,6 @@ job_create <- function(
       )
     }
   )
-  if (!is.function(job_agent_manifest)) {
-    job_abort("The Agent job manifest helper is unavailable.", "job_invalid")
-  }
   task <- job_text(task, "task")
   owner_id <- job_text(owner_id, "owner_id", max_bytes = 4096L)
   definition_revision <- job_revision(
@@ -1520,9 +1517,6 @@ job_worker_checkpoint_commit <- function(worker, agent, event = NULL) {
 }
 
 job_worker_start_poller <- function(worker) {
-  if (!requireNamespace("later", quietly = TRUE)) {
-    return(invisible(NULL))
-  }
   worker$poller_active <- TRUE
   poll <- NULL
   poll <- function() {

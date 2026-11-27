@@ -3637,18 +3637,16 @@ Agent <- R6::R6Class(
         }
       },
 
+      # Run contexts are normalized at ingress into plain copy-on-modify lists,
+      # so hot internal reads do not need to re-run recursive validation.
       effective_run_context = function() {
-        clone_run_context(
-          private$current_run_context %||% private$.run_context
-        )
+        private$current_run_context %||% private$.run_context
       },
 
       snapshot_run_context = function() {
-        clone_run_context(
-          private$current_run_context %||%
-            private$last_run_context %||%
-            private$.run_context
-        )
+        private$current_run_context %||%
+          private$last_run_context %||%
+          private$.run_context
       },
 
       event_correlation = function(delegation_id = NULL) {
@@ -3840,8 +3838,6 @@ Agent <- R6::R6Class(
 
         invisible(NULL)
       },
-
-      # Create a true coro generator for streaming events
 
       get_last_response = function() {
         last <- private$.chat$last_turn()

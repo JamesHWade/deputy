@@ -69,6 +69,7 @@ deputy/
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
 │   ├── run-ending.R        # RunEnding values and the stop-reason mapping
 │   ├── run-usage.R         # Run accounting and fail-closed limits
+│   ├── limit-wrap-up.R     # Opt-in limit wrap-up and cut-off answer handling
 │   ├── stall-detection.R   # Canonical repeated-tool progress signal
 │   ├── permissions.R       # S7 permission configuration and public evaluation
 │   ├── permission-evaluation.R # Internal tool gating and capability evaluation
@@ -90,6 +91,9 @@ deputy/
 │   ├── r-session.R        # Conversation-scoped trusted R worker owner
 │   ├── r-session-worker.R # Ordered evaluate output and plot capture
 │   ├── r-session-tools.R  # Bounded data bridge to selected host tools
+│   ├── r-session-artifacts.R # Owner-scoped durable R display artifacts
+│   ├── r-session-checkpoint.R # Portable R data checkpoints and restore
+│   ├── r-session-rich-renderer.R # Interactive table and plot HTML rendering
 │   ├── tool-invocation.R  # Governed nested tool admission and invocation
 │   ├── r-session-result.R # Native ellmer content and portable display evidence
 │   ├── tool-rich-results.R # Independent native text and image context bounds
@@ -416,7 +420,7 @@ test_that("descriptive test name", {
   # Verify
 
   expect_s7_class(result, AgentResult)
-  expect_equal(result$stop_reason, "end_turn")
+  expect_equal(result$stop_reason, "complete")
 })
 ```
 
@@ -710,7 +714,7 @@ are trusted host controls. `queue = TRUE` (and every `delegation_tool()`
 call) goes through `continue_conversation_queued()`: a busy entry keeps
 `waiters`, settlement wakes the oldest with `later`, release fails them all,
 and a woken task is admitted afresh. Graph routes don't queue, since
-members can route to each other. are trusted host controls. The shared child inspection and observation methods
+members can route to each other. The shared child inspection and observation methods
 now live on Agent and are inherited by LeadAgent. `R/owned-conversations.R` owns
 handle admission and cleanup; it uses the existing delegation lifecycle and run
 kernel. See ADR-0024 for lifetime, resource, approval and recursion boundaries.
@@ -935,12 +939,16 @@ the AgentDefinition supplies the child's executable registry.
 - `evaluate` - Ordered R output, conditions, and graphics capture
 - `grDevices` - Graphics devices and static plot capture
 - `htmltools` - Escaped HTML for portable host display evidence
+- `httr2` (>= 1.3.0.9000) - HTTP requests and non-blocking streaming support
+- `stats`, `tools`, `utils` - Base R helpers
+
+**Optional external tools**:
 - `mcp-console` (optional, through mcptools) - OS-sandboxed R, Python and SQL
   workbench; `mcp_console_connection()` verifies version 0.4.0 and an active
   native restricted-network sandbox before exposing `send`
 
 **Development** (in Suggests):
-- `testthat` (>= 3.0.0) - Testing
+- `testthat` (>= 3.2.2) - Testing
 - `knitr` - Vignettes
 
 **Shiny Integration** (in Suggests):

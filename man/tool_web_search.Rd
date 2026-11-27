@@ -19,9 +19,8 @@ The numbered results as one string.
 }
 \description{
 A tool that searches the web with DuckDuckGo's HTML search page and returns
-the title, URL and snippet of each result. Needs the httr2 package. For
-better results, use a provider's own search tool (see \code{\link[=tools_web]{tools_web()}}) or a
-dedicated search API.
+the title, URL and snippet of each result. For better results, use a
+provider's own search tool (see \code{\link[=tools_web]{tools_web()}}) or a dedicated search API.
 }
 \examples{
 \dontrun{

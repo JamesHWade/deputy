@@ -1,22 +1,6 @@
 # required feature dependencies provide installation guidance
 
     Code
-      tool_web_fetch("https://example.com")
-    Condition
-      Error in `rlang::check_installed()`:
-      ! The package "httr2" (>= 9999) is required to fetch web content
-
----
-
-    Code
-      tool_web_search("deputy")
-    Condition
-      Error in `rlang::check_installed()`:
-      ! The package "httr2" (>= 9999) is required to search the web
-
----
-
-    Code
       skill_load(skill_dir)
     Condition
       Error in `rlang::check_installed()`:

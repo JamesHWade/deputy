@@ -1,5 +1,10 @@
 # Delegate OS sandboxing to mcp-repl
 
+> **Status: Superseded by [ADR-0029](0029-mcp-console-workbench.md).**
+> `mcp_repl_connection()`, `mcp_repl_control()`, and `tools_mcp_repl()` were
+> removed in #267; OS-sandboxed code execution now uses
+> `mcp_console_connection()` (`posit-dev/mcp-console` 0.4.0).
+
 Deputy treats its built-in R and shell tools as trusted-code execution. It does
 not implement a second operating-system sandbox. Model-generated R that needs
 confinement runs through an explicitly configured mcp-repl server loaded by

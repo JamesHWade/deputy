@@ -9,9 +9,6 @@ test_that("required feature dependencies provide installation guidance", {
     .package = "rlang"
   )
 
-  expect_snapshot(error = TRUE, tool_web_fetch("https://example.com"))
-  expect_snapshot(error = TRUE, tool_web_search("deputy"))
-
   skill_dir <- withr::local_tempdir()
   writeLines("name: example", file.path(skill_dir, "SKILL.yaml"))
   expect_snapshot(error = TRUE, skill_load(skill_dir))

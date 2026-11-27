@@ -114,6 +114,7 @@ initialize_agent_run <- function(
   private$tool_started_at <- list()
   private$tool_event_overrides <- list()
   private$tool_call_records <- list()
+  private$trusted_arguments <- list()
   private$pending_delegations <- list()
   private$original_tool_results <- list()
   private$last_limit_status <- NULL

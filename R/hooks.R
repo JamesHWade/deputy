@@ -534,8 +534,7 @@ HookRegistry <- R6::R6Class(
 
   private = list(
     call_hook = function(hook, args) {
-      # Call with timeout if callr is available
-      if (hook@timeout > 0 && rlang::is_installed("callr")) {
+      if (hook@timeout > 0) {
         callr::r(
           child_function(function(callback, args) {
             do.call(callback, args)
@@ -544,19 +543,6 @@ HookRegistry <- R6::R6Class(
           timeout = hook@timeout
         )
       } else {
-        # Warn once if timeout requested but callr not installed
-        if (
-          hook@timeout > 0 &&
-            !rlang::is_installed("callr") &&
-            !isTRUE(private$callr_warned)
-        ) {
-          private$callr_warned <- TRUE
-          cli::cli_warn(c(
-            "Hook timeout ignored: {.pkg callr} not installed",
-            "i" = "Install {.pkg callr} to enforce timeout: {.code install.packages('callr')}",
-            "i" = "Or set {.code timeout = 0} to suppress this warning"
-          ))
-        }
         do.call(hook@callback, args)
       }
     },
@@ -583,7 +569,7 @@ HookRegistry <- R6::R6Class(
       if (event == "PreToolUse") {
         cli::cli_alert_danger(c(
           "PreToolUse hook failed - denying tool for safety",
-          "x" = error_message
+          "x" = "{error_message}"
         ))
         return(HookResultPreToolUse(
           permission = "deny",
@@ -603,9 +589,9 @@ HookRegistry <- R6::R6Class(
       )
 
       cli::cli_alert_danger(c(
-        severity,
-        "x" = error_message,
-        "i" = "Use registry$last_errors to inspect hook failures"
+        "{severity}",
+        "x" = "{error_message}",
+        "i" = "Use registry$last_errors() to inspect hook failures"
       ))
 
       NULL
@@ -653,8 +639,7 @@ HookRegistry <- R6::R6Class(
     hooks = list(),
     hook_errors = list(),
     fire_count = 0L,
-    reserved_fire_id = NULL,
-    callr_warned = FALSE
+    reserved_fire_id = NULL
   )
 )
 
@@ -681,17 +666,12 @@ hook_log_tools <- function(verbose = FALSE) {
     timeout = 0, # Run in main process for cli output
     callback = function(tool_name, tool_result, tool_error, context) {
       if (!is.null(tool_error)) {
-        cli::cli_alert_danger(paste0(
-          "Tool ",
-          tool_name,
-          " failed: ",
-          tool_error
-        ))
+        cli::cli_alert_danger("Tool {tool_name} failed: {tool_error}")
       } else {
-        cli::cli_alert_success(paste0("Tool ", tool_name, " completed"))
+        cli::cli_alert_success("Tool {tool_name} completed")
         if (verbose && !is.null(tool_result)) {
           result_preview <- truncate_string(as.character(tool_result), 100)
-          cli::cli_alert_info(paste0("Result: ", result_preview))
+          cli::cli_alert_info("Result: {result_preview}")
         }
       }
       # Only observes: let later PostToolUse hooks run.
@@ -839,7 +819,6 @@ hook_block_dangerous_bash <- function(
 
     # Base64/encoding piping to shell
     "base64.*\\|.*\\b(ba)?sh\\b", # base64 -d | bash
-    "base64.*\\|.*\\bsh\\b",
     "\\|\\s*(ba)?sh\\s*$", # anything | bash at end
     "\\|\\s*/bin/(ba)?sh", # pipe to /bin/bash
     "xxd.*\\|.*\\b(ba)?sh\\b", # xxd -r | bash (hex decoding)
