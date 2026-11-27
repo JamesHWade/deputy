@@ -266,6 +266,13 @@ lists the skills in a directory.
 
 ## More tools
 
+- [Trusted
+  mini-agents](https://jameshwade.github.io/deputy/articles/trusted-mini-agents.md):
+  [`tools_commons()`](https://jameshwade.github.io/deputy/reference/tools_commons.md)
+  wraps the public search and measure methods of a
+  [`commons::commons()`](https://posit-dev.github.io/commons/r/reference/commons.html)
+  object (Commons 0.2.0 or later) for sharing across a lead agent and
+  specialists.
 - [Running R
   code](https://jameshwade.github.io/deputy/articles/code-execution.md):
   trusted R execution, persistent R sessions, and sandboxed R, Python

@@ -165,6 +165,8 @@ Make one tool the only source of each kind of result.
   : Designate trusted tools
 - [`result_trusted_results()`](https://jameshwade.github.io/deputy/reference/result_trusted_results.md)
   : Get the trusted results from a run
+- [`tools_commons()`](https://jameshwade.github.io/deputy/reference/tools_commons.md)
+  : Get tools for a Commons 0.2.0 object
 
 ## Hooks
 
