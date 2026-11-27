@@ -26,7 +26,10 @@ remain stable as these internal modules evolve.
 | Durable approval suspension and governed resume | `R/agent-approval.R` |
 | Portable approval control records and S7 inspection | `R/approval-record.R` |
 | Locked immutable approval storage revisions | `R/approval-store.R` |
-| Durable host-scheduled job records and recovery transitions | `R/agent-job.R` |
+| Durable host-scheduled job public entry points | `R/agent-job.R` |
+| AgentJob S7 snapshot, evidence bounds and state transitions | `R/agent-job-record.R` |
+| Job store validation, control records, authorization and recovery | `R/agent-job-store.R` |
+| Job worker binding, checkpointing, cleanup and settlement | `R/agent-job-worker.R` |
 | Job manifests, graph snapshots and governed runtime checkpoints | `R/agent-job-runtime.R` |
 | Session payload construction and restoration | `R/agent-session.R` |
 | Context estimation and compaction orchestration | `R/agent-context.R` |
@@ -38,6 +41,8 @@ remain stable as these internal modules evolve.
 | Ellmer structured requests and finite application corrections | `R/structured-run.R` |
 | Governance trace adapter | `R/agent-tracing.R` |
 | S7 hook and permission callback result contracts | `R/callback-result.R` |
+| Built-in hook presets (logging, bash, file writes) | `R/hook-presets.R` |
+| TrustedResults across retained specialists and graph routes | `R/trusted-results-routes.R` |
 | Permissions object and policy presets | `R/permissions.R` |
 | Permission modes, capability intersections and path policy | `R/permission-policy.R` |
 | Checkpoint journal operations | `R/file-checkpoints.R` |
@@ -109,12 +114,10 @@ These files have since grown past 1,000 lines and have no agreed exception
 
 | Source | Lines |
 | --- | --- |
-| `R/agent-job.R` | 2,405 |
 | `R/subagent-chat.R` | 1,514 |
 | `R/subagent-history.R` | 1,315 |
 | `R/delegation-activity.R` | 1,279 |
 | `R/agent-stream.R` | 1,162 |
-| `R/trusted-results.R` | 1,161 |
 | `R/agent-context.R` | 1,132 |
 | `R/agents-multi.R` | 1,126 |
 | `R/tool-runtime.R` | 1,097 |

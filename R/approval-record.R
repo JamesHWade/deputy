@@ -507,37 +507,25 @@ approval_type_record <- function(value) {
   value
 }
 
-intersect_usage_limits <- function(left, right) {
-  fields <- S7::props(left)
-  for (name in usage_limit_fields()) {
-    values <- c(S7::prop(left, name), S7::prop(right, name))
-    fields[name] <- list(if (length(values)) min(values) else NULL)
+enforce_static_policy_ceilings <- function(
+  policies,
+  tool_name,
+  tool_input,
+  context,
+  fallback_reason
+) {
+  for (policy in policies) {
+    decision <- permissions_check(
+      approval_static_policy(policy),
+      tool_name,
+      tool_input,
+      context
+    )
+    if (!S7::S7_inherits(decision, PermissionResultAllow)) {
+      ellmer::tool_reject(decision$reason %||% fallback_reason)
+    }
   }
-  fields$on_unknown_cost <- if (
-    "stop" %in% c(left$on_unknown_cost, right$on_unknown_cost)
-  ) {
-    "stop"
-  } else {
-    "continue"
-  }
-  settings <- c(left$on_exceed, right$on_exceed)
-  # A looser hard ceiling still holds when the tighter limit allows one
-  # more request. Keep the hard stop when its ceiling determines the limit.
-  hard_wrap_up_limit <- function(limits) {
-    identical(limits$on_exceed, "stop") &&
-      (isTRUE(limits$max_requests == fields$max_requests) ||
-        isTRUE(limits$max_tool_calls == fields$max_tool_calls))
-  }
-  fields$on_exceed <- if ("error" %in% settings) {
-    "error"
-  } else if (hard_wrap_up_limit(left) || hard_wrap_up_limit(right)) {
-    "stop"
-  } else if ("wrap_up" %in% settings) {
-    "wrap_up"
-  } else {
-    "stop"
-  }
-  do.call(UsageLimits, fields)
+  invisible(NULL)
 }
 
 # Convert display-only currency and S7's stored NULL representation to

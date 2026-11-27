@@ -32,7 +32,10 @@ deputy/
 │   ├── agent-tracing.R     # OpenTelemetry governance trace adapter
 │   ├── agent-stream.R      # Shared governed stream and finalization
 │   ├── agent-approval.R     # Durable pending-tool suspension and governed resume
-│   ├── agent-job.R          # Host-scheduled durable jobs and recovery states
+│   ├── agent-job.R          # Host-scheduled durable job public entry points
+│   ├── agent-job-record.R   # AgentJob S7 snapshot, evidence bounds and transitions
+│   ├── agent-job-store.R    # Job store validation, control records and authorization
+│   ├── agent-job-worker.R   # Job worker binding, checkpointing, cleanup and settlement
 │   ├── agent-job-runtime.R  # Job manifests, graph snapshots and checkpoints
 │   ├── approval-record.R    # S7 approval inspection and portable control records
 │   ├── approval-store.R     # Locked immutable approval revisions
@@ -75,9 +78,11 @@ deputy/
 │   ├── permission-evaluation.R # Internal tool gating and capability evaluation
 │   ├── permission-policy.R # Permission modes, capability intersections and path policy
 │   ├── hooks.R             # HookRegistry for lifecycle events
+│   ├── hook-presets.R      # Built-in hook presets (logging, bash, file writes)
 │   ├── hook-validation.R   # HookMatcher configuration validation
 │   ├── callback-result.R   # S7 hook and permission decisions
 │   ├── trusted-results.R   # TrustedResults policy and no-bypass registry check
+│   ├── trusted-results-routes.R # TrustedResults across retained specialists and routes
 │   ├── turn-notes.R        # Host notes beside the turns, and shared overlay helpers
 │   ├── tool-input-review.R # Typed per-field tables for input review
 │   ├── skill.R             # S7 Skill values and requirement inspection

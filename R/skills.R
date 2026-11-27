@@ -70,26 +70,15 @@ skill_load <- function(path, check_requirements = TRUE) {
     }
     skill <- load_skill_from_markdown(path)
     if (check_requirements) {
-      req_check <- skill_check_requirements(skill)
-      if (!req_check$ok) {
-        cli_warn(c(
-          "Skill {.val {skill$name}} has unmet requirements",
-          "x" = "Missing: {.val {req_check$missing}}"
-        ))
-      }
+      warn_unmet_skill_requirements(skill)
     }
     return(skill)
   }
 
   # Check for SKILL.yaml or SKILL.md in directory
-  yaml_path <- file.path(path, "SKILL.yaml")
-  md_path <- file.path(path, "SKILL.md")
-  if (!file.exists(yaml_path)) {
-    yaml_path <- file.path(path, "skill.yaml")
-  }
-  if (!file.exists(md_path)) {
-    md_path <- file.path(path, "skill.md")
-  }
+  files <- find_skill_files(path)
+  yaml_path <- files$yaml
+  md_path <- files$md
 
   if (!file.exists(yaml_path) && !file.exists(md_path)) {
     cli_abort(c(
@@ -138,19 +127,36 @@ skill_load <- function(path, check_requirements = TRUE) {
 
   # Check requirements if requested
   if (check_requirements) {
-    req_check <- skill_check_requirements(skill)
-    if (!req_check$ok) {
-      cli_warn(c(
-        "Skill {.val {skill$name}} has unmet requirements",
-        "x" = "Missing: {.val {req_check$missing}}"
-      ))
-    }
+    warn_unmet_skill_requirements(skill)
   }
 
   skill
 }
 
 # Load a skill directly from a SKILL.md file
+find_skill_files <- function(dir) {
+  yaml_path <- file.path(dir, "SKILL.yaml")
+  if (!file.exists(yaml_path)) {
+    yaml_path <- file.path(dir, "skill.yaml")
+  }
+  md_path <- file.path(dir, "SKILL.md")
+  if (!file.exists(md_path)) {
+    md_path <- file.path(dir, "skill.md")
+  }
+  list(yaml = yaml_path, md = md_path)
+}
+
+warn_unmet_skill_requirements <- function(skill) {
+  req_check <- skill_check_requirements(skill)
+  if (!req_check$ok) {
+    cli_warn(c(
+      "Skill {.val {skill$name}} has unmet requirements",
+      "x" = "Missing: {.val {req_check$missing}}"
+    ))
+  }
+  invisible(req_check)
+}
+
 load_skill_from_markdown <- function(path) {
   parsed <- parse_markdown_frontmatter(path)
   meta <- parsed$meta %||% list()
@@ -215,10 +221,7 @@ load_skill_tools <- function(skill_path, tool_specs) {
         }
 
         tool <- get(fn_name, envir = tool_env)
-        # Check for S7 ToolDef class (ellmer uses S7)
-        tool_class <- class(tool)
-        is_tool <- any(grepl("ToolDef", tool_class))
-        if (!is_tool) {
+        if (!inherits(tool, "ellmer::ToolDef")) {
           cli_warn(c(
             "{.fn {fn_name}} is not a tool definition",
             "i" = "Use {.fn ellmer::tool} to create tools",
@@ -323,21 +326,13 @@ skills_list <- function(path = "skills") {
   subdirs <- list.dirs(path, recursive = FALSE, full.names = TRUE)
   md_files <- list.files(path, pattern = "\\.md$", full.names = TRUE)
 
-  skills <- data.frame(
-    name = character(),
-    path = character(),
-    stringsAsFactors = FALSE
-  )
+  skill_names <- character()
+  skill_paths <- character()
 
   for (dir in subdirs) {
-    yaml_path <- file.path(dir, "SKILL.yaml")
-    if (!file.exists(yaml_path)) {
-      yaml_path <- file.path(dir, "skill.yaml")
-    }
-    md_path <- file.path(dir, "SKILL.md")
-    if (!file.exists(md_path)) {
-      md_path <- file.path(dir, "skill.md")
-    }
+    files <- find_skill_files(dir)
+    yaml_path <- files$yaml
+    md_path <- files$md
 
     if (file.exists(yaml_path) || file.exists(md_path)) {
       # Try to get the name from YAML/frontmatter
@@ -361,14 +356,8 @@ skills_list <- function(path = "skills") {
         name <- parsed$meta$name %||% basename(dir)
       }
 
-      skills <- rbind(
-        skills,
-        data.frame(
-          name = name,
-          path = dir,
-          stringsAsFactors = FALSE
-        )
-      )
+      skill_names <- c(skill_names, name)
+      skill_paths <- c(skill_paths, dir)
     }
   }
 
@@ -379,17 +368,15 @@ skills_list <- function(path = "skills") {
       parsed <- parse_markdown_frontmatter(md_path)
       name <- parsed$meta$name %||% name
     }
-    skills <- rbind(
-      skills,
-      data.frame(
-        name = name,
-        path = md_path,
-        stringsAsFactors = FALSE
-      )
-    )
+    skill_names <- c(skill_names, name)
+    skill_paths <- c(skill_paths, md_path)
   }
 
-  skills
+  data.frame(
+    name = skill_names,
+    path = skill_paths,
+    stringsAsFactors = FALSE
+  )
 }
 
 # The text `$load_skill()` appends to the system prompt for one skill.

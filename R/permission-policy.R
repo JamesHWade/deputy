@@ -121,6 +121,16 @@ permission_native_capability_tool_ids <- c(
   "delegate_to_agent"
 )
 
+# Normalize Deputy's canonical snake-case tool identifiers.
+normalize_native_tool_id <- function(name) {
+  if (is.null(name) || length(name) == 0L) {
+    return(NA_character_)
+  }
+  normalized <- tolower(trimws(as.character(name[[1L]])))
+  normalized <- gsub("[^a-z0-9]+", "_", normalized)
+  gsub("^_+|_+$", "", normalized)
+}
+
 is_permission_file_read_tool <- function(tool_name) {
   normalize_native_tool_id(tool_name) %in% permission_file_read_tool_ids
 }
