@@ -427,14 +427,7 @@ RSession <- R6::R6Class(
       ))
     },
     check_checkpoint = function() {
-      private$check_current()
-      if (is.null(private$checkpoint_config)) {
-        abort_deputy(
-          "Configure {.arg checkpoint_dir} and {.arg checkpoint_owner_id} to use R session checkpoints.",
-          class = "r_session_checkpoint"
-        )
-      }
-      invisible(NULL)
+      r_session_check_checkpoint(private)
     },
     enqueue_job = function(job) {
       if (
@@ -459,34 +452,10 @@ RSession <- R6::R6Class(
       })
     },
     bridge_directory = function(job) {
-      if (is.null(private$bridge_root)) {
-        private$bridge_root <- tempfile("deputy-r-tools-")
-        if (!dir.create(private$bridge_root, recursive = TRUE, mode = "0700")) {
-          abort_deputy(
-            "Could not create the R session tool mailbox.",
-            class = "r_session_tool_mailbox"
-          )
-        }
-      }
-      directory <- file.path(
-        private$bridge_root,
-        paste0("generation-", private$generation),
-        paste0("call-", job$id)
-      )
-      if (!dir.create(directory, recursive = TRUE, mode = "0700")) {
-        abort_deputy(
-          "Could not create the R session execution mailbox.",
-          class = "r_session_tool_mailbox"
-        )
-      }
-      directory
+      r_session_bridge_directory(private, job)
     },
     cleanup_bridge = function() {
-      if (!is.null(private$bridge_root)) {
-        unlink(private$bridge_root, recursive = TRUE, force = TRUE)
-        private$bridge_root <- NULL
-      }
-      invisible(NULL)
+      r_session_cleanup_bridge(private)
     },
     active_job = function(job) {
       !is.null(private$active) && identical(private$active$id, job$id)
@@ -498,181 +467,17 @@ RSession <- R6::R6Class(
       value = NULL,
       error = NULL
     ) {
-      if (!private$active_job(job)) {
-        return(invisible(NULL))
-      }
-      request_id <- request$request_id
-      if (
-        exists(request_id, envir = job$tool_requests, inherits = FALSE) &&
-          identical(get(request_id, envir = job$tool_requests), "settled")
-      ) {
-        return(invisible(NULL))
-      }
-      response <- tryCatch(
-        r_session_tool_response(
-          request,
-          status = status,
-          value = value,
-          error = error,
-          session_id = private$id,
-          call_id = job$id,
-          generation = job$generation
-        ),
-        error = function(condition) {
-          list(
-            protocol = r_session_tool_protocol_version,
-            request_id = request_id,
-            session_id = private$id,
-            call_id = job$id,
-            execution_id = job$governed_execution_id,
-            generation = job$generation,
-            tool_name = request$tool_name %||% "unknown",
-            status = "error",
-            error = r_session_tool_error_message(condition)
-          )
-        }
+      r_session_write_tool_response(
+        private,
+        job = job,
+        request = request,
+        status = status,
+        value = value,
+        error = error
       )
-      path <- file.path(job$mailbox_dir, paste0(request_id, ".response.json"))
-      tryCatch(
-        r_session_tool_atomic_write(
-          path,
-          r_session_tool_json(
-            response,
-            r_session_tool_max_result_bytes * 2L,
-            context = "response"
-          )
-        ),
-        error = function(condition) {
-          # The worker may have timed out or the owner may be resetting.  In
-          # either case there is no later execution to which this response may
-          # be delivered.
-          invisible(NULL)
-        }
-      )
-      assign(request_id, "settled", envir = job$tool_requests)
-      invisible(NULL)
     },
     poll_tool_mailbox = function(job) {
-      if (
-        !length(private$tool_names) ||
-          is.null(job$mailbox_dir) ||
-          !dir.exists(job$mailbox_dir)
-      ) {
-        return(invisible(NULL))
-      }
-      paths <- list.files(
-        job$mailbox_dir,
-        pattern = "\\.request\\.json$",
-        full.names = TRUE,
-        no.. = TRUE
-      )
-      for (path in paths) {
-        request_id <- sub("\\.request\\.json$", "", basename(path))
-        if (exists(request_id, envir = job$tool_requests, inherits = FALSE)) {
-          next
-        }
-        assign(request_id, "processing", envir = job$tool_requests)
-        request <- tryCatch(
-          r_session_tool_read_json(
-            path,
-            r_session_tool_max_request_bytes,
-            context = "request"
-          ),
-          error = function(condition) condition
-        )
-        if (inherits(request, "deputy_r_session_tool_io")) {
-          # The request has not been parsed or dispatched. Leave it eligible
-          # for the next poll; the execution's existing deadline bounds retries.
-          job$tool_read_state$last_error <- conditionMessage(request)
-          rm(list = request_id, envir = job$tool_requests)
-          next
-        }
-        job$tool_read_state$last_error <- NULL
-        if (inherits(request, "condition")) {
-          # A malformed request cannot be safely associated with an execution;
-          # mark it consumed and leave the worker to report its bounded timeout.
-          assign(request_id, "settled", envir = job$tool_requests)
-          next
-        }
-        validated <- tryCatch(
-          r_session_tool_validate_request(
-            request,
-            session_id = private$id,
-            call_id = job$id,
-            execution_id = job$governed_execution_id,
-            generation = job$generation,
-            tool_names = private$tool_names,
-            request_basename = basename(path)
-          ),
-          error = function(condition) condition
-        )
-        if (inherits(validated, "condition")) {
-          if (
-            is.list(request) &&
-              is_nonempty_string(request$request_id) &&
-              r_session_tool_valid_request_id(request$request_id) &&
-              identical(request$request_id, request_id)
-          ) {
-            private$write_tool_response(
-              job,
-              request,
-              status = "error",
-              error = r_session_tool_error_message(validated)
-            )
-          } else {
-            assign(request_id, "settled", envir = job$tool_requests)
-          }
-          next
-        }
-        value <- tryCatch(
-          job$dispatch(
-            validated$tool_name,
-            validated$arguments,
-            execution_id = job$id,
-            generation = as.character(job$generation)
-          ),
-          error = function(condition) condition
-        )
-        if (inherits(value, "condition")) {
-          private$write_tool_response(
-            job,
-            request,
-            status = "error",
-            error = r_session_tool_error_message(value)
-          )
-          next
-        }
-        if (promises::is.promising(value)) {
-          local({
-            pending_request <- request
-            promises::then(
-              value,
-              function(result) {
-                private$write_tool_response(
-                  job,
-                  pending_request,
-                  "ok",
-                  value = result
-                )
-                invisible(NULL)
-              },
-              function(condition) {
-                private$write_tool_response(
-                  job,
-                  pending_request,
-                  "error",
-                  error = r_session_tool_error_message(condition)
-                )
-                invisible(NULL)
-              }
-            )
-          })
-          assign(request_id, "pending", envir = job$tool_requests)
-        } else {
-          private$write_tool_response(job, request, "ok", value = value)
-        }
-      }
-      invisible(NULL)
+      r_session_poll_tool_mailbox(private, job)
     },
     reset = function(reason, detail = NULL) {
       private$cleanup_bridge()
@@ -774,70 +579,13 @@ RSession <- R6::R6Class(
       invisible(NULL)
     },
     reject_checkpoint = function(job, reason) {
-      job$reject(tryCatch(
-        abort_deputy(
-          "R session checkpoint operation ended ({.val {reason}}).",
-          class = "r_session_checkpoint"
-        ),
-        error = identity
-      ))
-      invisible(NULL)
+      r_session_reject_checkpoint(job, reason)
     },
     prepare_checkpoint = function(job, fresh) {
-      if (identical(job$checkpoint, "capture")) {
-        if (fresh) {
-          abort_deputy(
-            "Start an R execution before capturing its data.",
-            class = "r_session_checkpoint"
-          )
-        }
-        return(job)
-      }
-      if (!fresh) {
-        abort_deputy(
-          "Restore an R session checkpoint before starting a worker or after resetting it.",
-          class = "r_session_checkpoint"
-        )
-      }
-      job$artifact <- r_session_checkpoint_read(
-        private$checkpoint_config,
-        private$owner,
-        job$checkpoint_id
-      )
-      job
+      r_session_prepare_checkpoint(private, job, fresh)
     },
     finish_checkpoint = function(job, response) {
-      tryCatch(
-        {
-          private$check_current()
-          if (!is.null(response$error)) {
-            abort_deputy(
-              "R session checkpoint failed: {response$error}",
-              class = "r_session_checkpoint"
-            )
-          }
-          receipt <- if (identical(job$checkpoint, "capture")) {
-            r_session_checkpoint_write(
-              private$checkpoint_config,
-              private$owner,
-              job$bindings,
-              response$payload,
-              job$generation
-            )
-          } else {
-            c(job$artifact$receipt, list(restored_generation = job$generation))
-          }
-          job$resolve(receipt)
-        },
-        error = function(error) {
-          job$reject(error)
-          # Avoid retaining a newly started worker after a failed import.
-          if (identical(job$checkpoint, "restore")) {
-            private$reset("restore_failed")
-          }
-        }
-      )
-      invisible(NULL)
+      r_session_finish_checkpoint(private, job, response)
     },
     call_worker = function(worker, job) {
       if (!is.null(job$checkpoint)) {
@@ -877,6 +625,85 @@ RSession <- R6::R6Class(
       )
       invisible(NULL)
     },
+    start_worker = function() {
+      worker <- callr::r_session$new(
+        options = callr::r_session_options(
+          libpath = private$settings$libpath %||% .libPaths(),
+          user_profile = FALSE,
+          system_profile = FALSE,
+          env = subprocess_env(private$settings$env),
+          # Let processx finalize its own native resources. Calling
+          # callr$close() from an R finalizer can re-enter pipe cleanup.
+          extra = list(cleanup_tree = TRUE)
+        ),
+        wait = FALSE
+      )
+      private$resource$worker <- worker
+      private$generation <- private$generation + 1L
+      worker
+    },
+    handle_worker_response = function(response) {
+      if (
+        !inherits(response, "callr_session_result") ||
+          identical(response$code, 301L)
+      ) {
+        return(FALSE)
+      }
+      if (!is.null(response$error) || response$code != 200L) {
+        private$reset("worker_failed")
+        return(TRUE)
+      }
+      finished <- private$active
+      private$active <- NULL
+      private$state <- "idle"
+      if (is.null(finished$checkpoint)) {
+        private$settle(
+          finished,
+          response$result$segments,
+          response$result$outcome
+        )
+      } else {
+        private$finish_checkpoint(finished, response$result)
+      }
+      private$drain()
+      TRUE
+    },
+    poll_step = function(worker, job, poll_state) {
+      if (!worker$is_alive()) {
+        private$reset("worker_exited")
+        return(FALSE)
+      }
+      if (unname(proc.time()[["elapsed"]]) >= poll_state$deadline) {
+        private$reset(
+          if (poll_state$dispatched) "timed_out" else "startup_timed_out",
+          detail = if (poll_state$dispatched) {
+            job$tool_read_state$last_error
+          } else {
+            NULL
+          }
+        )
+        return(FALSE)
+      }
+      if (!poll_state$dispatched) {
+        if (identical(worker$get_state(), "idle")) {
+          private$call_worker(worker, job)
+          poll_state$dispatched <- TRUE
+          private$state <- "running"
+          poll_state$deadline <- unname(proc.time()[["elapsed"]]) +
+            private$settings$timeout
+        } else if (identical(worker$poll_process(0), "ready")) {
+          worker$read()
+        }
+      } else if (identical(worker$poll_process(0), "ready")) {
+        if (private$handle_worker_response(worker$read())) {
+          return(FALSE)
+        }
+      }
+      if (poll_state$dispatched && private$active_job(job)) {
+        private$poll_tool_mailbox(job)
+      }
+      private$active_job(job)
+    },
     drain = function() {
       if (
         !is.null(private$active) ||
@@ -911,20 +738,7 @@ RSession <- R6::R6Class(
             job <- prepared
           }
           if (fresh) {
-            worker <- callr::r_session$new(
-              options = callr::r_session_options(
-                libpath = private$settings$libpath %||% .libPaths(),
-                user_profile = FALSE,
-                system_profile = FALSE,
-                env = subprocess_env(private$settings$env),
-                # Let processx finalize its own native resources. Calling
-                # callr$close() from an R finalizer can re-enter pipe cleanup.
-                extra = list(cleanup_tree = TRUE)
-              ),
-              wait = FALSE
-            )
-            private$resource$worker <- worker
-            private$generation <- private$generation + 1L
+            worker <- private$start_worker()
           }
           job$fresh <- fresh
           job$generation <- private$generation
@@ -934,75 +748,24 @@ RSession <- R6::R6Class(
           private$active <- job
           private$active$reset_reason <- if (fresh) private$last_reset else NULL
           private$state <- if (fresh) "starting" else "running"
-          began <- unname(proc.time()[["elapsed"]])
-          dispatched <- FALSE
-          deadline <- began + private$settings$startup_timeout
+          poll_state <- new.env(parent = emptyenv())
+          poll_state$dispatched <- FALSE
+          poll_state$deadline <- unname(proc.time()[["elapsed"]]) +
+            private$settings$startup_timeout
           poll <- function() {
-            if (
-              is.null(private$active) || !identical(private$active$id, job$id)
-            ) {
+            if (!private$active_job(job)) {
               return(invisible(NULL))
             }
-            tryCatch(
-              {
-                if (!worker$is_alive()) {
-                  private$reset("worker_exited")
-                  return(invisible(NULL))
-                }
-                if (unname(proc.time()[["elapsed"]]) >= deadline) {
-                  private$reset(
-                    if (dispatched) "timed_out" else "startup_timed_out",
-                    detail = if (dispatched) {
-                      job$tool_read_state$last_error
-                    } else {
-                      NULL
-                    }
-                  )
-                  return(invisible(NULL))
-                }
-                if (!dispatched) {
-                  if (identical(worker$get_state(), "idle")) {
-                    private$call_worker(worker, job)
-                    dispatched <<- TRUE
-                    private$state <- "running"
-                    deadline <<- unname(proc.time()[["elapsed"]]) +
-                      private$settings$timeout
-                  } else if (identical(worker$poll_process(0), "ready")) {
-                    worker$read()
-                  }
-                } else if (identical(worker$poll_process(0), "ready")) {
-                  response <- worker$read()
-                  if (
-                    inherits(response, "callr_session_result") &&
-                      !identical(response$code, 301L)
-                  ) {
-                    if (!is.null(response$error) || response$code != 200L) {
-                      private$reset("worker_failed")
-                      return(invisible(NULL))
-                    }
-                    finished <- private$active
-                    private$active <- NULL
-                    private$state <- "idle"
-                    if (is.null(finished$checkpoint)) {
-                      private$settle(
-                        finished,
-                        response$result$segments,
-                        response$result$outcome
-                      )
-                    } else {
-                      private$finish_checkpoint(finished, response$result)
-                    }
-                    private$drain()
-                    return(invisible(NULL))
-                  }
-                }
-                if (dispatched && private$active_job(job)) {
-                  private$poll_tool_mailbox(job)
-                }
-                if (private$active_job(job)) later::later(poll, 0.01)
-              },
-              error = function(e) private$reset("worker_failed")
+            keep_polling <- tryCatch(
+              private$poll_step(worker, job, poll_state),
+              error = function(e) {
+                private$reset("worker_failed")
+                FALSE
+              }
             )
+            if (isTRUE(keep_polling)) {
+              later::later(poll, 0.01)
+            }
             invisible(NULL)
           }
           poll()
@@ -1032,29 +795,19 @@ validate_r_session_tool_owner <- function(
   agent,
   run_context = agent$run_context
 ) {
-  source <- runtime_source_tool(tool)
-  owner <- attr(source, "deputy_r_session_owner", exact = TRUE)
-  if (
-    !is.null(owner) && !identical(owner, r_session_owner(agent, run_context))
-  ) {
-    tool_registration_error(
-      "The R session belongs to a different Agent, session, workspace or run context."
-    )
-  }
-  invisible(NULL)
+  validate_owned_tool(
+    tool,
+    owner_attr = "deputy_r_session_owner",
+    expected_owner = r_session_owner(agent, run_context),
+    message = "The R session belongs to a different Agent, session, workspace or run context."
+  )
 }
 
 cancel_active_r_session_tools <- function(tools, agent, run_context) {
-  owner <- r_session_owner(agent, run_context)
-  for (tool in tools) {
-    source <- runtime_source_tool(tool)
-    if (
-      !identical(attr(source, "deputy_r_session_owner", exact = TRUE), owner)
-    ) {
-      next
-    }
-    cancel <- attr(source, "deputy_r_session_cancel_active", exact = TRUE)
-    if (is.function(cancel)) cancel()
-  }
-  invisible(NULL)
+  cancel_owned_tools(
+    tools,
+    owner_attr = "deputy_r_session_owner",
+    cancel_attr = "deputy_r_session_cancel_active",
+    expected_owner = r_session_owner(agent, run_context)
+  )
 }

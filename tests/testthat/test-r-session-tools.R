@@ -766,3 +766,47 @@ test_that("an interrupt while a nested tool call's hook is pending keeps the too
   expect_identical(calls, 0L)
   expect_identical(agent$last_run()$stop_reason, "stop now")
 })
+
+test_that("RSession construction rejects recursive execution and composition tools upfront", {
+  raw_bash <- ellmer::tool(
+    function(command) command,
+    name = "run_bash",
+    description = "Raw shell stub.",
+    arguments = list(command = ellmer::type_string("Command")),
+    convert = FALSE
+  )
+  agent <- Agent$new(
+    chat = create_mock_chat("ok"),
+    tools = list(raw_bash),
+    working_dir = withr::local_tempdir()
+  )
+  child <- Agent$new(
+    chat = create_mock_chat("ok"),
+    working_dir = withr::local_tempdir()
+  )
+  handle <- agent$retain_agent(
+    child,
+    usage_limits = UsageLimits(max_requests = 1L)
+  )
+  withr::defer(agent$release_agent(handle))
+  delegate_tool <- delegation_tool(
+    agent,
+    handle,
+    name = "specialist",
+    description = "Delegated specialist.",
+    usage_limits = UsageLimits(max_requests = 1L)
+  )
+  delegate_tool@convert <- FALSE
+  agent$register_tool(delegate_tool)
+
+  expect_error(
+    RSession$new(agent, tools = "run_bash"),
+    class = "deputy_r_session_tool",
+    regexp = "cannot bridge recursive execution or composition tool"
+  )
+  expect_error(
+    RSession$new(agent, tools = "specialist"),
+    class = "deputy_r_session_tool",
+    regexp = "cannot bridge recursive execution or composition tool"
+  )
+})

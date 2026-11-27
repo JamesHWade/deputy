@@ -5,7 +5,7 @@ run_r_code_child <- function(code_string) {
   output <- utils::capture.output({
     result <- tryCatch(
       base::eval(base::parse(text = code_string)),
-      error = function(e) list(.deputy_error = e$message)
+      error = function(e) list(.deputy_error = base::conditionMessage(e))
     )
   })
   list(
@@ -32,33 +32,59 @@ run_bash_child <- function(cmd) {
   )
 }
 
+callr_run_tool <- function(
+  fun,
+  args,
+  timeout,
+  working_dir,
+  env,
+  timeout_label,
+  error_label,
+  stderr = NULL
+) {
+  call_args <- list(
+    func = fun,
+    args = args,
+    timeout = timeout,
+    wd = working_dir,
+    env = subprocess_env(env)
+  )
+  if (!is.null(stderr)) {
+    call_args$stderr <- stderr
+  }
+  tryCatch(
+    do.call(callr::r, call_args),
+    error = function(e) {
+      if (inherits(e, "callr_timeout_error")) {
+        ellmer::tool_reject(sprintf(
+          "%s timed out after %s seconds",
+          timeout_label,
+          format(timeout, trim = TRUE)
+        ))
+      }
+      ellmer::tool_reject(paste(
+        error_label,
+        conditionMessage(e)
+      ))
+    }
+  )
+}
+
 run_r_code_impl <- function(
   code,
   timeout = 30,
   working_dir = getwd(),
   env = NULL
 ) {
-  result <- tryCatch(
-    callr::r(
-      # The code sees the child's attached packages, as at an R prompt.
-      child_function(run_r_code_child, globalenv()),
-      args = list(code_string = code),
-      timeout = timeout,
-      wd = working_dir,
-      env = subprocess_env(env)
-    ),
-    error = function(e) {
-      if (inherits(e, "callr_timeout_error")) {
-        ellmer::tool_reject(sprintf(
-          "R code execution timed out after %s seconds",
-          format(timeout, trim = TRUE)
-        ))
-      }
-      ellmer::tool_reject(paste(
-        "R code execution failed:",
-        conditionMessage(e)
-      ))
-    }
+  result <- callr_run_tool(
+    # The code sees the child's attached packages, as at an R prompt.
+    fun = child_function(run_r_code_child, globalenv()),
+    args = list(code_string = code),
+    timeout = timeout,
+    working_dir = working_dir,
+    env = env,
+    timeout_label = "R code execution",
+    error_label = "R code execution failed:"
   )
 
   parts <- character()
@@ -169,27 +195,15 @@ run_bash_impl <- function(
   # The shell inherits the child's stderr, so this file captures its errors.
   stderr_file <- tempfile("deputy-bash-", fileext = ".txt")
   on.exit(unlink(stderr_file), add = TRUE)
-  result <- tryCatch(
-    callr::r(
-      child_function(run_bash_child),
-      args = list(cmd = command),
-      timeout = timeout,
-      wd = working_dir,
-      stderr = stderr_file,
-      env = subprocess_env(env)
-    ),
-    error = function(e) {
-      if (inherits(e, "callr_timeout_error")) {
-        ellmer::tool_reject(sprintf(
-          "Command timed out after %s seconds",
-          format(timeout, trim = TRUE)
-        ))
-      }
-      ellmer::tool_reject(paste(
-        "Command failed:",
-        conditionMessage(e)
-      ))
-    }
+  result <- callr_run_tool(
+    fun = child_function(run_bash_child),
+    args = list(cmd = command),
+    timeout = timeout,
+    working_dir = working_dir,
+    env = env,
+    stderr = stderr_file,
+    timeout_label = "Command",
+    error_label = "Command failed:"
   )
   errors <- if (file.exists(stderr_file)) {
     readLines(stderr_file, warn = FALSE)

@@ -14,22 +14,12 @@ r_session_checkpoint_abort <- function(message, parent = NULL) {
 }
 
 r_session_checkpoint_config <- function(directory, owner_id) {
-  if (is.null(directory) && is.null(owner_id)) {
-    return(NULL)
-  }
-  if (!is_nonempty_string(directory) || !dir.exists(directory)) {
-    r_session_checkpoint_abort(
-      "{.arg checkpoint_dir} must be an existing directory."
-    )
-  }
-  if (!is_nonempty_string(owner_id) || nchar(owner_id, "bytes") > 4096L) {
-    r_session_checkpoint_abort(
-      "{.arg checkpoint_owner_id} must be one non-empty string of at most 4096 bytes."
-    )
-  }
-  list(
-    directory = normalizePath(directory, winslash = "/", mustWork = TRUE),
-    owner_id = unname(owner_id)
+  r_session_store_config(
+    directory = directory,
+    owner_id = owner_id,
+    dir_arg = "checkpoint_dir",
+    owner_arg = "checkpoint_owner_id",
+    abort_fn = r_session_checkpoint_abort
   )
 }
 
@@ -68,12 +58,11 @@ r_session_checkpoint_path <- function(config, id) {
   if (!is_nonempty_string(id) || !grepl("^r_checkpoint_[0-9a-f-]{36}$", id)) {
     r_session_checkpoint_abort("The R session checkpoint ID is invalid.")
   }
-  directory <- normalizePath(config$directory, winslash = "/", mustWork = FALSE)
-  if (!dir.exists(directory) || !identical(directory, config$directory)) {
-    r_session_checkpoint_abort(
-      "The R session checkpoint directory has changed."
-    )
-  }
+  directory <- r_session_store_verify_dir(
+    config,
+    "checkpoint",
+    r_session_checkpoint_abort
+  )
   file.path(directory, paste0(id, ".bin"))
 }
 
@@ -263,4 +252,86 @@ r_session_checkpoint_validate_data <- function(value) {
     invisible(NULL)
   }
   check(value)
+}
+
+# Checkpoint queue orchestration for RSession -------------------------------
+
+r_session_check_checkpoint <- function(private) {
+  private$check_current()
+  if (is.null(private$checkpoint_config)) {
+    abort_deputy(
+      "Configure {.arg checkpoint_dir} and {.arg checkpoint_owner_id} to use R session checkpoints.",
+      class = "r_session_checkpoint"
+    )
+  }
+  invisible(NULL)
+}
+
+r_session_reject_checkpoint <- function(job, reason) {
+  job$reject(tryCatch(
+    abort_deputy(
+      "R session checkpoint operation ended ({.val {reason}}).",
+      class = "r_session_checkpoint"
+    ),
+    error = identity
+  ))
+  invisible(NULL)
+}
+
+r_session_prepare_checkpoint <- function(private, job, fresh) {
+  if (identical(job$checkpoint, "capture")) {
+    if (fresh) {
+      abort_deputy(
+        "Start an R execution before capturing its data.",
+        class = "r_session_checkpoint"
+      )
+    }
+    return(job)
+  }
+  if (!fresh) {
+    abort_deputy(
+      "Restore an R session checkpoint before starting a worker or after resetting it.",
+      class = "r_session_checkpoint"
+    )
+  }
+  job$artifact <- r_session_checkpoint_read(
+    private$checkpoint_config,
+    private$owner,
+    job$checkpoint_id
+  )
+  job
+}
+
+r_session_finish_checkpoint <- function(private, job, response) {
+  tryCatch(
+    {
+      private$check_current()
+      if (!is.null(response$error)) {
+        abort_deputy(
+          "R session checkpoint failed: {response$error}",
+          class = "r_session_checkpoint"
+        )
+      }
+      receipt <- if (identical(job$checkpoint, "capture")) {
+        r_session_checkpoint_write(
+          private$checkpoint_config,
+          private$owner,
+          job$bindings,
+          response$payload,
+          job$generation
+        )
+      } else {
+        c(job$artifact$receipt, list(restored_generation = job$generation))
+      }
+      job$resolve(receipt)
+    },
+    error = function(error) {
+      job$reject(error)
+      # Avoid retaining a newly started worker after a failed import.
+      if (identical(job$checkpoint, "restore")) {
+        private$reset("restore_failed")
+      }
+    }
+  )
+  invisible(NULL)
 }
