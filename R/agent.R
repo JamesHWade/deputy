@@ -27,7 +27,7 @@ NULL
 #' checkpoint without changing the conversation. A file tool call that would
 #' exceed the checkpoint size limits is refused.
 #'
-#' @include conversation-state.R agent-approval.R agent-stream.R agent-session.R agent-context.R agent-tool-callbacks.R agent-tool-records.R
+#' @include conversation-state.R agent-approval.R agent-run-state.R agent-stream.R agent-session.R agent-context.R agent-tool-callbacks.R agent-tool-records.R agent-tool-execution.R run-usage.R
 #' @importFrom later run_now
 #' @importFrom utils tail
 #' @export
@@ -572,65 +572,7 @@ Agent <- R6::R6Class(
     #'
     #' @return A data frame with one row per delegation.
     list_subagents = function() {
-      runs <- lead_delegation_records(self)
-      if (length(runs) == 0) {
-        return(data.frame(
-          agent_name = character(),
-          agent_id = character(),
-          parent_agent_id = character(),
-          parent_delegation_id = character(),
-          depth = integer(),
-          root_agent_id = character(),
-          session_id = character(),
-          run_id = character(),
-          parent_run_id = character(),
-          delegation_id = character(),
-          tool_call_id = character(),
-          task = character(),
-          status = character(),
-          stop_reason = character(),
-          input_error = character(),
-          admitted_at = as.POSIXct(character()),
-          hook_error = character(),
-          cleanup_error = character(),
-          observation_error = character(),
-          started_at = as.POSIXct(character()),
-          completed_at = as.POSIXct(character()),
-          error = character(),
-          stringsAsFactors = FALSE
-        ))
-      }
-
-      do.call(
-        rbind,
-        lapply(runs, function(run) {
-          data.frame(
-            agent_name = run$agent_name,
-            agent_id = run$agent_id %||% NA_character_,
-            parent_agent_id = run$parent_agent_id %||% NA_character_,
-            parent_delegation_id = run$parent_delegation_id %||% NA_character_,
-            depth = run$depth %||% NA_integer_,
-            root_agent_id = run$root_agent_id %||% NA_character_,
-            session_id = run$session_id %||% NA_character_,
-            run_id = run$run_id %||% NA_character_,
-            parent_run_id = run$parent_run_id %||% NA_character_,
-            delegation_id = run$delegation_id %||% NA_character_,
-            tool_call_id = run$tool_call_id %||% NA_character_,
-            task = run$task,
-            status = run$status,
-            stop_reason = run$stop_reason %||% NA_character_,
-            input_error = run$input_error %||% NA_character_,
-            admitted_at = as.POSIXct(run$admitted_at, tz = "UTC"),
-            hook_error = run$hook_error %||% NA_character_,
-            cleanup_error = run$cleanup_error %||% NA_character_,
-            observation_error = run$observation_error %||% NA_character_,
-            started_at = as.POSIXct(run$started_at, tz = "UTC"),
-            completed_at = as.POSIXct(run$completed_at, tz = "UTC"),
-            error = run$error %||% NA_character_,
-            stringsAsFactors = FALSE
-          )
-        })
-      )
+      agent_list_subagents(self)
     },
 
     #' @description
@@ -834,55 +776,14 @@ Agent <- R6::R6Class(
       reference,
       offset = 0L
     ) {
-      views <- lead_inspect_subagents(self, requester, delegation_id, FALSE)
-      references <- unlist(
-        lapply(views, function(view) view$outcome$references),
-        recursive = FALSE
+      agent_read_subagent_result(
+        self,
+        private,
+        requester = requester,
+        delegation_id = delegation_id,
+        reference = reference,
+        offset = offset
       )
-      selected <- Filter(
-        function(ref) identical(ref$reference, reference),
-        references
-      )
-      if (
-        !is.character(reference) ||
-          length(reference) != 1L ||
-          is.na(reference) ||
-          !length(selected)
-      ) {
-        delegation_disclosure_abort()
-      }
-      # Disclosure authorizes the public reference. Storage routing remains
-      # host-owned even when the redactor removes or replaces private metadata.
-      records <- Filter(
-        function(record) identical(record$delegation_id, delegation_id),
-        lead_delegation_records(self)
-      )
-      stored <- if (length(records) == 1L) {
-        Filter(
-          function(ref) identical(ref$reference, reference),
-          records[[1L]]$references
-        )
-      } else {
-        list()
-      }
-      if (!length(stored)) {
-        delegation_disclosure_abort()
-      }
-      record <- records[[1L]]
-      storage <- lead_artifact_storage(self, record, stored[[1L]])
-      chunk <- read_tool_result_chunk(
-        reference,
-        offset = offset,
-        max_chars = 8192L,
-        policy = storage$policy,
-        session_id = storage$session_id
-      )
-      view <- private$.delegation_disclosure$redact(
-        list(kind = "artifact", reference = reference, result = chunk),
-        requester
-      )
-      inspection_portable(view)
-      inspection_bound(view, private$.delegation_disclosure)
     },
 
     #' @description
@@ -923,20 +824,13 @@ Agent <- R6::R6Class(
       validate = NULL,
       max_corrections = 0L
     ) {
-      structured <- structured_run_spec(type, validate, max_corrections)
-      effective_run_context <- merge_run_context(
-        private$.run_context,
-        run_context
-      )
-
-      limits <- private$run_usage_limits(usage_limits)
-
-      governed_run <- private$start_governed_stream(
-        messages = list(task),
-        limits = limits,
-        run_context = effective_run_context,
-        stream = "content",
-        extraction = structured
+      governed_run <- private$start_task_run(
+        task = task,
+        usage_limits = usage_limits,
+        run_context = run_context,
+        type = type,
+        validate = validate,
+        max_corrections = max_corrections
       )
       private$event_generator(
         governed_run,
@@ -1024,21 +918,12 @@ Agent <- R6::R6Class(
     #'   this run.
     #' @return The reply text.
     chat = function(..., echo = NULL, run_context = list()) {
-      effective_run_context <- merge_run_context(
-        private$.run_context,
-        run_context
-      )
-      governed_run <- private$start_governed_stream(
-        messages = rlang::list2(...),
-        limits = self$usage_limits,
-        run_context = effective_run_context,
-        stream = "content"
-      )
-      result <- private$resolve_promise(private$collect_governed_stream(
-        governed_run
+      response <- private$resolve_promise(self$chat_async(
+        ...,
+        run_context = run_context
       ))
-      private$echo_chat_result(result$response, echo)
-      result$response
+      private$echo_chat_result(response, echo)
+      response
     },
 
     #' @description
@@ -1182,20 +1067,14 @@ Agent <- R6::R6Class(
       usage_limits = NULL
     ) {
       stream <- match.arg(stream)
-      effective_run_context <- merge_run_context(
-        private$.run_context,
-        run_context
-      )
-      limits <- private$run_usage_limits(usage_limits)
-      governed_run <- private$start_governed_stream(
+      governed_run <- private$start_chat_stream(
         messages = rlang::list2(...),
-        limits = limits,
-        run_context = effective_run_context,
         stream = stream,
         controller = controller,
-        stream_type = type
+        run_context = run_context,
+        type = type,
+        usage_limits = usage_limits
       )
-      reset_stream_controller(controller)
       private$sync_stream_generator(governed_run$stream)
     },
 
@@ -1231,21 +1110,15 @@ Agent <- R6::R6Class(
     ) {
       tool_mode <- match.arg(tool_mode)
       stream <- match.arg(stream)
-      effective_run_context <- merge_run_context(
-        private$.run_context,
-        run_context
-      )
-      limits <- private$run_usage_limits(usage_limits)
-      governed_run <- private$start_governed_stream(
+      governed_run <- private$start_chat_stream(
         messages = rlang::list2(...),
-        limits = limits,
-        run_context = effective_run_context,
         tool_mode = tool_mode,
         stream = stream,
         controller = controller,
-        stream_type = type
+        run_context = run_context,
+        type = type,
+        usage_limits = usage_limits
       )
-      reset_stream_controller(controller)
       out <- if (!is.null(private$.activity) && identical(stream, "content")) {
         activity_stream(self, governed_run$stream, private$.activity)
       } else {
@@ -1829,91 +1702,7 @@ Agent <- R6::R6Class(
     #' @param mode Permission mode, see [PermissionMode].
     #' @return The agent, invisibly.
     set_permission_mode = function(mode) {
-      check_conversation_access(self, NULL)
-      mode <- validate_permission_mode_value(mode)
-      existing <- self$permissions
-      old_mode <- existing$mode
-
-      if (identical(mode, old_mode)) {
-        return(invisible(self))
-      }
-
-      if (!mode %in% permission_mode_targets(old_mode)) {
-        cli_abort(
-          c(
-            "Permission mode cannot widen or replace the current policy",
-            "x" = paste0(
-              "Mode ",
-              old_mode,
-              " cannot change to ",
-              mode,
-              "."
-            ),
-            "i" = paste0(
-              "Create a new Agent with explicitly broader Permissions to ",
-              "make this change."
-            )
-          ),
-          class = c("deputy_permission_mode_widening", "deputy_error")
-        )
-      }
-
-      capabilities <- intersect_permission_capabilities(
-        permission_capabilities_from(existing),
-        permission_mode_capabilities(mode, self$working_dir)
-      )
-
-      narrowed_permissions <- Permissions(
-        mode = mode,
-        file_read = capabilities$file_read,
-        file_write = capabilities$file_write,
-        bash = capabilities$bash,
-        r_code = capabilities$r_code,
-        web = capabilities$web,
-        install_packages = capabilities$install_packages,
-        can_use_tool = existing$can_use_tool,
-        tool_allowlist = existing$tool_allowlist,
-        tool_denylist = existing$tool_denylist,
-        permission_prompt_tool_name = capabilities$permission_prompt_tool_name
-      )
-
-      registered_tools <- private$.chat$get_tools()
-      provider_native <- vapply(
-        registered_tools,
-        inherits,
-        logical(1),
-        what = "ellmer::ToolBuiltIn"
-      )
-      removed_provider_tools <- character()
-      if (!isTRUE(narrowed_permissions$web) && any(provider_native)) {
-        removed_provider_tools <- vapply(
-          registered_tools[provider_native],
-          \(tool) tool@name,
-          character(1)
-        )
-        private$.chat$set_tools(registered_tools[!provider_native])
-      }
-
-      private$.permissions <- narrowed_permissions
-
-      hook_unawaited(private$fire_hook(
-        "ConfigChange",
-        key = "permission_mode",
-        old_value = old_mode,
-        new_value = mode,
-        context = private$hook_context()
-      ))
-
-      private$notify(
-        paste0("Permission mode changed from ", old_mode, " to ", mode, "."),
-        level = "info",
-        code = "permission_mode_changed",
-        previous_mode = old_mode,
-        permission_mode = mode,
-        removed_provider_tools = removed_provider_tools
-      )
-
-      invisible(self)
+      agent_set_permission_mode(self, private, mode)
     },
 
     #' @description
@@ -2336,116 +2125,7 @@ Agent <- R6::R6Class(
     #'   name clash is an error.
     #' @return The agent, invisibly, for chaining.
     load_skill = function(skill, allow_conflicts = FALSE) {
-      check_conversation_lease(self, NULL)
-      if (is.character(skill)) {
-        # Load from path
-        skill <- skill_load(skill)
-      }
-
-      if (!S7::S7_inherits(skill, Skill)) {
-        cli_abort(
-          "{.arg skill} must be a Skill object or path to a skill directory"
-        )
-      }
-
-      # Get current provider for validation
-      current_provider <- tryCatch(
-        {
-          provider_info <- self$provider()
-          # provider() returns a list with name and model
-          provider_info$name
-        },
-        error = function(e) {
-          # Log unexpected errors (not just "no provider configured")
-          if (
-            !grepl("no provider|not configured", e$message, ignore.case = TRUE)
-          ) {
-            cli_warn(c(
-              "Could not determine provider for skill validation",
-              "x" = e$message,
-              "i" = "Provider compatibility check will be skipped"
-            ))
-          }
-          NULL
-        }
-      )
-
-      # Check requirements with provider
-      req_check <- skill_check_requirements(skill, current_provider)
-
-      # Report missing packages
-      if (length(req_check$missing) > 0) {
-        cli_warn(c(
-          "Loading skill with missing packages: {.val {skill$name}}",
-          "x" = "Missing: {.val {req_check$missing}}"
-        ))
-      }
-
-      # Report provider mismatch
-      if (isTRUE(req_check$provider_mismatch)) {
-        required <- paste(req_check$required_providers, collapse = ", ")
-        cli_warn(c(
-          "Skill {.val {skill$name}} may not work optimally with current provider",
-          "i" = "Current provider: {.val {current_provider}}",
-          "i" = "Skill requires: {.val {required}}",
-          "!" = "Some features may not work as expected"
-        ))
-      }
-
-      # Register tools with conflict detection
-      if (length(skill$tools) > 0) {
-        # Get current tool names to detect conflicts
-        current_tools <- private$.chat$get_tools()
-        current_tool_names <- names(current_tools)
-
-        # Get names of tools being registered
-        new_tool_names <- vapply(
-          skill$tools,
-          function(tool) tool@name,
-          character(1)
-        )
-
-        # Check for conflicts
-        conflicts <- new_tool_names[new_tool_names %in% current_tool_names]
-        if (length(conflicts) > 0) {
-          if (isTRUE(allow_conflicts)) {
-            cli_warn(c(
-              "Skill {.val {skill$name}} overwrites existing tool(s)",
-              "!" = "Conflicting tools: {.val {conflicts}}",
-              "i" = "Previous definitions will be replaced"
-            ))
-          } else {
-            cli_abort(c(
-              "Skill {.val {skill$name}} conflicts with existing tool(s)",
-              "!" = "Conflicting tools: {.val {conflicts}}",
-              "i" = "Use {.code allow_conflicts = TRUE} to overwrite existing tools"
-            ))
-          }
-        }
-
-        self$register_tools(skill$tools, replace = allow_conflicts)
-      }
-
-      # Append prompt to system prompt
-      if (!is.null(skill$prompt) && nchar(skill$prompt) > 0) {
-        current_prompt <- private$.chat$get_system_prompt() %||% ""
-        new_prompt <- paste0(current_prompt, skill_prompt_block(skill))
-        private$.conversation_state$set_prompt(
-          private$.chat,
-          new_prompt,
-          reconcile = FALSE
-        )
-      }
-
-      # Store reference to loaded skill
-      if (is.null(private$loaded_skills)) {
-        private$loaded_skills <- list()
-      }
-      private$loaded_skills[[skill$name]] <- NULL
-      private$loaded_skills[[skill$name]] <- skill
-
-      cli_alert_success("Loaded skill: {.val {skill$name}}")
-      invisible(self)
+      agent_load_skill(self, private, skill, allow_conflicts = allow_conflicts)
     },
 
     #' @description
@@ -2477,125 +2157,13 @@ Agent <- R6::R6Class(
     #'   tools with the same names. If `FALSE`, a name clash is an error.
     #' @return The agent, invisibly, for chaining.
     load_mcp = function(config = NULL, servers = NULL, replace = FALSE) {
-      check_conversation_lease(self, NULL)
-      if (!rlang::is_bool(replace)) {
-        tool_registration_error("{.arg replace} must be TRUE or FALSE.")
-      }
-      # mcptools closes old transports before replacement discovery/validation.
-      # Clean up on errors and interrupts as well as normal returns, including
-      # failures while publishing a successfully discovered batch.
-      on.exit(private$discard_stale_mcp_tools(), add = TRUE)
-      loaded <- load_mcp_tools_result(config, servers)
-      mcp_tools_list <- loaded$tools
-      loaded_at <- Sys.time()
-
-      if (isTRUE(loaded$success)) {
-        # Prepare the whole refreshed registry before publishing it. Successful
-        # discovery can contain zero tools; working unrelated tools are retained.
-        existing <- private$.chat$get_tools()
-        removed <- character()
-        tryCatch(
-          {
-            if (replace) {
-              from_selected_server <- vapply(
-                existing,
-                function(tool) {
-                  source <- tool_metadata(tool)$source
-                  identical(source$type, "mcp") &&
-                    source$server %in% loaded$servers
-                },
-                logical(1)
-              )
-              removed <- names(existing)[from_selected_server]
-              retained <- existing[!from_selected_server]
-              incoming <- validate_tool_batch(
-                mcp_tools_list,
-                retained,
-                replace = TRUE
-              )
-              retained[names(incoming)] <- incoming
-              self$set_tools(retained)
-            } else {
-              self$register_tools(mcp_tools_list)
-            }
-          },
-          error = function(e) {
-            private$loaded_mcp_status <- c(
-              private$loaded_mcp_status,
-              list(list(
-                status = "failed",
-                config = config,
-                servers = loaded$servers,
-                tools = character(),
-                loaded_at = loaded_at,
-                error = conditionMessage(e)
-              ))
-            )
-            cli::cli_abort(c(
-              "Failed to register MCP tools",
-              "x" = e$message,
-              "i" = "Check for tool name conflicts with existing tools"
-            ))
-          }
-        )
-        private$loaded_mcp_tools <- setdiff(private$loaded_mcp_tools, removed)
-      }
-
-      if (length(mcp_tools_list) > 0) {
-        # Track loaded MCP tools with warnings for extraction failures
-        tool_names <- vapply(
-          seq_along(mcp_tools_list),
-          function(i) {
-            t <- mcp_tools_list[[i]]
-            tryCatch(
-              t@name %||% paste0("<unnamed_", i, ">"),
-              error = function(e) {
-                cli::cli_warn(c(
-                  "Could not read name from MCP tool {.val {i}}",
-                  "x" = e$message
-                ))
-                paste0("<unknown_", i, ">")
-              }
-            )
-          },
-          character(1)
-        )
-        private$loaded_mcp_tools <- unique(c(
-          private$loaded_mcp_tools,
-          tool_names
-        ))
-        private$loaded_mcp_status <- c(
-          private$loaded_mcp_status,
-          list(list(
-            status = "connected",
-            config = config,
-            servers = servers %||% character(),
-            tools = tool_names,
-            loaded_at = loaded_at,
-            error = NULL
-          ))
-        )
-      } else {
-        private$loaded_mcp_status <- c(
-          private$loaded_mcp_status,
-          list(list(
-            status = if (!mcp_available()) {
-              "unavailable"
-            } else if (loaded$success) {
-              "empty"
-            } else {
-              "failed"
-            },
-            config = config,
-            servers = servers %||% character(),
-            tools = character(),
-            loaded_at = loaded_at,
-            error = loaded$error
-          ))
-        )
-      }
-
-      invisible(self)
+      agent_load_mcp(
+        self,
+        private,
+        config = config,
+        servers = servers,
+        replace = replace
+      )
     },
 
     #' @description
@@ -2613,33 +2181,7 @@ Agent <- R6::R6Class(
     #'   `"empty"`, `"failed"` or `"unavailable"`), `config`, `servers`,
     #'   `tools`, `loaded_at` and `error`.
     mcp_status = function() {
-      records <- private$loaded_mcp_status
-      if (length(records) == 0) {
-        return(data.frame(
-          status = character(),
-          config = character(),
-          servers = character(),
-          tools = character(),
-          loaded_at = as.POSIXct(character()),
-          error = character(),
-          stringsAsFactors = FALSE
-        ))
-      }
-
-      do.call(
-        rbind,
-        lapply(records, function(record) {
-          data.frame(
-            status = record$status,
-            config = record$config %||% NA_character_,
-            servers = paste(record$servers, collapse = ","),
-            tools = paste(record$tools, collapse = ","),
-            loaded_at = as.POSIXct(record$loaded_at, tz = "UTC"),
-            error = record$error %||% NA_character_,
-            stringsAsFactors = FALSE
-          )
-        })
-      )
+      agent_mcp_status(private)
     },
 
     #' @description
@@ -2674,20 +2216,13 @@ Agent <- R6::R6Class(
       validate = NULL,
       max_corrections = 0L
     ) {
-      structured <- structured_run_spec(type, validate, max_corrections)
-      effective_run_context <- merge_run_context(
-        private$.run_context,
-        run_context
-      )
-
-      limits <- private$run_usage_limits(usage_limits)
-
-      governed_run <- private$start_governed_stream(
-        messages = list(task),
-        limits = limits,
-        run_context = effective_run_context,
-        stream = "content",
-        extraction = structured
+      governed_run <- private$start_task_run(
+        task = task,
+        usage_limits = usage_limits,
+        run_context = run_context,
+        type = type,
+        validate = validate,
+        max_corrections = max_corrections
       )
       private$collect_governed_stream(governed_run)
     }
@@ -2802,99 +2337,6 @@ Agent <- R6::R6Class(
 
   private = c(
     list(
-      derive_subagent_usage_limits = function(def) {
-        limits <- private$current_usage_limits %||% self$usage_limits
-        current <- if (isTRUE(private$run_active)) {
-          private$current_run_usage()
-        } else {
-          AgentUsage()
-        }
-        remaining <- usage_limits_remaining(
-          limits,
-          current,
-          private$reserved_delegation_usage()
-        )
-        if (!is.null(def$max_requests)) {
-          remaining$max_requests <- if (is.null(remaining$max_requests)) {
-            def$max_requests
-          } else {
-            min(remaining$max_requests, def$max_requests)
-          }
-        }
-
-        do.call(
-          UsageLimits,
-          c(
-            remaining,
-            list(
-              on_unknown_cost = limits$on_unknown_cost,
-              on_exceed = limits$on_exceed
-            )
-          )
-        )
-      },
-
-      reserve_delegation_usage = function(delegation_id, limits) {
-        fields <- c(
-          "max_requests",
-          "max_tool_calls",
-          "max_input_tokens",
-          "max_output_tokens",
-          "max_total_tokens",
-          "max_cost_usd"
-        )
-        reservation <- vapply(
-          fields,
-          function(field) S7::prop(limits, field) %||% 0,
-          numeric(1)
-        )
-        reservation[["max_requests"]] <- delegation_request_allowance(
-          limits
-        ) %||%
-          0
-        private$delegation_usage_reservations[[delegation_id]] <- reservation
-        if (is.function(private$.job_checkpoint)) {
-          private$.job_checkpoint(
-            self,
-            list(
-              type = "delegation_reserved",
-              delegation_id = delegation_id
-            )
-          )
-        }
-        invisible(NULL)
-      },
-
-      release_delegation_usage = function(delegation_id) {
-        private$delegation_usage_reservations[[delegation_id]] <- NULL
-        if (is.function(private$.job_checkpoint)) {
-          private$.job_checkpoint(
-            self,
-            list(
-              type = "delegation_released",
-              delegation_id = delegation_id
-            )
-          )
-        }
-        invisible(NULL)
-      },
-
-      reserved_delegation_usage = function() {
-        fields <- c(
-          "max_requests",
-          "max_tool_calls",
-          "max_input_tokens",
-          "max_output_tokens",
-          "max_total_tokens",
-          "max_cost_usd"
-        )
-        reserved <- stats::setNames(numeric(length(fields)), fields)
-        for (reservation in private$delegation_usage_reservations) {
-          reserved <- reserved + reservation[fields]
-        }
-        reserved
-      },
-
       .delegation_disclosure = NULL,
       .delegation_buffer = NULL,
       delegation_bindings = list(),
@@ -2943,9 +2385,9 @@ Agent <- R6::R6Class(
       .file_checkpoints = NULL,
       .file_checkpoint_config = NULL,
 
-      # Flag to signal stopping from hooks
+      # Flag to signal stopping from hooks, limits, or interrupts
       should_stop = FALSE,
-      stop_reason_from_hook = NULL,
+      stop_reason = NULL,
       stop_requested_by = NULL,
       # The states of the streams that were made and have not started yet, so
       # an interrupt before their first pull is kept for their start.
@@ -2969,8 +2411,6 @@ Agent <- R6::R6Class(
       current_outer_requests = 0L,
       current_external_usage = NULL,
       current_stream_controller = NULL,
-      current_stream_content = FALSE,
-      pending_events = list(),
       tool_started_at = list(),
       tool_event_overrides = list(),
       tool_call_records = list(),
@@ -3013,22 +2453,11 @@ Agent <- R6::R6Class(
       .tool_observer_id = 0L,
       .tool_observer_removers = list(),
       .r6_clone = NULL,
-      current_run_checkpoint_id = NULL,
 
       # The selected conversation without subagent activity: what the model
       # was given before compaction, with cleared tool results restored.
       transcript_turns = function() {
         private$.conversation_state$transcript(private$.chat)
-      },
-
-      # The limits for one run: the run's own, merged over the agent's.
-      run_usage_limits = function(usage_limits) {
-        limits <- if (is.null(usage_limits)) {
-          self$usage_limits
-        } else {
-          merge_usage_limits(usage_limits, self$usage_limits)
-        }
-        normalize_usage_limits(limits)
       },
 
       interrupt_run = function(
@@ -3116,456 +2545,11 @@ Agent <- R6::R6Class(
         value
       },
 
-      rewire_chat_runtime = function() {
-        clear_chat_tool_callbacks(private$.chat)
-
-        tools <- private$.chat$get_tools()
-        had_result_reader <- "deputy_read_tool_result" %in% names(tools)
-        tools[["deputy_read_tool_result"]] <- NULL
-        tools <- validate_tool_batch(tools)
-        private$check_trusted_tools(tools)
-        private$.chat$set_tools(lapply(tools, private$prepare_cloned_tool))
-        private$.tool_result_reader_registered <- FALSE
-        if (isTRUE(had_result_reader)) {
-          private$ensure_tool_result_reader()
-        }
-        private$.chat$on_tool_request(private$handle_tool_request)
-        private$.chat$on_tool_result(private$handle_tool_result)
-        rebind_tool_observers(self)
-        invisible(NULL)
-      },
-
-      prepare_cloned_tool = function(tool) {
-        private$adapt_tool(tool)
-      },
-
-      discard_stale_mcp_tools = function() {
-        tools <- private$.chat$get_tools()
-        current <- vapply(tools, mcp_tool_is_current, logical(1))
-        if (all(current)) {
-          return(invisible(NULL))
-        }
-        removed <- names(tools)[!current]
-        # These are already adapted tools; only remove invalidated handles.
-        private$.chat$set_tools(tools[current])
-        private$loaded_mcp_tools <- setdiff(private$loaded_mcp_tools, removed)
-        invisible(NULL)
-      },
-
       new_file_checkpoint_store = function() {
         FileCheckpointStore$new(
           private$.working_dir,
           max_file_bytes = private$.file_checkpoint_config$max_file_bytes,
           max_journal_bytes = private$.file_checkpoint_config$max_journal_bytes
-        )
-      },
-
-      resolve_tool_arguments = function(tool_name, arguments) {
-        resolve_runtime_tool_arguments(
-          tool_name,
-          arguments,
-          private$.working_dir
-        )
-      },
-
-      adapt_tool = function(tool) {
-        validate_composition_tool_owner(tool, self)
-        validate_mcp_tool_owner(tool, self)
-        validate_r_session_tool_owner(tool, self)
-        if (inherits(tool, "ellmer::ToolBuiltIn")) {
-          if (!is.null(private$.approval_dir)) {
-            approval_abort(
-              "Durable approvals require function tools; provider-native effects cannot be journaled."
-            )
-          }
-          tool_name <- tryCatch(tool@name, error = function(error) NULL)
-          tool_id <- normalize_native_tool_id(tool_name %||% "")
-          if (!tool_id %in% c("web_search", "web_fetch")) {
-            cli_abort(c(
-              "Unsupported provider-native tool: {.val {tool_name %||% '<unknown>'}}",
-              "x" = paste0(
-                "Deputy cannot interpose on provider-side execution for this ",
-                "tool."
-              )
-            ))
-          }
-          if (!isTRUE(self$permissions$web)) {
-            cli_abort(c(
-              "Provider-native web tool {.val {tool_name}} is not authorized.",
-              "i" = "Set {.code web = TRUE} and explicitly allow the tool."
-            ))
-          }
-          allowlist <- self$permissions$tool_allowlist %||% character()
-          allowlist_ids <- unique(vapply(
-            allowlist,
-            normalize_native_tool_id,
-            character(1)
-          ))
-          if (!tool_id %in% allowlist_ids) {
-            cli_abort(c(
-              "Provider-native web tool {.val {tool_name}} is not explicitly allowed.",
-              "i" = "Add the tool name to {.arg tool_allowlist}."
-            ))
-          }
-          if (!is.null(self$permissions$can_use_tool)) {
-            cli_abort(c(
-              "Provider-native tool {.val {tool_name}} cannot use a custom permission callback.",
-              "x" = paste0(
-                "Provider-side requests cannot be checked against request ",
-                "arguments or run context."
-              ),
-              "i" = paste0(
-                "Remove {.arg can_use_tool} or use Deputy's universal ",
-                "function tool."
-              )
-            ))
-          }
-          permission <- permissions_check(
-            self$permissions,
-            tool_name,
-            list(),
-            list(
-              working_dir = private$.working_dir,
-              tool_annotations = tool@annotations
-            )
-          )
-          if (S7::S7_inherits(permission, PermissionResultDeny)) {
-            cli_abort(c(
-              "Provider-native tool {.val {tool_name}} was denied at registration.",
-              "x" = permission$reason,
-              "i" = paste0(
-                "Provider-native tools are authorized before a request because ",
-                "they execute inside the provider."
-              )
-            ))
-          }
-          return(tool)
-        }
-        runtime_wrap_tool(
-          tool,
-          resolve_arguments = if (
-            identical(tool_metadata(tool)$source$type, "mcp")
-          ) {
-            function(tool_name, arguments) arguments
-          } else {
-            private$resolve_tool_arguments
-          },
-          process_result = private$process_tool_result,
-          begin_execution = private$begin_tool_execution,
-          execute = private$execute_tool,
-          invocation_id = private$tool_invocation_id
-        )
-      },
-
-      # Trusted tools run only as the tool of ellmer's active request, so host
-      # code or another tool cannot claim a pending governed call or publish.
-      tool_invocation_id = function(tool, arguments) {
-        if (is.null(trusted_result_type(private$.trusted_results, tool@name))) {
-          return(composition_invocation_id(tool, arguments))
-        }
-        trusted_invocation_id(tool)
-      },
-
-      execute_tool = function(tool, arguments, execution_id = NULL) {
-        validate_composition_tool_owner(tool, self)
-        if (
-          !is.null(trusted_result_type(private$.trusted_results, tool@name))
-        ) {
-          # The producer must still be the tool the policy or tree pinned.
-          pinned <- private$.trusted_sources[[tool@name]] %||%
-            trusted_policy_sources(private$.trusted_results)[[tool@name]]
-          if (
-            !is_nonempty_string(execution_id) ||
-              (!is.null(pinned) && !identical(pinned, tool))
-          ) {
-            trusted_invocation_abort(tool@name)
-          }
-          private$trusted_arguments[[execution_id]] <- arguments
-        }
-        if (!is.null(composition_tool_owner(tool))) {
-          if (
-            !isTRUE(private$run_active) || !is_nonempty_string(execution_id)
-          ) {
-            conversation_abort(
-              "Delegation tools require their owner's active governed run."
-            )
-          }
-          control <- attr(tool, "deputy_background_control", exact = TRUE)
-          if (is.function(control)) {
-            return(control(arguments))
-          }
-          correlation <- private$claim_delegation(
-            tool_name = tool@name,
-            tool_call_id = execution_id,
-            required = TRUE
-          )
-          background <- attr(tool, "deputy_background_invoke", exact = TRUE)
-          if (is.function(background)) {
-            return(background(arguments, correlation))
-          }
-          invoke <- attr(tool, "deputy_composition_invoke", exact = TRUE)
-          return(invoke(arguments[["task"]], correlation))
-        }
-        validate_mcp_tool_owner(tool, self, private$effective_run_context())
-        validate_r_session_tool_owner(
-          tool,
-          self,
-          private$effective_run_context()
-        )
-        workspace_runner <- attr(
-          tool,
-          "deputy_workspace_runner",
-          exact = TRUE
-        )
-        if (is.function(workspace_runner)) {
-          return(workspace_runner(arguments, private$.working_dir))
-        }
-        write_root <- private$execution_write_root(execution_id)
-        if (!is.null(write_root)) {
-          # A file or link changed since the permission check must not move
-          # the write outside the directory the policy checked.
-          return(tryCatch(
-            validate_path_at_operation(
-              arguments$path,
-              write_root,
-              function(path) do.call(tool, arguments)
-            ),
-            deputy_unsafe_path = function(error) {
-              ellmer::tool_reject(paste(
-                "The path no longer resolves inside the allowed directory;",
-                "a file or link in it changed after the permission check:",
-                arguments$path
-              ))
-            }
-          ))
-        }
-        source <- runtime_source_tool(tool)
-        cancel <- attr(source, "deputy_mcp_cancel_active", exact = TRUE) %||%
-          attr(source, "deputy_r_session_cancel_active", exact = TRUE)
-        if (!is.function(cancel)) {
-          return(do.call(tool, arguments))
-        }
-        id <- new_deputy_id("owned_call_")
-        private$active_owned_tools[[id]] <- source
-        pending <- FALSE
-        on.exit({
-          if (!pending) {
-            private$active_owned_tools[[id]] <- NULL
-          }
-        })
-        invoke <- attr(source, "deputy_r_session_invoke", exact = TRUE)
-        value <- if (is.function(invoke)) {
-          invoke(arguments$code, execution_id)
-        } else {
-          do.call(tool, arguments)
-        }
-        if (!promises::is.promising(value)) {
-          return(value)
-        }
-        result <- promises::finally(value, function() {
-          private$active_owned_tools[[id]] <- NULL
-        })
-        pending <- TRUE
-        result
-      },
-
-      check_trusted_tools = function(tools) {
-        policy <- private$.trusted_results
-        check_trusted_registry(
-          policy,
-          tools,
-          available = if (isTRUE(private$.trusted_tree_member)) {
-            policy@results
-          } else {
-            names(tools)
-          },
-          sources = private$.trusted_sources,
-          require_source = isTRUE(private$.trusted_tree_member),
-          admit_route = trusted_route_admission(self, tools)
-        )
-        # Names a retained agent's own policy designates stay that tool here:
-        # those this agent retained, and for a retained agent or graph
-        # member, those its policy root retained too, siblings included.
-        entries <- private$owned_conversations
-        root <- trusted_policy_root(self)
-        if (!is.null(root) && !identical(root, self)) {
-          entries <- c(
-            entries,
-            root$.__enclos_env__$private$owned_conversations
-          )
-        }
-        for (entry in entries) {
-          if (!is.null(entry$trusted)) {
-            trusted_check_names(
-              trusted_policy_sources(entry$trusted$policy),
-              list(tools)
-            )
-          }
-        }
-      },
-
-      process_tool_result = function(tool_name, value, execution_id = NULL) {
-        type <- trusted_result_type(private$.trusted_results, tool_name)
-        if (!is.null(type)) {
-          value <- private$deliver_trusted_result(
-            type,
-            tool_name,
-            value,
-            execution_id
-          )
-        }
-        private$offload_tool_result(tool_name, value, execution_id)
-      },
-
-      # The trusted tool's return value reaches the host before any model
-      # output, independently of offloading and PostToolUse event rewrites.
-      deliver_trusted_result = function(type, tool_name, value, execution_id) {
-        arguments <- NULL
-        if (is_nonempty_string(execution_id)) {
-          arguments <- private$trusted_arguments[[execution_id]]
-          private$trusted_arguments[[execution_id]] <- NULL
-        }
-        if (
-          inherits(value, "ellmer::ContentToolResult") && !is.null(value@error)
-        ) {
-          return(value)
-        }
-        policy <- private$.trusted_results
-        result_id <- new_deputy_id("result_")
-        producer <- private$.trusted_sources[[tool_name]] %||%
-          trusted_policy_sources(policy)[[tool_name]] %||%
-          runtime_source_tool(private$.chat$get_tools()[[tool_name]])
-        event <- private$agent_event(
-          "trusted_result",
-          result_id = result_id,
-          result_type = type,
-          tool_name = tool_name,
-          tool_fingerprint = trusted_producer_fingerprint(producer),
-          tool_call_id = execution_id,
-          arguments = arguments,
-          value = value
-        )
-        private$record_run_event(event)
-        if (is.function(policy@on_result)) {
-          delivered <- tryCatch(
-            {
-              policy@on_result(event)
-              TRUE
-            },
-            error = function(error) error
-          )
-          if (!isTRUE(delivered)) {
-            private$notify(
-              paste0(
-                "Trusted result ",
-                result_id,
-                " was produced but the host callback failed: ",
-                conditionMessage(delivered)
-              ),
-              level = "warning",
-              code = "trusted_result_delivery_failed",
-              tool_name = tool_name,
-              result_id = result_id,
-              result_type = type
-            )
-            abort_tool_execution(
-              "Trusted result {result_id} was produced but could not be delivered to the user.",
-              tool_name = tool_name
-            )
-          }
-        }
-        if (isTRUE(policy@model_receipt)) {
-          return(trusted_result_receipt(result_id, type))
-        }
-        value
-      },
-
-      offload_tool_result = function(tool_name, value, execution_id = NULL) {
-        if (identical(tool_name, "deputy_read_tool_result")) {
-          return(value)
-        }
-        rich <- bound_rich_tool_result(
-          value,
-          tool_name,
-          private$.context_policy,
-          private$.session_id,
-          private$.agent_id
-        )
-        record <- if (!is.null(rich)) {
-          rich$record
-        } else {
-          offload_tool_result(
-            value = value,
-            tool_name = tool_name,
-            policy = private$.context_policy,
-            session_id = private$.session_id,
-            agent_id = private$.agent_id
-          )
-        }
-        if (is.null(record)) {
-          return(value)
-        }
-        # Returning a result to the caller claims it independently of any
-        # concurrent compaction that first created these content-addressed bytes.
-        private$.compaction_catalog_registry$provisional[[record$id]] <- NULL
-        private$ensure_tool_result_reader()
-        if (!is.null(private$.delegation_id)) {
-          private$delegation_artifacts[[
-            length(private$delegation_artifacts) + 1L
-          ]] <- list(
-            reference = record$uri,
-            source = "tool_result",
-            bytes = record$bytes,
-            sha256 = record$sha256,
-            agent_id = private$.agent_id,
-            run_id = private$current_run_id,
-            delegation_id = private$.delegation_id,
-            tool_call_id = execution_id,
-            tool_name = tool_name,
-            storage_session_id = private$.session_id,
-            verification = "not_assessed",
-            approval = "not_granted"
-          )
-        }
-        private$notify(
-          paste0("Offloaded large result from ", tool_name, "."),
-          level = "info",
-          code = "tool_result_offloaded",
-          tool_name = tool_name,
-          result_reference = record$uri,
-          result_bytes = record$bytes,
-          result_sha256 = record$sha256
-        )
-        if (is_nonempty_string(execution_id)) {
-          native <- inherits(value, "ellmer::ContentToolResult")
-          private$original_tool_results[[execution_id]] <- list(
-            value = if (native) value@value else value,
-            error = if (native) value@error else NULL
-          )
-        }
-        if (!is.null(rich)) rich$result else tool_result_reference_text(record)
-      },
-
-      ensure_tool_result_reader = function() {
-        if (isTRUE(private$.tool_result_reader_registered)) {
-          return(invisible(NULL))
-        }
-        private$.chat$register_tool(
-          private$adapt_tool(tool_result_reader_tool(
-            private$read_tool_result_chunk
-          ))
-        )
-        private$.tool_result_reader_registered <- TRUE
-        invisible(NULL)
-      },
-
-      read_tool_result_chunk = function(reference, offset, max_chars) {
-        read_tool_result_chunk(
-          reference = reference,
-          offset = offset,
-          max_chars = max_chars,
-          policy = private$.context_policy,
-          session_id = private$.session_id
         )
       },
 
@@ -3690,116 +2674,6 @@ Agent <- R6::R6Class(
         context
       },
 
-      current_run_usage = function() {
-        baseline <- private$current_usage_baseline %||% AgentUsage()
-        current <- agent_usage_snapshot(private$.chat)
-        requests <- max(
-          current$requests - baseline$requests,
-          private$current_outer_requests
-        )
-        usage <- agent_usage_difference(
-          current,
-          baseline,
-          tool_calls = private$current_tool_calls,
-          requests = requests
-        )
-        agent_usage_add(
-          usage,
-          private$current_external_usage %||% AgentUsage()
-        )
-      },
-
-      add_external_usage = function(usage) {
-        if (!S7::S7_inherits(usage, AgentUsage)) {
-          return(invisible(FALSE))
-        }
-        private$current_external_usage <- agent_usage_add(
-          private$current_external_usage %||% AgentUsage(),
-          usage
-        )
-        if (!is.null(private$current_usage_limits)) {
-          limit_status <- private$limit_status(require_followup = TRUE)
-          if (!is.null(limit_status)) {
-            private$mark_usage_limit(limit_status)
-          }
-        }
-        invisible(TRUE)
-      },
-
-      # The run's limit status for the agent's own next step: what unsettled
-      # background tasks have set aside is not the agent's to use.
-      limit_status = function(require_followup = FALSE, usage = NULL) {
-        background_limit_status(
-          private,
-          usage %||% private$current_run_usage(),
-          private$current_usage_limits %||% self$usage_limits,
-          require_followup
-        )
-      },
-
-      mark_usage_limit = function(status) {
-        if (is.null(status)) {
-          return(invisible(NULL))
-        }
-        if (is.null(private$last_limit_status)) {
-          private$last_limit_status <- status
-        }
-        private$should_stop <- TRUE
-        private$stop_reason_from_hook <- status$reason
-        private$stop_requested_by <- NULL
-
-        message <- usage_limit_message(status)
-        private$notify(
-          message,
-          level = "warning",
-          code = status$reason,
-          usage = private$current_run_usage(),
-          limit = status$limit
-        )
-
-        private$request_stream_stop(status$reason)
-        invisible(status)
-      },
-
-      abort_usage_limit = function(status) {
-        if (is.null(status)) {
-          return(invisible(NULL))
-        }
-        message <- usage_limit_message(status)
-        if (identical(status$reason, "request_limit")) {
-          abort_request_limit(
-            message,
-            current_requests = status$actual,
-            max_requests = status$limit,
-            run_id = private$current_run_id
-          )
-        }
-        if (identical(status$reason, "cost_unavailable")) {
-          abort_cost_unavailable(
-            message,
-            max_cost = status$limit,
-            run_id = private$current_run_id
-          )
-        }
-        abort_budget_exceeded(
-          message,
-          current_cost = if (identical(status$reason, "cost_limit")) {
-            status$actual
-          } else {
-            NULL
-          },
-          max_cost = if (identical(status$reason, "cost_limit")) {
-            status$limit
-          } else {
-            NULL
-          },
-          budget_type = status$field,
-          actual = status$actual,
-          limit = status$limit,
-          run_id = private$current_run_id
-        )
-      },
-
       append_hook_context = function(additional_context) {
         if (is.null(additional_context)) {
           return(invisible(NULL))
@@ -3861,20 +2735,17 @@ Agent <- R6::R6Class(
 
       # Storage for loaded MCP tool names
       loaded_mcp_tools = character(),
-      loaded_mcp_status = list(),
-
-      # Tool call counter for callback-based limits
-      tool_call_count = 0L,
-
-      # Active tool call limit; NULL means unbounded.
-      tool_call_limit = NULL
+      loaded_mcp_status = list()
     ),
     deputy_agent_approval_methods(),
+    deputy_agent_run_state_methods(),
     deputy_agent_stream_methods(),
+    deputy_agent_usage_methods(),
     deputy_agent_session_methods(),
     deputy_agent_context_methods(),
     deputy_agent_tool_callbacks_methods(),
-    deputy_agent_tool_records_methods()
+    deputy_agent_tool_records_methods(),
+    deputy_agent_tool_execution_methods()
   )
 )
 

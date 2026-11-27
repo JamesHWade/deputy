@@ -256,10 +256,10 @@ test_that("sub-agents inherit remaining lead run budgets", {
   expect_false(private$should_stop)
   private$add_external_usage(AgentUsage(requests = 3))
   expect_true(private$should_stop)
-  expect_identical(private$stop_reason_from_hook, "request_limit")
+  expect_identical(private$stop_reason, "request_limit")
   private$run_active <- FALSE
   private$should_stop <- FALSE
-  private$stop_reason_from_hook <- NULL
+  private$stop_reason <- NULL
 })
 
 test_that("LeadAgent passes working_dir to sub-agents", {

@@ -65,7 +65,7 @@ test_that("near-identical responses cannot hide identical tool cycles", {
     )))
   }
 
-  expect_identical(private$stop_reason_from_hook, "tool_loop")
+  expect_identical(private$stop_reason, "tool_loop")
 })
 
 test_that("different tool arguments reset loop detection", {
@@ -89,7 +89,7 @@ test_that("different tool arguments reset loop detection", {
     )))
   }
 
-  expect_identical(private$stop_reason_from_hook, NULL)
+  expect_identical(private$stop_reason, NULL)
 })
 
 test_that("changing tool results reset loop detection for polling", {
@@ -113,7 +113,7 @@ test_that("changing tool results reset loop detection for polling", {
     )))
   }
 
-  expect_identical(private$stop_reason_from_hook, NULL)
+  expect_identical(private$stop_reason, NULL)
 })
 
 test_that("equivalent tool errors ignore trace and environment identity", {

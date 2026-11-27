@@ -229,7 +229,7 @@ test_that("Hook denial with continue=FALSE sets should_stop", {
   # (accessing private fields via R6's internal structure for testing)
   expect_true(agent$.__enclos_env__$private$should_stop)
   expect_equal(
-    agent$.__enclos_env__$private$stop_reason_from_hook,
+    agent$.__enclos_env__$private$stop_reason,
     "hook_requested_stop"
   )
 })
