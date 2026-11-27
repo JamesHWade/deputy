@@ -179,19 +179,13 @@ deputy_agent_approval_methods <- function(self = NULL, private = NULL) {
         private$.approval_ceilings,
         list(approval_policy_record(self$permissions))
       )
-      for (policy in policies) {
-        result <- permissions_check(
-          approval_static_policy(policy),
-          tool_name,
-          tool_input,
-          context
-        )
-        if (!S7::S7_inherits(result, PermissionResultAllow)) {
-          ellmer::tool_reject(
-            result$reason %||% "Outside the continuation authority ceiling."
-          )
-        }
-      }
+      enforce_static_policy_ceilings(
+        policies,
+        tool_name,
+        tool_input,
+        context,
+        fallback_reason = "Outside the continuation authority ceiling."
+      )
       invisible(NULL)
     },
 

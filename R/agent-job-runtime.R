@@ -1,4 +1,7 @@
-# Runtime binding for host-scheduled jobs. Persistence stays in agent-job.R;
+#' @include agent-job-record.R
+NULL
+
+# Runtime binding for host-scheduled jobs. Persistence stays in agent-job*.R;
 # execution stays in the ordinary governed Agent kernel.
 job_runtime_abort <- function(message) {
   abort_deputy(message, class = "job_error")
@@ -404,17 +407,13 @@ job_attach_runtime <- function(agent, checkpoint, record = NULL) {
         if (is.null(saved)) {
           job_runtime_abort("An unbound Agent entered the job.")
         }
-        decision <- permissions_check(
-          approval_static_policy(saved),
+        enforce_static_policy_ceilings(
+          list(saved),
           data$tool_name,
           data$tool_input,
-          data$context
+          data$context,
+          fallback_reason = "Outside the saved job authority."
         )
-        if (!S7::S7_inherits(decision, PermissionResultAllow)) {
-          ellmer::tool_reject(
-            decision$reason %||% "Outside the saved job authority."
-          )
-        }
       }
       return(invisible(NULL))
     }

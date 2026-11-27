@@ -900,3 +900,36 @@ usage_limit_message <- function(status) {
     "."
   )
 }
+
+intersect_usage_limits <- function(left, right) {
+  fields <- S7::props(left)
+  for (name in usage_limit_fields()) {
+    values <- c(S7::prop(left, name), S7::prop(right, name))
+    fields[name] <- list(if (length(values)) min(values) else NULL)
+  }
+  fields$on_unknown_cost <- if (
+    "stop" %in% c(left$on_unknown_cost, right$on_unknown_cost)
+  ) {
+    "stop"
+  } else {
+    "continue"
+  }
+  settings <- c(left$on_exceed, right$on_exceed)
+  # A looser hard ceiling still holds when the tighter limit allows one
+  # more request. Keep the hard stop when its ceiling determines the limit.
+  hard_wrap_up_limit <- function(limits) {
+    identical(limits$on_exceed, "stop") &&
+      (isTRUE(limits$max_requests == fields$max_requests) ||
+        isTRUE(limits$max_tool_calls == fields$max_tool_calls))
+  }
+  fields$on_exceed <- if ("error" %in% settings) {
+    "error"
+  } else if (hard_wrap_up_limit(left) || hard_wrap_up_limit(right)) {
+    "stop"
+  } else if ("wrap_up" %in% settings) {
+    "wrap_up"
+  } else {
+    "stop"
+  }
+  do.call(UsageLimits, fields)
+}

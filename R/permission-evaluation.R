@@ -498,3 +498,148 @@ permission_check_plan_mode <- function(
 
   PermissionResultAllow()
 }
+
+# Mode and capability checks, without the custom callback.
+permission_check_mode <- function(
+  permissions,
+  tool_name,
+  tool_input,
+  context,
+  allowlist_exempt = FALSE
+) {
+  if (permissions@mode == "full") {
+    return(PermissionResultAllow())
+  }
+
+  # MCP Console executes code whatever annotations its server supplies.
+  if (
+    permissions@mode %in%
+      c("readonly", "plan") &&
+      identical(
+        context$tool_metadata$source$execution$backend,
+        "mcp-console"
+      )
+  ) {
+    return(PermissionResultDeny(
+      reason = paste0(
+        "Permission denied: MCP Console executes code and ",
+        permissions@mode,
+        " mode is active"
+      )
+    ))
+  }
+
+  # Extract tool annotations from context if available
+  annotations <- context$tool_annotations
+  if (
+    !permission_is_native_capability(tool_name, context) &&
+      !isTRUE(allowlist_exempt)
+  ) {
+    annotations <- effective_tool_annotations(annotations)
+  }
+
+  if (permissions@mode == "readonly") {
+    return(permission_check_readonly_mode(
+      permissions,
+      tool_name,
+      annotations,
+      context,
+      allowlist_exempt = allowlist_exempt
+    ))
+  }
+
+  if (permissions@mode == "plan") {
+    return(permission_check_plan_mode(
+      permissions,
+      tool_name,
+      tool_input,
+      context
+    ))
+  }
+
+  # Tool-specific checks (with annotation awareness)
+  permission_check_tool_specific(permissions, tool_name, tool_input, context)
+}
+
+permission_check_readonly_mode <- function(
+  permissions,
+  tool_name,
+  annotations,
+  context,
+  allowlist_exempt = FALSE
+) {
+  tool_id <- normalize_native_tool_id(tool_name)
+  explicitly_allowed <- permission_tool_name_in_list(
+    tool_name,
+    permissions@tool_allowlist
+  ) ||
+    isTRUE(allowlist_exempt)
+
+  # Native mutating tools remain denied even if their annotations are
+  # incorrect. MCP tools are classified by metadata, not remote names.
+  if (!is_mcp_tool_context(context) && permission_is_write_tool(tool_name)) {
+    return(PermissionResultDeny(
+      reason = "Permission denied: readonly mode active"
+    ))
+  }
+  if (isTRUE(annotations$destructive_hint)) {
+    return(PermissionResultDeny(
+      reason = paste0(
+        "Permission denied: tool is destructive and readonly mode ",
+        "is active"
+      )
+    ))
+  }
+  if (isTRUE(annotations$open_world_hint) && !isTRUE(permissions@web)) {
+    return(PermissionResultDeny(
+      reason = paste0(
+        "Permission denied: tool can access external resources and ",
+        "web access is disabled"
+      )
+    ))
+  }
+
+  # Native read and web names keep their restrictions for every non-MCP
+  # tool, but only Deputy's own tools are known reads (#216).
+  if (
+    !is_mcp_tool_context(context) &&
+      is_permission_file_read_tool(tool_name)
+  ) {
+    if (!isTRUE(permissions@file_read)) {
+      return(PermissionResultDeny(
+        reason = "File reading is not allowed"
+      ))
+    }
+    if (permission_trusts_native_name(context)) {
+      return(PermissionResultAllow())
+    }
+  }
+
+  if (
+    !is_mcp_tool_context(context) &&
+      tool_id %in% c("web_search", "web_fetch")
+  ) {
+    if (!isTRUE(permissions@web)) {
+      return(PermissionResultDeny(
+        reason = "Web access is not allowed in readonly mode"
+      ))
+    }
+    if (permission_trusts_native_name(context)) {
+      return(PermissionResultAllow())
+    }
+  }
+  # Every tool call a subagent or retained agent makes is also checked against
+  # this policy, so delegating can't widen what runs.
+  if (permission_is_own_delegation(tool_name, context)) {
+    return(PermissionResultAllow())
+  }
+  if (isTRUE(explicitly_allowed)) {
+    return(PermissionResultAllow())
+  }
+  PermissionResultDeny(
+    reason = paste0(
+      "Permission denied: readonly mode requires a known read tool ",
+      "or an explicit tool allowlist entry"
+    )
+  )
+}
