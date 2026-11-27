@@ -165,9 +165,7 @@ ApprovalContinuation <- S7::new_class(
     freeze_value(value)
   }
 )
-local({
-  S7::method(`$`, ApprovalContinuation) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(ApprovalContinuation)
 S7::method(print, ApprovalContinuation) <- function(x, ...) {
   cli::cat_line(cli::cli_format_method({
     cli::cli_text("<ApprovalContinuation: {x@id}>")
@@ -185,57 +183,14 @@ approval_portable <- function(
   path = "record",
   allow_classed = FALSE
 ) {
-  if (depth > 100L) {
-    approval_abort("Approval data exceeds the nesting limit.")
-  }
-  if (is.null(value)) {
-    return(invisible(value))
-  }
-  if (
-    inherits(value, c("condition", "connection")) ||
-      is.function(value) ||
-      is.environment(value) ||
-      typeof(value) %in% c("externalptr", "weakref") ||
-      S7::S7_inherits(value) ||
-      isS4(value)
-  ) {
-    approval_abort(
-      "Approval data must not contain runtime objects or conditions."
-    )
-  }
-  if (is.list(value) && (!is.object(value) || allow_classed)) {
-    elements <- if (is.object(value)) unclass(value) else value
-    for (i in seq_along(elements)) {
-      label <- names(elements)[i] %||% as.character(i)
-      approval_portable(
-        elements[[i]],
-        depth + 1L,
-        paste0(path, "$", label),
-        allow_classed
-      )
-    }
-  } else if (
-    !is.atomic(value) ||
-      (is.object(value) &&
-        !allow_classed &&
-        !inherits(value, c("json", "POSIXct")))
-  ) {
-    approval_abort(
-      "Approval data at {.val {path}} must contain only portable values; found {.val {class(value)}}."
-    )
-  }
-  # Classed session data retain their RDS representation, including attributes.
-  # Inspect attributes too so an otherwise plain value cannot hide a callback
-  # or runtime environment in metadata.
-  for (attribute in attributes(value)) {
-    approval_portable(
-      attribute,
-      depth + 1L,
-      paste0(path, " attributes"),
-      allow_classed
-    )
-  }
-  invisible(value)
+  assert_portable_data(
+    value,
+    depth = depth,
+    path = path,
+    allow_classed = allow_classed,
+    label = "Approval data",
+    abort_fn = approval_abort
+  )
 }
 
 approval_record_content <- function(value) {
@@ -348,7 +303,7 @@ approval_result_content <- function(request, value = NULL, error = NULL) {
 }
 
 approval_tool_fingerprint <- function(tool) {
-  source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  source <- runtime_source_tool(tool)
   if (!inherits(source, "ellmer::ToolDef")) {
     approval_abort("Approval requires a function tool.")
   }
@@ -486,10 +441,7 @@ validate_approval_record <- function(record) {
   }
   invisible(lapply(record$ceilings, approval_static_policy))
   if (
-    is.null(names(record$tools)) ||
-      anyNA(names(record$tools)) ||
-      !all(nzchar(names(record$tools))) ||
-      anyDuplicated(names(record$tools)) ||
+    !has_unique_names(record$tools) ||
       !all(vapply(record$tools, is_nonempty_string, logical(1)))
   ) {
     approval_abort("Approval requires a uniquely named tool registry.")

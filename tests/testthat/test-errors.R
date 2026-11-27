@@ -120,22 +120,6 @@ test_that("abort_request_limit has correct structure", {
   expect_equal(err$max_requests, 25)
 })
 
-test_that("abort_provider has correct structure", {
-  err <- tryCatch(
-    abort_provider(
-      "API rate limit exceeded",
-      provider_name = "openai",
-      model = "gpt-4o"
-    ),
-    error = function(e) e
-  )
-
-  expect_s3_class(err, "deputy_provider")
-  expect_s3_class(err, "deputy_error")
-  expect_equal(err$provider_name, "openai")
-  expect_equal(err$model, "gpt-4o")
-})
-
 test_that("abort_session_load has correct structure", {
   err <- tryCatch(
     abort_session_load(
@@ -164,20 +148,6 @@ test_that("abort_session_save has correct structure", {
   expect_s3_class(err, "deputy_session")
   expect_s3_class(err, "deputy_error")
   expect_equal(err$path, "/readonly/session.rds")
-})
-
-test_that("abort_hook has correct structure", {
-  err <- tryCatch(
-    abort_hook(
-      "Hook callback failed",
-      hook_event = "PreToolUse"
-    ),
-    error = function(e) e
-  )
-
-  expect_s3_class(err, "deputy_hook")
-  expect_s3_class(err, "deputy_error")
-  expect_equal(err$hook_event, "PreToolUse")
 })
 
 test_that("is_deputy_error correctly identifies errors", {

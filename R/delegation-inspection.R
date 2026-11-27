@@ -45,7 +45,7 @@ DelegationDisclosure <- S7::new_class(
     if (!is.function(authorize) || !is.function(redact)) {
       cli::cli_abort("Disclosure callbacks must be functions.")
     }
-    max_bytes <- context_policy_whole_number(max_bytes, "max_bytes")
+    max_bytes <- validate_positive_int(max_bytes, "max_bytes")
     if (is.null(max_bytes)) {
       cli::cli_abort("max_bytes must be finite.")
     }
@@ -112,10 +112,8 @@ DelegationOutcome <- S7::new_class(
   }
 )
 
-local({
-  S7::method(`$`, DelegationDisclosure) <- function(x, name) S7::prop(x, name)
-  S7::method(`$`, DelegationOutcome) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(DelegationDisclosure)
+register_dollar_prop(DelegationOutcome)
 
 inspection_portable <- function(x, depth = 0L) {
   if (

@@ -150,19 +150,7 @@ RSession <- R6::R6Class(
         list()
       }
       for (name in c("timeout", "startup_timeout")) {
-        value <- get(name)
-        if (
-          !is.numeric(value) ||
-            length(value) != 1L ||
-            is.na(value) ||
-            !is.finite(value) ||
-            value <= 0
-        ) {
-          abort_deputy(
-            "{.arg {name}} must be positive and finite.",
-            class = "r_session"
-          )
-        }
+        validate_positive_timeout(get(name), name, class = "r_session")
       }
       for (name in c(
         "queue_limit",
@@ -171,7 +159,7 @@ RSession <- R6::R6Class(
         "plot_height"
       )) {
         value <- tryCatch(
-          context_policy_whole_number(get(name), name),
+          validate_positive_int(get(name), name),
           error = function(e) NULL
         )
         if (is.null(value)) {
@@ -1044,7 +1032,7 @@ validate_r_session_tool_owner <- function(
   agent,
   run_context = agent$run_context
 ) {
-  source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  source <- runtime_source_tool(tool)
   owner <- attr(source, "deputy_r_session_owner", exact = TRUE)
   if (
     !is.null(owner) && !identical(owner, r_session_owner(agent, run_context))
@@ -1059,7 +1047,7 @@ validate_r_session_tool_owner <- function(
 cancel_active_r_session_tools <- function(tools, agent, run_context) {
   owner <- r_session_owner(agent, run_context)
   for (tool in tools) {
-    source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+    source <- runtime_source_tool(tool)
     if (
       !identical(attr(source, "deputy_r_session_owner", exact = TRUE), owner)
     ) {

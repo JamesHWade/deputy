@@ -259,7 +259,7 @@ test_that("activity is split from the model's turns and merged back", {
     merged[[2L]]@contents,
     list(request, forged, shown, answer)
   )
-  expect_identical(activity_strip(merged), split$turns)
+  expect_identical(activity_split(merged)$turns, split$turns)
 })
 
 test_that("set_turns keeps shown activity out of the model context", {

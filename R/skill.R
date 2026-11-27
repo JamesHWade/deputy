@@ -208,9 +208,7 @@ Skill <- S7::new_class(
   }
 )
 
-local({
-  S7::method(`$`, Skill) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(Skill)
 
 #' Check a skill's requirements
 #'

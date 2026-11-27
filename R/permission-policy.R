@@ -260,10 +260,7 @@ intersect_file_write_capability <- function(ceiling, requested) {
 }
 
 is_canonical_permission_root_within <- function(path, root) {
-  root_with_sep <- if (endsWith(root, "/")) root else paste0(root, "/")
-  path_with_sep <- if (endsWith(path, "/")) path else paste0(path, "/")
-  startsWith(path_with_sep, root_with_sep) ||
-    identical(path, sub("/$", "", root_with_sep))
+  path_prefix_within(path, root, ignore_case = FALSE)
 }
 
 canonical_permission_root <- function(value) {

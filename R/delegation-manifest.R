@@ -1,4 +1,4 @@
-#' @include delegation-input.R
+#' @include value-properties.R delegation-input.R
 NULL
 
 #' Record what a subagent started with
@@ -321,6 +321,4 @@ lead_subagent_contexts <- function(lead, delegation_id, view, redact) {
   })
 }
 
-local({
-  S7::method(`$`, DelegationManifest) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(DelegationManifest)

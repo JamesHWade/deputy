@@ -253,36 +253,16 @@ context_policy_run_ceiling <- function(policy) {
 }
 
 context_policy_whole_number <- function(value, argument) {
-  if (is.null(value)) {
-    return(NULL)
-  }
-  if (
-    !is.numeric(value) ||
-      length(value) != 1L ||
-      is.na(value) ||
-      !is.finite(value) ||
-      value < 1 ||
-      value > .Machine$integer.max ||
-      value != floor(value)
-  ) {
-    cli_abort("{.arg {argument}} must be NULL or one positive whole number")
-  }
-  as.integer(value)
+  validate_positive_int(
+    value,
+    argument,
+    allow_null = TRUE,
+    call = rlang::current_env()
+  )
 }
 
 context_policy_nonnegative_whole_number <- function(value, argument) {
-  if (
-    !is.numeric(value) ||
-      length(value) != 1L ||
-      is.na(value) ||
-      !is.finite(value) ||
-      value < 0 ||
-      value > .Machine$integer.max ||
-      value != floor(value)
-  ) {
-    cli_abort("{.arg {argument}} must be one non-negative whole number")
-  }
-  as.integer(value)
+  validate_nonnegative_int(value, argument, call = rlang::current_env())
 }
 
 normalize_context_policy <- function(policy) {
@@ -430,9 +410,7 @@ compaction_automatic <- function(value) {
   value
 }
 
-local({
-  S7::method(`$`, DeputyCompaction) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(DeputyCompaction)
 
 S7::method(print, DeputyCompaction) <- function(x, ...) {
   cli::cat_line(cli::cli_format_method({

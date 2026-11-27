@@ -72,13 +72,7 @@ commons_parse_measure_args <- function(arguments) {
     if (length(arguments) == 0L) {
       return(list())
     }
-    arg_names <- names(arguments)
-    if (
-      is.null(arg_names) ||
-        anyNA(arg_names) ||
-        !all(nzchar(arg_names)) ||
-        anyDuplicated(arg_names)
-    ) {
+    if (!has_unique_names(arguments)) {
       ellmer::tool_reject(
         "`arguments` must be a JSON object with unique argument names."
       )
@@ -110,13 +104,7 @@ commons_parse_measure_args <- function(arguments) {
   if (length(parsed) == 0L) {
     return(list())
   }
-  arg_names <- names(parsed)
-  if (
-    is.null(arg_names) ||
-      anyNA(arg_names) ||
-      !all(nzchar(arg_names)) ||
-      anyDuplicated(arg_names)
-  ) {
+  if (!has_unique_names(parsed)) {
     ellmer::tool_reject(
       "`arguments` must be a JSON object with unique argument names."
     )

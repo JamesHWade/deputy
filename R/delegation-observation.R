@@ -1,4 +1,4 @@
-#' @include delegation-inspection.R
+#' @include value-properties.R delegation-inspection.R
 NULL
 
 #' Set limits for the subagent event buffer
@@ -29,9 +29,9 @@ DelegationObservation <- S7::new_class(
     max_bytes = 1024^2,
     max_event_bytes = 65536
   ) {
-    max_events <- context_policy_whole_number(max_events, "max_events")
-    max_bytes <- context_policy_whole_number(max_bytes, "max_bytes")
-    max_event_bytes <- context_policy_whole_number(
+    max_events <- validate_positive_int(max_events, "max_events")
+    max_bytes <- validate_positive_int(max_bytes, "max_bytes")
+    max_event_bytes <- validate_positive_int(
       max_event_bytes,
       "max_event_bytes"
     )
@@ -55,9 +55,7 @@ DelegationObservation <- S7::new_class(
     freeze_value(value)
   }
 )
-local({
-  S7::method(`$`, DelegationObservation) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(DelegationObservation)
 
 new_delegation_buffer <- function(policy) {
   buffer <- new.env(parent = emptyenv())

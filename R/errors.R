@@ -268,47 +268,6 @@ abort_request_limit <- function(
   )
 }
 
-#' Signal a provider error
-#'
-#' @description
-#' Signals that the LLM provider returned an error.
-#'
-#' @param message The error message (supports cli formatting)
-#' @param provider_name Name of the provider (e.g., "openai", "anthropic")
-#' @param model The model being used (optional)
-#' @param parent The parent error from the provider (optional)
-#' @param ... Additional context fields
-#' @param .envir Environment for cli interpolation
-#'
-#' @examples
-#' \dontrun{
-#' abort_provider(
-#'   c("API error from {.val {provider_name}}", "x" = "Rate limit exceeded"),
-#'   provider_name = "openai",
-#'   model = "gpt-6.2-sol"
-#' )
-#' }
-#'
-#' @noRd
-abort_provider <- function(
-  message,
-  provider_name = NULL,
-  model = NULL,
-  parent = NULL,
-  ...,
-  .envir = parent.frame()
-) {
-  abort_deputy(
-    message,
-    class = "provider",
-    provider_name = provider_name,
-    model = model,
-    parent = parent,
-    ...,
-    .envir = .envir
-  )
-}
-
 #' Signal a session load error
 #'
 #' @description
@@ -377,43 +336,6 @@ abort_session_save <- function(
     message,
     class = c("session_save", "session"),
     path = path,
-    parent = parent,
-    ...,
-    .envir = .envir
-  )
-}
-
-#' Signal a hook error
-#'
-#' @description
-#' Signals that a hook callback failed.
-#'
-#' @param message The error message (supports cli formatting)
-#' @param hook_event The hook event type (e.g., "PreToolUse", "PostToolUse")
-#' @param parent The parent error from the hook callback (optional)
-#' @param ... Additional context fields
-#' @param .envir Environment for cli interpolation
-#'
-#' @examples
-#' \dontrun{
-#' abort_hook(
-#'   c("Hook {.val {hook_event}} failed", "x" = "Callback error"),
-#'   hook_event = "PreToolUse"
-#' )
-#' }
-#'
-#' @noRd
-abort_hook <- function(
-  message,
-  hook_event = NULL,
-  parent = NULL,
-  ...,
-  .envir = parent.frame()
-) {
-  abort_deputy(
-    message,
-    class = "hook",
-    hook_event = hook_event,
     parent = parent,
     ...,
     .envir = .envir

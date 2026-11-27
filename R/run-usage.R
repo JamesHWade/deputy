@@ -159,9 +159,7 @@ UsageLimits <- S7::new_class(
   }
 )
 
-local({
-  S7::method(`$`, UsageLimits) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(UsageLimits)
 
 S7::method(print, UsageLimits) <- function(x, ...) {
   cli::cat_line(cli::cli_format_method({
@@ -280,9 +278,7 @@ AgentUsage <- S7::new_class(
   }
 )
 
-local({
-  S7::method(`$`, AgentUsage) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(AgentUsage)
 
 validate_agent_usage_value <- function(
   value,

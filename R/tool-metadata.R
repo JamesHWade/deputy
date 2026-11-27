@@ -19,7 +19,7 @@ tool_metadata <- function(tool) {
   if (!inherits(tool, c("ellmer::ToolDef", "ellmer::ToolBuiltIn"))) {
     tool_registration_error("{.arg tool} must be an ellmer tool definition.")
   }
-  tool <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  tool <- runtime_source_tool(tool)
   annotations <- tool@annotations
   validate_tool_annotations(annotations, tool@name)
   source <- attr(tool, "deputy_tool_source", exact = TRUE)
@@ -59,7 +59,7 @@ mark_native_tool <- function(tool) {
 }
 
 is_native_tool <- function(tool) {
-  source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  source <- runtime_source_tool(tool)
   identical(
     attr(source, "deputy_native_tool", exact = TRUE),
     deputy_native_tool_marker

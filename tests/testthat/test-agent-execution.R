@@ -766,42 +766,6 @@ test_that("run_sync stops when cost limit is reached", {
   expect_equal(result$stop_reason, "cost_limit")
 })
 
-test_that("get_tool_annotation works with S7 ToolDef objects", {
-  # This test verifies the S7 inherits() fix for get_tool_annotation
-  # If someone reverts to inherits(tool, "ToolDef") this will fail
-
-  # Create actual S7 tool with annotations
-  test_tool <- ellmer::tool(
-    fun = function() "result",
-    name = "test_tool",
-    description = "A test tool",
-    arguments = list(),
-    annotations = ellmer::tool_annotations(
-      read_only_hint = TRUE,
-      destructive_hint = FALSE
-    )
-  )
-
-  # Verify it's an S7 ToolDef with namespace prefix
-  expect_true(inherits(test_tool, "ellmer::ToolDef"))
-
-  # get_tool_annotation should extract values correctly
-  expect_true(get_tool_annotation(test_tool, "read_only_hint", default = FALSE))
-  expect_false(get_tool_annotation(
-    test_tool,
-    "destructive_hint",
-    default = TRUE
-  ))
-  expect_null(get_tool_annotation(test_tool, "nonexistent"))
-
-  # Non-ToolDef objects should return default
-  expect_equal(
-    get_tool_annotation(list(), "read_only_hint", default = "default"),
-    "default"
-  )
-  expect_null(get_tool_annotation("not a tool", "annotation"))
-})
-
 test_that("run_sync reports terminal request usage limits", {
   mock_chat <- create_mock_chat()
 

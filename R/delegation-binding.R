@@ -503,7 +503,5 @@ forward_delegation_hook <- function(lead, id, event, ...) {
   )
 }
 
-local({
-  S7::method(`$`, DelegationPolicy) <- function(x, name) S7::prop(x, name)
-  S7::method(`$`, DelegationResources) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(DelegationPolicy)
+register_dollar_prop(DelegationResources)

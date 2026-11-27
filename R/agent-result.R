@@ -391,9 +391,7 @@ AgentResult <- S7::new_class(
   }
 )
 
-local({
-  S7::method(`$`, AgentResult) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(AgentResult)
 
 #' Count the turns in a result
 #'

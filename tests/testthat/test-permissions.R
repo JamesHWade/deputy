@@ -898,7 +898,10 @@ test_that("file-write intersections return stable canonical roots", {
   unlink(alias)
   expect_true(file.symlink(other_root, alias))
   expect_identical(first, canonical)
-  expect_false(is_path_within(file.path(other_root, "file.txt"), first))
+  expect_false(is_path_within_permission_root(
+    file.path(other_root, "file.txt"),
+    first
+  ))
 
   permissions <- Permissions(file_write = real_root)
   unlink(real_root, recursive = TRUE)

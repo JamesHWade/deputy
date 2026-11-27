@@ -63,30 +63,12 @@ McpConnection <- R6::R6Class(
         resources = mcp_connection_allowlist(resources, "resources"),
         prompts = mcp_connection_allowlist(prompts, "prompts")
       )
-      if (
-        !is.numeric(timeout) ||
-          length(timeout) != 1L ||
-          is.na(timeout) ||
-          !is.finite(timeout) ||
-          timeout <= 0
-      ) {
-        abort_deputy(
-          "{.arg timeout} must be positive and finite.",
-          class = "mcp_connection"
-        )
-      }
-      if (
-        !is.numeric(startup_timeout) ||
-          length(startup_timeout) != 1L ||
-          is.na(startup_timeout) ||
-          !is.finite(startup_timeout) ||
-          startup_timeout <= 0
-      ) {
-        abort_deputy(
-          "{.arg startup_timeout} must be positive and finite.",
-          class = "mcp_connection"
-        )
-      }
+      validate_positive_timeout(timeout, "timeout", class = "mcp_connection")
+      validate_positive_timeout(
+        startup_timeout,
+        "startup_timeout",
+        class = "mcp_connection"
+      )
       selected <- mcp_connection_config(config, server)
       rlang::check_installed("mcptools", reason = "to create an MCP connection")
       mcp_metadata_state()

@@ -231,12 +231,7 @@ r_session_tool_dispatcher <- function(
       "Nested R session tools must be requested from an active registered run_r_code call."
     )
   }
-  parent_source <- attr(
-    request@tool,
-    "deputy_runtime_source_tool",
-    exact = TRUE
-  ) %||%
-    request@tool
+  parent_source <- runtime_source_tool(request@tool)
   parent_owner <- attr(
     parent_source,
     "deputy_r_session_owner",
@@ -272,8 +267,7 @@ r_session_tool_dispatcher <- function(
         "Nested R session tool {.val {name}} is not registered as a function tool."
       )
     }
-    source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||%
-      tool
+    source <- runtime_source_tool(tool)
     if (!identical(source@name, name)) {
       r_session_tool_dispatch_abort(
         "Nested R session tool {.val {name}} does not have an exact registered executable."
@@ -320,12 +314,7 @@ r_session_tool_dispatcher <- function(
 
   selected_current <- function(name) {
     registered_now <- private$.chat$get_tools()[[name]]
-    source_now <- attr(
-      registered_now,
-      "deputy_runtime_source_tool",
-      exact = TRUE
-    ) %||%
-      registered_now
+    source_now <- runtime_source_tool(registered_now)
     if (!identical(source_now, selected[[name]]$source)) {
       r_session_tool_dispatch_abort(
         "The selected nested tool was replaced after dispatcher admission."

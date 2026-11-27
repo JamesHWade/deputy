@@ -111,45 +111,39 @@ r_session_checkpoint_write <- function(
   body <- c(header, as.raw(10L), payload)
   sha256 <- digest::digest(body, algo = "sha256", serialize = FALSE)
   path <- r_session_checkpoint_path(config, id)
-  temporary <- tempfile(".checkpoint-", tmpdir = config$directory)
-  on.exit(unlink(temporary), add = TRUE)
-  tryCatch(
-    {
+  write_file_atomic(
+    path,
+    write_fn = function(temporary) {
       connection <- file(temporary, "wb")
       tryCatch(
         writeBin(c(charToRaw(sha256), as.raw(10L), body), connection),
         finally = close(connection)
       )
     },
-    error = function(error) {
+    prefix = ".checkpoint-",
+    fail_if_exists = TRUE,
+    on_write_error = function(error) {
       r_session_checkpoint_abort(
         "Could not write the R session checkpoint.",
         error
       )
+    },
+    on_commit_error = function() {
+      r_session_checkpoint_abort("Could not publish the R session checkpoint.")
     }
   )
-  Sys.chmod(temporary, "0600")
-  if (
-    file.exists(path) ||
-      nzchar(file_checkpoint_link_target(path)) ||
-      !suppressWarnings(file.rename(temporary, path))
-  ) {
-    r_session_checkpoint_abort("Could not publish the R session checkpoint.")
-  }
   r_session_checkpoint_receipt(manifest, sha256)
 }
 
 r_session_checkpoint_read <- function(config, owner, id) {
   path <- r_session_checkpoint_path(config, id)
-  if (
-    !utils::file_test("-f", path) || nzchar(file_checkpoint_link_target(path))
-  ) {
+  if (!utils::file_test("-f", path) || nzchar(read_symlink_target(path))) {
     r_session_checkpoint_abort(
       "The R session checkpoint file is missing or invalid."
     )
   }
   bytes <- tryCatch(
-    suppressWarnings(file_checkpoint_read_raw(
+    suppressWarnings(read_file_raw_bounded(
       path,
       r_session_checkpoint_max_bytes + r_session_checkpoint_header_bytes + 66L
     )),

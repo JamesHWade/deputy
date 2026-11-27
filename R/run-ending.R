@@ -284,9 +284,7 @@ RunEndingFailed <- S7::new_class(
   }
 )
 
-local({
-  S7::method(`$`, RunEnding) <- function(x, name) S7::props(x)[[name]]
-})
+register_dollar_prop(RunEnding, missing_null = TRUE)
 
 S7::method(print, RunEnding) <- function(x, ...) {
   values <- S7::props(x)

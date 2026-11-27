@@ -1277,7 +1277,7 @@ subagent_chat_history <- function(
       "{.arg conversation_id} must be a function returning the open conversation's ID."
     )
   }
-  max_bytes <- context_policy_whole_number(max_bytes, "max_bytes")
+  max_bytes <- validate_positive_int(max_bytes, "max_bytes")
   if (is.null(max_bytes) || max_bytes < 1024) {
     cli::cli_abort("{.arg max_bytes} must be at least 1024.")
   }

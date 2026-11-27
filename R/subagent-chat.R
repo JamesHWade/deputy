@@ -206,7 +206,7 @@ subagent_chat_server <- function(
         deputy_delegation_disclosure = function(error) FALSE
       ))
   }
-  poll_interval <- context_policy_whole_number(poll_interval, "poll_interval")
+  poll_interval <- validate_positive_int(poll_interval, "poll_interval")
   if (is.null(poll_interval) || poll_interval < 100L) {
     cli::cli_abort("poll_interval must be at least 100 milliseconds.")
   }
@@ -828,7 +828,7 @@ subagent_chat_activity <- function(
   if (!is.function(requester)) {
     cli::cli_abort("{.arg requester} must be a function.")
   }
-  interval <- context_policy_whole_number(interval, "interval")
+  interval <- validate_positive_int(interval, "interval")
   if (is.null(interval) || interval < 50L) {
     cli::cli_abort("{.arg interval} must be at least 50 milliseconds.")
   }

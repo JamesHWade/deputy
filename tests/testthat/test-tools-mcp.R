@@ -31,24 +31,6 @@ test_that("tools_mcp with config parameter returns list", {
   expect_true(is.list(result))
 })
 
-test_that("mcp_servers returns NULL when mcptools not installed", {
-  skip_if(mcp_available(), "mcptools is installed")
-
-  expect_warning(
-    result <- mcp_servers(),
-    "mcptools package is not installed"
-  )
-  expect_null(result)
-})
-
-test_that("mcp_servers returns NULL for missing config", {
-  skip_if_not(mcp_available(), "mcptools required")
-
-  # Test with non-existent config
-  result <- mcp_servers(config = "/nonexistent/config.json")
-  expect_null(result)
-})
-
 test_that("Agent$mcp_tools returns empty vector initially", {
   skip_if_not_installed("ellmer")
 
@@ -107,50 +89,6 @@ test_that("Agent$load_mcp is chainable", {
 })
 
 # --- Tests requiring mcptools ---
-
-test_that("mcp_servers parses valid config correctly", {
-  skip_if_not(mcp_available(), "mcptools required")
-
-  config_dir <- tempfile()
-  dir.create(config_dir, recursive = TRUE)
-  withr::defer(unlink(config_dir, recursive = TRUE))
-
-  config_path <- file.path(config_dir, "config.json")
-  config_content <- '{"mcpServers": {"github": {}, "slack": {}}}'
-  writeLines(config_content, config_path)
-
-  result <- mcp_servers(config = config_path)
-  expect_equal(sort(result), c("github", "slack"))
-})
-
-test_that("mcp_servers returns empty vector for config with no servers", {
-  skip_if_not(mcp_available(), "mcptools required")
-
-  config_dir <- tempfile()
-  dir.create(config_dir, recursive = TRUE)
-  withr::defer(unlink(config_dir, recursive = TRUE))
-
-  config_path <- file.path(config_dir, "config.json")
-  writeLines('{"mcpServers": {}}', config_path)
-
-  result <- mcp_servers(config = config_path)
-  expect_equal(result, character(0))
-})
-
-test_that("mcp_servers handles malformed JSON config", {
-  skip_if_not(mcp_available(), "mcptools required")
-
-  config_path <- tempfile(fileext = ".json")
-  withr::defer(unlink(config_path))
-
-  writeLines("{ invalid json }", config_path)
-
-  expect_warning(
-    result <- mcp_servers(config = config_path),
-    "Failed to read MCP config"
-  )
-  expect_null(result)
-})
 
 test_that("tools_mcp with empty servers parameter loads all tools", {
   skip_if_not(mcp_available(), "mcptools required")

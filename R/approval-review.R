@@ -137,8 +137,7 @@ approval_review_server <- function(
         tool_name <- request$tool_name %||% request$name
         tool <- agent$get_tools()[[tool_name]]
         arguments <- if (inherits(tool, "ellmer::ToolDef")) {
-          (attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||%
-            tool)@arguments
+          runtime_source_tool(tool)@arguments
         }
         tool_input <- request$tool_input %||% list()
         # An input that cannot be tabulated is shown as submitted and can
