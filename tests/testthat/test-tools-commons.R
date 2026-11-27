@@ -408,6 +408,58 @@ test_that("tools_commons preserves labels on named vectors and dimensions on mat
   expect_match(as.character(mat@extra$display$html), "<pre>")
 })
 
+test_that("tools_commons preserves meaningful data-frame row names without adding default ones", {
+  local_mocked_bindings(
+    commons_package_version = function() numeric_version("0.2.0")
+  )
+  stub <- structure(
+    list(
+      search = function(query) {
+        "### rev_rows\nRun with `$measure(\"rev_rows\")`."
+      },
+      measure = function(name, arguments = list()) {
+        switch(
+          name,
+          named_rows = data.frame(
+            revenue = c(1234567.89, 140),
+            row.names = c("North", "South")
+          ),
+          default_rows = data.frame(
+            region = c("North", "South"),
+            revenue = c(100, 140)
+          ),
+          html_rows = data.frame(
+            revenue = c(100, 140),
+            row.names = c("<b>North</b>", "A | B")
+          )
+        )
+      }
+    ),
+    class = "commons"
+  )
+  tools <- tools_commons(stub)
+
+  named <- tools$commons_measure("named_rows")
+  expect_match(named@value, "\\|  \\| revenue \\|")
+  expect_match(named@value, "\\| North \\| 1234567\\.89 \\|")
+  expect_match(named@value, "\\| South \\| 140 \\|")
+  expect_match(named@extra$display$html, "<th></th><th>revenue</th>")
+  expect_match(named@extra$display$html, "<td>North</td><td>1234567\\.89</td>")
+  expect_match(named@extra$display$html, "<td>South</td><td>140</td>")
+
+  plain <- tools$commons_measure("default_rows")
+  expect_match(plain@value, "^\\| region \\| revenue \\|")
+  expect_match(plain@extra$display$html, "<th>region</th><th>revenue</th>")
+
+  escaped <- tools$commons_measure("html_rows")
+  expect_match(escaped@value, "A \\\\\\| B")
+  expect_no_match(as.character(escaped@extra$display$html), "<b>North</b>")
+  expect_match(
+    as.character(escaped@extra$display$html),
+    "<td>&lt;b&gt;North&lt;/b&gt;</td>"
+  )
+})
+
 test_that("tools_commons governs permissions, budgets, and trusted receipts without substitute bypass", {
   skip_if_no_commons()
   sales <- data.frame(region = c("North", "East"), revenue = c(100, 140))

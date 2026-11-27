@@ -195,22 +195,58 @@ commons_bound_text <- function(text, max_chars = commons_max_text_chars) {
   )
 }
 
+commons_df_with_row_names <- function(df) {
+  rn <- attr(df, "row.names")
+  if (
+    nrow(df) == 0L ||
+      !is.character(rn) ||
+      identical(rn, as.character(seq_len(nrow(df))))
+  ) {
+    return(df)
+  }
+  col_names <- names(df) %||% paste0("V", seq_len(ncol(df)))
+  cols <- c(list(rn), unclass(df))
+  names(cols) <- c("", col_names)
+  structure(
+    cols,
+    class = "data.frame",
+    row.names = .set_row_names(nrow(df))
+  )
+}
+
 commons_format_df_cells <- function(df) {
-  cols <- lapply(df, function(col) {
-    formatted <- commons_format_atomic(col)
+  cols <- lapply(unclass(df), function(col) {
+    formatted <- if (is.list(col) && !is.object(col)) {
+      vapply(col, commons_format_value_text, character(1))
+    } else if (!is.null(dim(col))) {
+      vapply(
+        seq_len(nrow(col)),
+        function(i) commons_format_vector(col[i, , drop = TRUE]),
+        character(1)
+      )
+    } else {
+      commons_format_atomic(col)
+    }
     gsub("[\r\n]+", " ", formatted)
   })
-  as.data.frame(cols, stringsAsFactors = FALSE, check.names = FALSE)
+  structure(
+    cols,
+    class = "data.frame",
+    row.names = .set_row_names(nrow(df))
+  )
 }
 
 commons_format_df_markdown <- function(df, max_rows = commons_max_table_rows) {
+  df <- commons_df_with_row_names(df)
   total_rows <- nrow(df)
   if (ncol(df) == 0L) {
     return(sprintf("Empty table (%d rows, 0 columns).", total_rows))
   }
   shown <- utils::head(df, max_rows)
   col_names <- names(shown) %||% paste0("V", seq_len(ncol(shown)))
-  escape_pipe <- function(x) gsub("|", "\\|", x, fixed = TRUE)
+  escape_pipe <- function(x) {
+    gsub("|", "\\|", gsub("[\r\n]+", " ", x), fixed = TRUE)
+  }
   header <- paste0("| ", paste(escape_pipe(col_names), collapse = " | "), " |")
   separator <- paste0(
     "| ",
@@ -246,6 +282,7 @@ commons_format_df_markdown <- function(df, max_rows = commons_max_table_rows) {
 }
 
 commons_format_df_html <- function(df, max_rows = commons_max_table_rows) {
+  df <- commons_df_with_row_names(df)
   total_rows <- nrow(df)
   if (ncol(df) == 0L) {
     return(sprintf("<p>Empty table (%d rows, 0 columns).</p>", total_rows))
