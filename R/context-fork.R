@@ -742,26 +742,19 @@ context_fork_manifest <- function(parent, child, fork, receipt, initial_turns) {
     receipt = receipt
   )
   fields$size$fork_bytes <- fork$size$bytes
-  fields$size$manifest_bytes <- 0L
   # max_bytes bounds only the host-selected history projection. The ordinary
   # parent admission ceiling remains the limit for the manifest and later
   # continuation brief.
-  limit <- parent$.__enclos_env__$private$delegation_max_bytes
-  repeat {
-    manifest <- do.call(DelegationManifest, fields)
-    bytes <- delegation_bytes(S7::props(manifest))
-    if (identical(bytes, fields$size$manifest_bytes)) {
-      break
+  finalize_delegation_manifest(
+    fields,
+    max_bytes = agent_private(parent)$delegation_max_bytes,
+    abort_fn = function() {
+      context_fork_abort(
+        "oversized",
+        "The fork manifest exceeds the host admission bound."
+      )
     }
-    fields$size$manifest_bytes <- bytes
-  }
-  if (bytes > limit) {
-    context_fork_abort(
-      "oversized",
-      "The fork manifest exceeds the host admission bound."
-    )
-  }
-  manifest
+  )
 }
 
 context_fork_reauthorize <- function(entry) {
@@ -853,7 +846,6 @@ validate_fork_candidate <- function(parent, agent) {
       "A fork child must use an independent empty Chat."
     )
   }
-  check_conversation_owner(parent)
   invisible(NULL)
 }
 

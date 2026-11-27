@@ -34,7 +34,7 @@ test_that("activity is split from the model's turns and merged back", {
     lapply(split$overlay, function(entry) entry$turn),
     list(2L, 2L)
   )
-  merged <- activity_merge(split$turns, split$overlay)
+  merged <- overlay_merge(split$turns, split$overlay)
   expect_identical(
     merged[[2L]]@contents,
     list(request, forged, shown, answer)

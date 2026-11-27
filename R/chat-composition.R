@@ -146,23 +146,14 @@ make_delegation_tool <- function(
       ),
       function(result) {
         record <- private$subagent_runs[[correlation$delegation_id]]
-        delegation_json(S7::props(delegation_outcome(record, compact = TRUE)))
+        delegation_tool_result_payload(record)
       },
       function(error) {
         record <- private$subagent_runs[[correlation$delegation_id]]
         if (is.null(record)) {
           rlang::cnd_signal(error)
         }
-        payload <- delegation_json(S7::props(delegation_outcome(
-          record,
-          compact = TRUE
-        )))
-        ellmer::tool_reject(paste0(
-          "Subagent '",
-          inspection_text(record$agent_name %||% "specialist", 512L),
-          "' failed.\n",
-          payload
-        ))
+        delegation_tool_result_payload(record, failed = TRUE)
       }
     )
   }

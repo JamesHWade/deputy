@@ -88,10 +88,40 @@ background_tools <- function(
   max_active = 4L,
   max_tasks = 16L
 ) {
+  validated <- background_validate_tools_args(
+    owner = owner,
+    agents = agents,
+    usage_limits = usage_limits,
+    descriptions = descriptions,
+    max_active = max_active,
+    max_tasks = max_tasks
+  )
+  private <- agent_private(owner)
+  state <- new.env(parent = emptyenv())
+  state$agents <- validated$agents
+  state$limits <- usage_limits
+  state$max_active <- validated$max_active
+  state$max_tasks <- validated$max_tasks
+  state$tasks <- list()
+  state$waiters <- list()
+  state$settled <- 0L
+  private$.background <- state
+
+  background_build_tools(owner, names(validated$agents), descriptions)
+}
+
+background_validate_tools_args <- function(
+  owner,
+  agents,
+  usage_limits,
+  descriptions,
+  max_active,
+  max_tasks
+) {
   if (!inherits(owner, "Agent")) {
     background_abort("owner must be an Agent.")
   }
-  private <- owner$.__enclos_env__$private
+  private <- agent_private(owner)
   background_check_owner(owner)
   agents <- unlist(as.list(agents))
   names <- names(agents)
@@ -142,16 +172,10 @@ background_tools <- function(
       "Wait for this agent's background tasks before replacing its tools."
     )
   }
-  state <- new.env(parent = emptyenv())
-  state$agents <- agents
-  state$limits <- usage_limits
-  state$max_active <- max_active
-  state$max_tasks <- max_tasks
-  state$tasks <- list()
-  state$waiters <- list()
-  state$settled <- 0L
-  private$.background <- state
+  list(agents = agents, max_active = max_active, max_tasks = max_tasks)
+}
 
+background_build_tools <- function(owner, names, descriptions) {
   roster <- vapply(
     names,
     function(name) {

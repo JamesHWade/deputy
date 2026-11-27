@@ -505,12 +505,12 @@ replace_agent_chat <- function(agent, chat) {
   # Microcompacted results are keyed by position; dropped turns shift them.
   # Remap the state only after the destination Chat has been rewired.
   private$.conversation_state$remap_context(kept)
-  private$.activity_overlay <- activity_remap(
+  private$.activity_overlay <- overlay_remap(
     private$.activity_overlay,
     kept,
     offset = length(private$.conversation_state$retained_turns())
   )
-  private$.note_overlay <- activity_remap(
+  private$.note_overlay <- overlay_remap(
     private$.note_overlay,
     kept,
     offset = length(private$.conversation_state$retained_turns())

@@ -199,20 +199,30 @@ prepare_delegation_manifest <- function(lead, definition, prepared, child) {
   ))
   # Canonical constructor output is the export representation. Include the
   # count itself until its decimal width stabilizes.
+  finalize_delegation_manifest(
+    fields,
+    max_bytes = private$delegation_max_bytes,
+    abort_fn = function() {
+      delegation_input_abort(
+        "oversized",
+        "Initial manifest exceeds the host admission ceiling."
+      )
+    }
+  )
+}
+
+finalize_delegation_manifest <- function(fields, max_bytes, abort_fn) {
   fields$size$manifest_bytes <- 0L
   repeat {
     manifest <- do.call(DelegationManifest, fields)
     manifest_bytes <- delegation_bytes(S7::props(manifest))
-    if (manifest_bytes == fields$size$manifest_bytes) {
+    if (identical(manifest_bytes, fields$size$manifest_bytes)) {
       break
     }
     fields$size$manifest_bytes <- manifest_bytes
   }
-  if (manifest_bytes > private$delegation_max_bytes) {
-    delegation_input_abort(
-      "oversized",
-      "Initial manifest exceeds the host admission ceiling."
-    )
+  if (manifest_bytes > max_bytes) {
+    abort_fn()
   }
   manifest
 }

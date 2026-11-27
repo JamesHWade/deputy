@@ -362,16 +362,8 @@ resolve_delegation_input <- function(lead, definition, input) {
       )
     }
     scoped <- Filter(
-      function(source) {
-        identical(source$owner_id, private$delegation_scope$owner_id) &&
-          identical(
-            source$conversation_id,
-            private$delegation_scope$conversation_id
-          ) &&
-          (is.null(source$allowed_agents) ||
-            definition$name %in% source$allowed_agents)
-      },
-      matches
+      function(source) identical(source$source_id, ref$source_id),
+      offered
     )
     if (!length(scoped)) {
       delegation_input_abort(

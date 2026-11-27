@@ -92,6 +92,118 @@ parallel_responder <- function(lead, item, state) {
     })
 }
 
+parallel_admit_batch <- function(lead, selected, state, context) {
+  count <- length(selected$tasks)
+  admitted <- character(count)
+  prepared <- lapply(seq_len(count), function(index) {
+    definition <- selected$definitions[[index]]
+    correlation <- list(
+      parent_agent_id = lead$agent_id,
+      parent_run_id = state$active_run_id,
+      delegation_id = new_deputy_id("delegation_"),
+      run_context = context,
+      tool_call_id = NULL
+    )
+    task <- selected$tasks[[index]]
+    id <- lead_admit_delegation(lead, definition, task, correlation)
+    admitted[[index]] <<- id
+    list(definition = definition, correlation = correlation, task = task)
+  })
+  list(prepared = prepared, admitted = admitted)
+}
+
+parallel_prepare_batch <- function(lead, private, prepared, limits) {
+  # Resolve every reference before constructing any Subagent.
+  prepared <- lapply(prepared, function(item) {
+    item$prepared <- tryCatch(
+      resolve_delegation_input(lead, item$definition, item$task),
+      error = function(condition) {
+        lead_settle_delegation(
+          lead,
+          item$correlation$delegation_id,
+          error = condition,
+          stop_reason = "setup_error"
+        )
+        rlang::cnd_signal(condition)
+      }
+    )
+    item
+  })
+  # Prepare the complete batch before any provider request.
+  lapply(prepared, function(item) {
+    id <- item$correlation$delegation_id
+    item$child <- tryCatch(
+      private$create_sub_agent(
+        item$definition,
+        item$correlation,
+        UsageLimits(
+          max_requests = min(1L, item$definition$max_requests %||% 1L),
+          max_tool_calls = 0L,
+          on_unknown_cost = limits$on_unknown_cost
+        ),
+        stateless = TRUE
+      ),
+      error = function(condition) {
+        lead_settle_delegation(
+          lead,
+          id,
+          error = condition,
+          stop_reason = "setup_error"
+        )
+        stop(condition)
+      }
+    )
+    item$manifest <- tryCatch(
+      prepare_delegation_manifest(
+        lead,
+        item$definition,
+        item$prepared,
+        item$child
+      ),
+      error = function(condition) {
+        lead_settle_delegation(
+          lead,
+          id,
+          item$child,
+          error = condition,
+          stop_reason = "setup_error"
+        )
+        rlang::cnd_signal(condition)
+      }
+    )
+    lead_bind_delegation(lead, id, item$child, item$manifest)
+    item
+  })
+}
+
+parallel_build_wave <- function(
+  lead,
+  private,
+  prepared,
+  indices,
+  remaining,
+  state
+) {
+  wave_size <- length(indices)
+  wave <- lapply(seq_along(indices), function(position) {
+    item <- prepared[[indices[[position]]]]
+    item$limits <- parallel_child_limits(
+      remaining,
+      item$definition,
+      wave_size,
+      position
+    )
+    item
+  })
+  lapply(wave, function(item) {
+    private$reserve_delegation_usage(
+      item$correlation$delegation_id,
+      item$limits
+    )
+    parallel_responder(lead, item, state)
+  })
+}
+
 lead_parallel_delegate <- function(
   lead,
   tasks,
@@ -101,7 +213,7 @@ lead_parallel_delegate <- function(
   run_context
 ) {
   selected <- validate_parallel_tasks(lead, tasks, max_active, mode)
-  private <- lead$.__enclos_env__$private
+  private <- agent_private(lead)
   limits <- if (is.null(usage_limits)) {
     lead$usage_limits
   } else {
@@ -151,85 +263,14 @@ lead_parallel_delegate <- function(
     count <- length(selected$tasks)
     # Admit every selected task before preparing children. Failed preparation
     # must retain the failing record and unstarted siblings without paid work.
-    prepared <- lapply(seq_len(count), function(index) {
-      definition <- selected$definitions[[index]]
-      correlation <- list(
-        parent_agent_id = lead$agent_id,
-        parent_run_id = state$active_run_id,
-        delegation_id = new_deputy_id("delegation_"),
-        run_context = context,
-        tool_call_id = NULL
-      )
-      task <- selected$tasks[[index]]
-      id <- lead_admit_delegation(lead, definition, task, correlation)
-      admitted <<- c(admitted, id)
-      list(definition = definition, correlation = correlation, task = task)
-    })
+    batch <- parallel_admit_batch(lead, selected, state, context)
+    admitted <- batch$admitted
+    prepared <- batch$prepared
     # A batch that was stopped at its start admits its tasks, so each has a
     # record, and prepares none of them: no input is resolved and no
     # Subagent is made.
     if (!isTRUE(private$should_stop)) {
-      # Resolve every reference before constructing any Subagent.
-      prepared <- lapply(prepared, function(item) {
-        item$prepared <- tryCatch(
-          resolve_delegation_input(lead, item$definition, item$task),
-          error = function(condition) {
-            lead_settle_delegation(
-              lead,
-              item$correlation$delegation_id,
-              error = condition,
-              stop_reason = "setup_error"
-            )
-            rlang::cnd_signal(condition)
-          }
-        )
-        item
-      })
-      # Prepare the complete batch before any provider request.
-      prepared <- lapply(prepared, function(item) {
-        id <- item$correlation$delegation_id
-        item$child <- tryCatch(
-          private$create_sub_agent(
-            item$definition,
-            item$correlation,
-            UsageLimits(
-              max_requests = min(1L, item$definition$max_requests %||% 1L),
-              max_tool_calls = 0L,
-              on_unknown_cost = limits$on_unknown_cost
-            ),
-            stateless = TRUE
-          ),
-          error = function(condition) {
-            lead_settle_delegation(
-              lead,
-              id,
-              error = condition,
-              stop_reason = "setup_error"
-            )
-            stop(condition)
-          }
-        )
-        item$manifest <- tryCatch(
-          prepare_delegation_manifest(
-            lead,
-            item$definition,
-            item$prepared,
-            item$child
-          ),
-          error = function(condition) {
-            lead_settle_delegation(
-              lead,
-              id,
-              item$child,
-              error = condition,
-              stop_reason = "setup_error"
-            )
-            rlang::cnd_signal(condition)
-          }
-        )
-        lead_bind_delegation(lead, id, item$child, item$manifest)
-        item
-      })
+      prepared <- parallel_prepare_batch(lead, private, prepared, limits)
     }
     outcomes <- rep(
       list(list(
@@ -260,24 +301,14 @@ lead_parallel_delegate <- function(
         remaining$max_requests %||% Inf
       )
       indices <- seq.int(next_index, length.out = wave_size)
-      wave <- lapply(seq_along(indices), function(position) {
-        index <- indices[[position]]
-        item <- prepared[[index]]
-        item$limits <- parallel_child_limits(
-          remaining,
-          item$definition,
-          wave_size,
-          position
-        )
-        item
-      })
-      promises <- lapply(wave, function(item) {
-        private$reserve_delegation_usage(
-          item$correlation$delegation_id,
-          item$limits
-        )
-        parallel_responder(lead, item, state)
-      })
+      promises <- parallel_build_wave(
+        lead,
+        private,
+        prepared,
+        indices,
+        remaining,
+        state
+      )
       wave_outcomes <- coro::await(promises::promise_all(.list = promises))
       outcomes[indices] <- wave_outcomes
       next_index <- next_index + wave_size

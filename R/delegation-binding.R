@@ -288,12 +288,8 @@ delegation_factory_chat <- function(lead, definition, correlation) {
   # Work on a deep copy, as for the lead's chat: a host's `template$clone()`
   # shares its callback managers with the template and every other shallow
   # copy, and clearing them would strip another live subagent's callbacks.
-  copy <- tryCatch(
-    {
-      copy <- clone_governed_chat(chat)
-      clear_chat_tool_callbacks(copy, source = chat)
-      copy
-    },
+  tryCatch(
+    clone_clean_subagent_chat(chat),
     error = function(error) {
       abort_deputy(
         "Could not copy the chat built for subagent {.val {definition$name}}.",
@@ -302,9 +298,6 @@ delegation_factory_chat <- function(lead, definition, correlation) {
       )
     }
   )
-  copy$set_turns(list())
-  copy$set_tools(list())
-  copy
 }
 
 release_delegation_binding <- function(lead, id) {
@@ -480,26 +473,11 @@ bind_delegation_host <- function(
 }
 
 forward_delegation_hook <- function(lead, id, event, ...) {
-  private <- lead$.__enclos_env__$private
   args <- list(...)
   fire_with_errors(
     lead$hooks,
     function() do.call(lead$hooks$fire, c(list(event), args)),
-    function(errors) {
-      record <- private$subagent_runs[[id]]
-      if (!is.null(record)) {
-        messages <- vapply(
-          errors,
-          function(error) paste0(error$event, ": ", error$error),
-          character(1)
-        )
-        record$hook_error <- paste(
-          c(record$hook_error, messages),
-          collapse = "\n"
-        )
-        private$subagent_runs[[id]] <- record
-      }
-    }
+    function(errors) record_delegation_hook_errors(lead, id, errors)
   )
 }
 

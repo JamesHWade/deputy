@@ -642,3 +642,8 @@ HookRegistry <- R6::R6Class(
     reserved_fire_id = NULL
   )
 )
+
+hook_registry_set_locked <- function(hooks, locked) {
+  hooks$.__enclos_env__$private$configuration_locked <- isTRUE(locked)
+  invisible(hooks)
+}
