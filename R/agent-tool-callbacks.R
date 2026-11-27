@@ -44,13 +44,11 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
 
       usage <- private$current_run_usage()
       limits <- private$current_usage_limits %||% self$usage_limits
-      limit_status <- tree_usage_status(self) %||%
-        background_limit_status(
-          private,
-          usage,
-          limits,
-          require_followup = TRUE
-        )
+      limit_status <- private$limit_status(
+        require_followup = TRUE,
+        usage = usage,
+        limits = limits
+      )
       if (!is.null(limit_status)) {
         if (!is.null(private$.approval_dir) && !restored_approval) {
           private$pause_for_approval(
@@ -61,25 +59,6 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
         }
         private$mark_usage_limit(limit_status)
         ellmer::tool_reject(usage_limit_message(limit_status))
-      }
-
-      # Retain the adapter-specific counter for callers that configure it
-      # directly. The governed run limit above counts all requests.
-      if (!is.null(private$tool_call_limit) && !restored_approval) {
-        private$tool_call_count <- private$tool_call_count + 1L
-        if (private$tool_call_count > private$tool_call_limit) {
-          private$request_stream_stop("tool_call_limit")
-          message <- paste0(
-            "Tool call limit reached. Please provide your final answer with ",
-            "the information gathered so far."
-          )
-          private$notify(
-            message,
-            level = "warning",
-            code = "tool_call_limit"
-          )
-          ellmer::tool_reject(message)
-        }
       }
 
       # A run that has been stopped starts no more tools: a call that comes
@@ -177,13 +156,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       # its stream was dropped, while the hook was pending. Nothing of that
       # run is left for the answer to change, and a later run must not be
       # changed by it.
-      hook_run_id <- private$current_run_id
-      hook_in_run <- isTRUE(private$run_active)
-      run_over <- function() {
-        hook_in_run &&
-          (!isTRUE(private$run_active) ||
-            !identical(private$current_run_id, hook_run_id))
-      }
+      run_over <- run_over_checker(private)
 
       # What follows a PreToolUse answer: the hook's own decision, the file
       # checkpoint, the "allow" event and the delegation queue.
@@ -384,7 +357,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
           ),
           deputy_file_checkpoint_error = function(e) {
             private$should_stop <- TRUE
-            private$stop_reason_from_hook <- "file_checkpoint_error"
+            private$stop_reason <- "file_checkpoint_error"
             private$notify(
               conditionMessage(e),
               level = "warning",
@@ -418,13 +391,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
       # its stream was dropped, while the hook was pending. Nothing of that
       # run is left for the answer to change, and a later run must not be
       # changed by it.
-      hook_run_id <- private$current_run_id
-      hook_in_run <- isTRUE(private$run_active)
-      run_over <- function() {
-        hook_in_run &&
-          (!isTRUE(private$run_active) ||
-            !identical(private$current_run_id, hook_run_id))
-      }
+      run_over <- run_over_checker(private)
 
       # What follows a PostToolUse answer. The tool_end event reads the
       # overrides this sets, so it waits for the hook too.
@@ -443,7 +410,7 @@ deputy_agent_tool_callbacks_methods <- function(self = NULL, private = NULL) {
           }
           if (!is.null(hook_result$continue) && !hook_result$continue) {
             private$should_stop <- TRUE
-            private$stop_reason_from_hook <- hook_result$stop_reason %||%
+            private$stop_reason <- hook_result$stop_reason %||%
               "hook_requested_stop"
             private$stop_requested_by <- "hook"
           }

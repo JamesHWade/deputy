@@ -22,7 +22,10 @@ remain stable as these internal modules evolve.
 | Stateless responder wave scheduling | `R/parallel-delegate.R` |
 | S7 Skill configuration and requirement inspection | `R/skill.R` |
 | Skill directory discovery, metadata, and explicit tool loading | `R/skills.R` |
-| Shared governed stream, adapters and finalization | `R/agent-stream.R` |
+| Shared governed stream generators and adapters | `R/agent-stream.R` |
+| Shared run initialization, settlement, end hooks and teardown | `R/agent-run-state.R` |
+| Run accounting, usage enforcement and fail-closed limits | `R/run-usage.R` |
+| Provider/ellmer token-table accounting and fallbacks | `R/provider-usage.R` |
 | Durable approval suspension and governed resume | `R/agent-approval.R` |
 | Portable approval control records and S7 inspection | `R/approval-record.R` |
 | Locked immutable approval storage revisions | `R/approval-store.R` |
@@ -33,9 +36,11 @@ remain stable as these internal modules evolve.
 | Job manifests, graph snapshots and governed runtime checkpoints | `R/agent-job-runtime.R` |
 | Session payload construction and restoration | `R/agent-session.R` |
 | Context estimation and compaction orchestration | `R/agent-context.R` |
+| Compaction evidence scanning, bounds and catalog registries | `R/compaction-evidence.R` |
 | Selected conversation reconstruction, prompt framing and atomic state transitions | `R/conversation-state.R` |
 | Governed asynchronous compaction requests and recovery | `R/compaction-run.R` |
 | Permission/hook callbacks and upstream tool content extraction | `R/agent-tool-callbacks.R` |
+| Tool adaptation, execution, trusted delivery and offloading | `R/agent-tool-execution.R` |
 | Tool call records and delegation correlation | `R/agent-tool-records.R` |
 | Public ellmer request callbacks and explicit Chat selection | `R/agent-requests.R` |
 | Ellmer structured requests and finite application corrections | `R/structured-run.R` |
@@ -117,11 +122,9 @@ These files have since grown past 1,000 lines and have no agreed exception
 | `R/subagent-chat.R` | 1,514 |
 | `R/subagent-history.R` | 1,315 |
 | `R/delegation-activity.R` | 1,279 |
-| `R/agent-stream.R` | 1,162 |
-| `R/agent-context.R` | 1,132 |
 | `R/agents-multi.R` | 1,126 |
+| `R/delegation-inspection.R` | 1,197 |
 | `R/tool-runtime.R` | 1,097 |
-| `R/delegation-inspection.R` | 1,078 |
 | `R/r-session.R` | 1,071 |
 
 Split each along its responsibility boundaries, or record an exception here

@@ -1074,3 +1074,124 @@ inspection_unresolved_references <- function(view) {
   }
   view
 }
+
+agent_list_subagents <- function(self) {
+  runs <- lead_delegation_records(self)
+  if (length(runs) == 0) {
+    return(data.frame(
+      agent_name = character(),
+      agent_id = character(),
+      parent_agent_id = character(),
+      parent_delegation_id = character(),
+      depth = integer(),
+      root_agent_id = character(),
+      session_id = character(),
+      run_id = character(),
+      parent_run_id = character(),
+      delegation_id = character(),
+      tool_call_id = character(),
+      task = character(),
+      status = character(),
+      stop_reason = character(),
+      input_error = character(),
+      admitted_at = as.POSIXct(character()),
+      hook_error = character(),
+      cleanup_error = character(),
+      observation_error = character(),
+      started_at = as.POSIXct(character()),
+      completed_at = as.POSIXct(character()),
+      error = character(),
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  do.call(
+    rbind,
+    lapply(runs, function(run) {
+      data.frame(
+        agent_name = run$agent_name,
+        agent_id = run$agent_id %||% NA_character_,
+        parent_agent_id = run$parent_agent_id %||% NA_character_,
+        parent_delegation_id = run$parent_delegation_id %||% NA_character_,
+        depth = run$depth %||% NA_integer_,
+        root_agent_id = run$root_agent_id %||% NA_character_,
+        session_id = run$session_id %||% NA_character_,
+        run_id = run$run_id %||% NA_character_,
+        parent_run_id = run$parent_run_id %||% NA_character_,
+        delegation_id = run$delegation_id %||% NA_character_,
+        tool_call_id = run$tool_call_id %||% NA_character_,
+        task = run$task,
+        status = run$status,
+        stop_reason = run$stop_reason %||% NA_character_,
+        input_error = run$input_error %||% NA_character_,
+        admitted_at = as.POSIXct(run$admitted_at, tz = "UTC"),
+        hook_error = run$hook_error %||% NA_character_,
+        cleanup_error = run$cleanup_error %||% NA_character_,
+        observation_error = run$observation_error %||% NA_character_,
+        started_at = as.POSIXct(run$started_at, tz = "UTC"),
+        completed_at = as.POSIXct(run$completed_at, tz = "UTC"),
+        error = run$error %||% NA_character_,
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+}
+
+agent_read_subagent_result <- function(
+  self,
+  private,
+  requester,
+  delegation_id,
+  reference,
+  offset = 0L
+) {
+  views <- lead_inspect_subagents(self, requester, delegation_id, FALSE)
+  references <- unlist(
+    lapply(views, function(view) view$outcome$references),
+    recursive = FALSE
+  )
+  selected <- Filter(
+    function(ref) identical(ref$reference, reference),
+    references
+  )
+  if (
+    !is.character(reference) ||
+      length(reference) != 1L ||
+      is.na(reference) ||
+      !length(selected)
+  ) {
+    delegation_disclosure_abort()
+  }
+  # Disclosure authorizes the public reference. Storage routing remains
+  # host-owned even when the redactor removes or replaces private metadata.
+  records <- Filter(
+    function(record) identical(record$delegation_id, delegation_id),
+    lead_delegation_records(self)
+  )
+  stored <- if (length(records) == 1L) {
+    Filter(
+      function(ref) identical(ref$reference, reference),
+      records[[1L]]$references
+    )
+  } else {
+    list()
+  }
+  if (!length(stored)) {
+    delegation_disclosure_abort()
+  }
+  record <- records[[1L]]
+  storage <- lead_artifact_storage(self, record, stored[[1L]])
+  chunk <- read_tool_result_chunk(
+    reference,
+    offset = offset,
+    max_chars = 8192L,
+    policy = storage$policy,
+    session_id = storage$session_id
+  )
+  view <- private$.delegation_disclosure$redact(
+    list(kind = "artifact", reference = reference, result = chunk),
+    requester
+  )
+  inspection_portable(view)
+  inspection_bound(view, private$.delegation_disclosure)
+}
