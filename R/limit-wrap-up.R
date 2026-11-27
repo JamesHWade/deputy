@@ -29,7 +29,7 @@ limit_wrap_up_plan <- function(agent, state, structured, extraction) {
       # The limit is why the run stopped, not an interrupt or a hook's stop
       # that arrived after it.
       !is.null(private$stop_requested_by) ||
-      !identical(private$stop_reason_from_hook, status$reason) ||
+      !identical(private$stop_reason, status$reason) ||
       !status$reason %in% limit_wrap_up_reasons ||
       !identical(status$on_exceed %||% state$limits$on_exceed, "wrap_up") ||
       !is.null(private$.approval_dir) ||
@@ -155,7 +155,7 @@ limit_wrap_up_start <- function(
       }
       chat$set_tools(list())
       private$should_stop <- FALSE
-      private$stop_reason_from_hook <- NULL
+      private$stop_reason <- NULL
       private$stop_requested_by <- NULL
       reset_stream_controller(private$current_stream_controller)
       state$response_parts <- character()
@@ -216,8 +216,8 @@ limit_wrap_up_end <- function(agent, state, reason = state$wrap_up_reason) {
   }
   if (!isTRUE(private$should_stop)) {
     private$should_stop <- TRUE
-    private$stop_reason_from_hook <- reason
+    private$stop_reason <- reason
   }
-  state$reason <- private$stop_reason_from_hook %||% "interrupted"
+  state$reason <- private$stop_reason %||% "interrupted"
   invisible(NULL)
 }

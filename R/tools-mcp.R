@@ -150,3 +150,165 @@ load_mcp_tools_result <- function(config, servers) {
 
   result
 }
+
+agent_load_mcp <- function(
+  self,
+  private,
+  config = NULL,
+  servers = NULL,
+  replace = FALSE,
+  call = rlang::caller_env()
+) {
+  check_conversation_lease(self, NULL)
+  if (!rlang::is_bool(replace)) {
+    tool_registration_error("{.arg replace} must be TRUE or FALSE.")
+  }
+  # mcptools closes old transports before replacement discovery/validation.
+  # Clean up on errors and interrupts as well as normal returns, including
+  # failures while publishing a successfully discovered batch.
+  on.exit(private$discard_stale_mcp_tools(), add = TRUE)
+  loaded <- load_mcp_tools_result(config, servers)
+  mcp_tools_list <- loaded$tools
+  loaded_at <- Sys.time()
+
+  if (isTRUE(loaded$success)) {
+    # Prepare the whole refreshed registry before publishing it. Successful
+    # discovery can contain zero tools; working unrelated tools are retained.
+    existing <- private$.chat$get_tools()
+    removed <- character()
+    tryCatch(
+      {
+        if (replace) {
+          from_selected_server <- vapply(
+            existing,
+            function(tool) {
+              source <- tool_metadata(tool)$source
+              identical(source$type, "mcp") &&
+                source$server %in% loaded$servers
+            },
+            logical(1)
+          )
+          removed <- names(existing)[from_selected_server]
+          retained <- existing[!from_selected_server]
+          incoming <- validate_tool_batch(
+            mcp_tools_list,
+            retained,
+            replace = TRUE
+          )
+          retained[names(incoming)] <- incoming
+          self$set_tools(retained)
+        } else {
+          self$register_tools(mcp_tools_list)
+        }
+      },
+      error = function(e) {
+        private$loaded_mcp_status <- c(
+          private$loaded_mcp_status,
+          list(list(
+            status = "failed",
+            config = config,
+            servers = loaded$servers,
+            tools = character(),
+            loaded_at = loaded_at,
+            error = conditionMessage(e)
+          ))
+        )
+        cli::cli_abort(
+          c(
+            "Failed to register MCP tools",
+            "x" = e$message,
+            "i" = "Check for tool name conflicts with existing tools"
+          ),
+          call = call
+        )
+      }
+    )
+    private$loaded_mcp_tools <- setdiff(private$loaded_mcp_tools, removed)
+  }
+
+  if (length(mcp_tools_list) > 0) {
+    # Track loaded MCP tools with warnings for extraction failures
+    tool_names <- vapply(
+      seq_along(mcp_tools_list),
+      function(i) {
+        t <- mcp_tools_list[[i]]
+        tryCatch(
+          t@name %||% paste0("<unnamed_", i, ">"),
+          error = function(e) {
+            cli::cli_warn(c(
+              "Could not read name from MCP tool {.val {i}}",
+              "x" = e$message
+            ))
+            paste0("<unknown_", i, ">")
+          }
+        )
+      },
+      character(1)
+    )
+    private$loaded_mcp_tools <- unique(c(
+      private$loaded_mcp_tools,
+      tool_names
+    ))
+    private$loaded_mcp_status <- c(
+      private$loaded_mcp_status,
+      list(list(
+        status = "connected",
+        config = config,
+        servers = servers %||% character(),
+        tools = tool_names,
+        loaded_at = loaded_at,
+        error = NULL
+      ))
+    )
+  } else {
+    private$loaded_mcp_status <- c(
+      private$loaded_mcp_status,
+      list(list(
+        status = if (!mcp_available()) {
+          "unavailable"
+        } else if (loaded$success) {
+          "empty"
+        } else {
+          "failed"
+        },
+        config = config,
+        servers = servers %||% character(),
+        tools = character(),
+        loaded_at = loaded_at,
+        error = loaded$error
+      ))
+    )
+  }
+
+  invisible(self)
+}
+
+agent_mcp_status <- function(private) {
+  records <- private$loaded_mcp_status
+  if (length(records) == 0) {
+    return(data.frame(
+      status = character(),
+      config = character(),
+      servers = character(),
+      tools = character(),
+      loaded_at = as.POSIXct(character()),
+      error = character(),
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  do.call(
+    rbind,
+    lapply(records, function(record) {
+      data.frame(
+        status = record$status,
+        config = record$config %||% NA_character_,
+        servers = paste(record$servers, collapse = ","),
+        tools = paste(record$tools, collapse = ","),
+        loaded_at = as.POSIXct(record$loaded_at, tz = "UTC"),
+        error = record$error %||% NA_character_,
+        stringsAsFactors = FALSE
+      )
+    })
+  )
+}

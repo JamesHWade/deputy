@@ -80,6 +80,7 @@ Remotes:
     r-lib/httr2
 Collate:
     'agent-approval.R'
+    'compaction-evidence.R'
     'agent-context.R'
     'agent-definition-files.R'
     'value-properties.R'
@@ -100,6 +101,7 @@ Collate:
     'agent-session.R'
     'agent-stream.R'
     'agent-tool-callbacks.R'
+    'agent-tool-execution.R'
     'agent-tool-records.R'
     'agent-tracing.R'
     'conversation-state.R'
@@ -143,6 +145,7 @@ Collate:
     'permission-evaluation.R'
     'permission-policy.R'
     'permissions.R'
+    'provider-usage.R'
     'r-session-artifacts.R'
     'r-session-checkpoint.R'
     'r-session-result.R'

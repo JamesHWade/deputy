@@ -127,13 +127,7 @@ compaction_can_continue <- function(agent) {
   if (isTRUE(private$should_stop)) {
     return(FALSE)
   }
-  status <- tree_usage_status(agent) %||%
-    background_limit_status(
-      private,
-      private$current_run_usage(),
-      private$current_usage_limits,
-      require_followup = TRUE
-    )
+  status <- private$limit_status(require_followup = TRUE)
   if (!is.null(status)) {
     private$mark_usage_limit(status)
     return(FALSE)
@@ -181,7 +175,7 @@ compaction_summary_requests_async <- coro::async(function(
         isTRUE(private$should_stop)
     ) {
       private$request_stream_stop(
-        private$stop_reason_from_hook %||% "interrupted"
+        private$stop_reason %||% "interrupted"
       )
       return(NULL)
     }
@@ -210,26 +204,11 @@ compaction_summary_requests_async <- coro::async(function(
   if (!compaction_can_continue(agent)) {
     return(NULL)
   }
-  if (identical(private$.context_policy$fallback, "error")) {
-    abort_deputy(
-      c(
-        "Conversation compaction failed.",
-        "x" = conditionMessage(attempt$condition),
-        "i" = "Set ContextPolicy(fallback = 'text') to permit degraded compaction."
-      ),
-      class = "compaction_error",
-      parent = attempt$condition
-    )
-  }
-  private$notify(
-    "Compaction used the configured deterministic text fallback.",
-    level = "warning",
-    code = "compact_fallback",
-    error = conditionMessage(attempt$condition)
-  )
-  list(
-    summary = private$generate_fallback_summary(turns),
-    method = "text",
+  compaction_handle_failure(
+    private = private,
+    turns = turns,
+    fallback = private$.context_policy$fallback,
+    condition = attempt$condition,
     usage = usage,
     attempts = attempts
   )

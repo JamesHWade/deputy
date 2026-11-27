@@ -697,7 +697,7 @@ test_that("pre-tool effects are applied before a real hook rejection", {
   expect_s3_class(rejection, "ellmer_tool_reject")
   expect_true(agent$.__enclos_env__$private$should_stop)
   expect_identical(
-    agent$.__enclos_env__$private$stop_reason_from_hook,
+    agent$.__enclos_env__$private$stop_reason,
     "hook_policy_stop"
   )
   expect_match(mock$chat$get_system_prompt(), "Persist this hook context")

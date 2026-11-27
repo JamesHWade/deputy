@@ -1,18 +1,18 @@
-test_that("tool_call_limit is NULL by default", {
+test_that("current_usage_limits is NULL and current_tool_calls is 0 by default", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat)
 
-  expect_null(agent$.__enclos_env__$private$tool_call_limit)
-  expect_equal(agent$.__enclos_env__$private$tool_call_count, 0L)
+  expect_null(agent$.__enclos_env__$private$current_usage_limits)
+  expect_equal(agent$.__enclos_env__$private$current_tool_calls, 0L)
 })
 
-test_that("on_tool_request enforces tool_call_limit", {
+test_that("on_tool_request enforces max_tool_calls from UsageLimits", {
   mock_chat <- create_mock_chat()
-  agent <- Agent$new(chat = mock_chat, tools = list(tool_read_file))
-
-  # Activate callback-based limits (simulating the governed stream setup)
-  agent$.__enclos_env__$private$tool_call_limit <- 2L
-  agent$.__enclos_env__$private$tool_call_count <- 0L
+  agent <- Agent$new(
+    chat = mock_chat,
+    tools = list(tool_read_file),
+    usage_limits = UsageLimits(max_tool_calls = 2L)
+  )
 
   # Create a mock tool request
   request <- create_mock_tool_request(
@@ -22,15 +22,15 @@ test_that("on_tool_request enforces tool_call_limit", {
 
   # First two calls should pass (count goes to 1, then 2)
   expect_no_error(agent$.__enclos_env__$private$handle_tool_request(request))
-  expect_equal(agent$.__enclos_env__$private$tool_call_count, 1L)
+  expect_equal(agent$.__enclos_env__$private$current_tool_calls, 1L)
 
   expect_no_error(agent$.__enclos_env__$private$handle_tool_request(request))
-  expect_equal(agent$.__enclos_env__$private$tool_call_count, 2L)
+  expect_equal(agent$.__enclos_env__$private$current_tool_calls, 2L)
 
   # Third call exceeds limit -- should call tool_reject
   expect_error(
     agent$.__enclos_env__$private$handle_tool_request(request),
-    "Tool call limit reached"
+    "Run limit reached for tool calls"
   )
 })
 
@@ -38,12 +38,8 @@ test_that("on_tool_request enforces cost limit in callback mode", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(
     chat = mock_chat,
-    usage_limits = UsageLimits(max_cost_usd = 0.001)
+    usage_limits = UsageLimits(max_cost_usd = 0.001, max_tool_calls = 100L)
   )
-
-  # Activate callback-based limits
-  agent$.__enclos_env__$private$tool_call_limit <- 100L
-  agent$.__enclos_env__$private$tool_call_count <- 0L
 
   request <- create_mock_tool_request(
     name = "read_file",
@@ -57,22 +53,19 @@ test_that("on_tool_request enforces cost limit in callback mode", {
   )
 })
 
-test_that("on_tool_request skips limit checks when tool_call_limit is NULL", {
+test_that("on_tool_request allows unbounded tool calls when max_tool_calls is NULL", {
   mock_chat <- create_mock_chat()
   agent <- Agent$new(chat = mock_chat, tools = list(tool_read_file))
 
-  # Ensure limit is NULL (default -- run/run_sync path)
-  expect_null(agent$.__enclos_env__$private$tool_call_limit)
+  expect_null(agent$usage_limits$max_tool_calls)
 
   request <- create_mock_tool_request(
     name = "read_file",
     arguments = list(path = "test.R")
   )
 
-  # Should not increment or check limits
-
   expect_no_error(agent$.__enclos_env__$private$handle_tool_request(request))
-  expect_equal(agent$.__enclos_env__$private$tool_call_count, 0L)
+  expect_equal(agent$.__enclos_env__$private$current_tool_calls, 1L)
 })
 
 test_that("Agent exposes stream_async instead of a separate Shiny bridge", {
@@ -89,8 +82,9 @@ test_that("stream_async returns content and resets counters on each call", {
 
   # Add stream_async to mock
   mock_chat$stream_async <- function(prompt, stream = "content") {
-    observed$count <- agent$.__enclos_env__$private$tool_call_count
-    observed$limit <- agent$.__enclos_env__$private$tool_call_limit
+    observed$count <- agent$.__enclos_env__$private$current_tool_calls
+    observed$limit <-
+      agent$.__enclos_env__$private$current_usage_limits$max_tool_calls
     coro::generator(function() {
       coro::yield("done")
     })()
@@ -102,19 +96,24 @@ test_that("stream_async returns content and resets counters on each call", {
   )
 
   # Simulate previous state
-  agent$.__enclos_env__$private$tool_call_count <- 10L
-  agent$.__enclos_env__$private$tool_call_limit <- 5L
+  agent$.__enclos_env__$private$current_tool_calls <- 10L
+  agent$.__enclos_env__$private$current_usage_limits <- UsageLimits(
+    max_tool_calls = 5L
+  )
 
   # Construction is lazy and must not reserve or mutate the Agent.
   result <- agent$stream_async("test")
 
   expect_true(inherits(result, "coro_generator_instance"))
-  expect_equal(agent$.__enclos_env__$private$tool_call_count, 10L)
-  expect_equal(agent$.__enclos_env__$private$tool_call_limit, 5L)
+  expect_equal(agent$.__enclos_env__$private$current_tool_calls, 10L)
+  expect_equal(
+    agent$.__enclos_env__$private$current_usage_limits$max_tool_calls,
+    5L
+  )
   expect_equal(collect_async_stream(result), list("done"))
   expect_equal(observed$count, 0L)
   expect_equal(observed$limit, 20L)
-  expect_null(agent$.__enclos_env__$private$tool_call_limit)
+  expect_null(agent$.__enclos_env__$private$current_usage_limits)
 })
 
 test_that("stream_async isolates and clears run-scoped state", {
@@ -122,9 +121,8 @@ test_that("stream_async isolates and clears run-scoped state", {
   observed <- new.env(parent = emptyenv())
   mock_chat$stream_async <- function(prompt, stream = "content") {
     observed$run_active <- private$run_active
-    observed$current_stream_content <- private$current_stream_content
     observed$current_usage_limits <- private$current_usage_limits
-    observed$pending_events <- private$pending_events
+    observed$tool_call_records <- private$tool_call_records
     coro::generator(function() {
       coro::yield("done")
     })()
@@ -137,28 +135,24 @@ test_that("stream_async isolates and clears run-scoped state", {
   private <- agent$.__enclos_env__$private
   private$current_usage_limits <- UsageLimits(max_requests = 0)
   private$current_usage_baseline <- AgentUsage(requests = 100)
-  private$current_stream_content <- FALSE
-  private$pending_events <- list(AgentEvent("warning", message = "stale"))
+  private$tool_call_records <- list(list(stale = TRUE))
 
   stream <- agent$stream_async("test")
 
   expect_false(private$run_active)
-  expect_false(private$current_stream_content)
   expect_equal(private$current_usage_limits$max_requests, 0L)
-  expect_length(private$pending_events, 1L)
+  expect_length(private$tool_call_records, 1L)
 
   expect_equal(collect_async_stream(stream), list("done"))
   expect_true(observed$run_active)
-  expect_false(observed$current_stream_content)
   expect_s7_class(observed$current_usage_limits, UsageLimits)
   expect_null(observed$current_usage_limits$max_requests)
   expect_equal(observed$current_usage_limits$max_tool_calls, 3L)
-  expect_length(observed$pending_events, 0L)
+  expect_length(observed$tool_call_records, 0L)
   expect_false(private$run_active)
-  expect_false(private$current_stream_content)
   expect_null(private$current_usage_limits)
   expect_null(private$current_usage_baseline)
-  expect_length(private$pending_events, 0L)
+  expect_length(private$tool_call_records, 0L)
 })
 
 test_that("stream_async releases state when stream setup fails", {
@@ -172,14 +166,14 @@ test_that("stream_async releases state when stream setup fails", {
   expect_error(collect_async_stream(stream), "setup failed")
   expect_false(agent$.__enclos_env__$private$run_active)
   expect_null(agent$.__enclos_env__$private$current_usage_limits)
-  expect_null(agent$.__enclos_env__$private$tool_call_limit)
 })
 
 test_that("stream_async uses max_tool_calls from Agent limits", {
   mock_chat <- create_mock_chat()
   observed_limit <- NULL
   mock_chat$stream_async <- function(prompt, stream = "content") {
-    observed_limit <<- agent$.__enclos_env__$private$tool_call_limit
+    observed_limit <<-
+      agent$.__enclos_env__$private$current_usage_limits$max_tool_calls
     coro::generator(function() {
       coro::yield("done")
     })()
@@ -192,10 +186,10 @@ test_that("stream_async uses max_tool_calls from Agent limits", {
 
   stream <- agent$stream_async("test")
 
-  expect_null(agent$.__enclos_env__$private$tool_call_limit)
+  expect_null(agent$.__enclos_env__$private$current_usage_limits)
   expect_equal(collect_async_stream(stream), list("done"))
   expect_equal(observed_limit, 15L)
-  expect_null(agent$.__enclos_env__$private$tool_call_limit)
+  expect_null(agent$.__enclos_env__$private$current_usage_limits)
 })
 
 test_that("stream_async fires Stop and SessionEnd hooks on completion", {
@@ -235,7 +229,7 @@ test_that("stream_async fires Stop and SessionEnd hooks on completion", {
   expect_equal(collect_async_stream(stream), list("done"))
   expect_equal(stop_reason, "complete")
   expect_equal(session_end_reason, "complete")
-  expect_null(agent$.__enclos_env__$private$tool_call_limit)
+  expect_null(agent$.__enclos_env__$private$current_usage_limits)
 })
 
 test_that("stream_async cleans up and reports stream errors", {
@@ -274,7 +268,7 @@ test_that("stream_async cleans up and reports stream errors", {
   expect_error(collect_async_stream(stream), "stream failed")
   expect_equal(stop_reason, "error")
   expect_equal(session_end_reason, "error")
-  expect_null(agent$.__enclos_env__$private$tool_call_limit)
+  expect_null(agent$.__enclos_env__$private$current_usage_limits)
 })
 
 test_that("stream_async checkpoints rooted file writes", {
