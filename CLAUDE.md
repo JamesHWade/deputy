@@ -25,12 +25,14 @@ deputy/
 ├── R/                      # Source code (R6 classes and functions)
 │   ├── agent.R             # Public Agent API and runtime wiring
 │   ├── agent-context.R     # Context estimation and compaction orchestration
+│   ├── compaction-evidence.R # Compaction reference scanning, bounds and catalogs
 │   ├── conversation-state.R # Selected conversation reconstruction and transitions
 │   ├── agent-session.R     # Session payload construction and restoration
 │   ├── agent-tool-callbacks.R # Permission/hook callbacks and tool content extraction
+│   ├── agent-tool-execution.R # Tool adaptation, execution, trusted delivery and offloading
 │   ├── agent-tool-records.R # Tool call records and delegation correlation
 │   ├── agent-tracing.R     # OpenTelemetry governance trace adapter
-│   ├── agent-stream.R      # Shared governed stream and finalization
+│   ├── agent-stream.R      # Shared governed stream generators and adapters
 │   ├── agent-approval.R     # Durable pending-tool suspension and governed resume
 │   ├── agent-job.R          # Host-scheduled durable job public entry points
 │   ├── agent-job-record.R   # AgentJob S7 snapshot, evidence bounds and transitions
@@ -61,7 +63,7 @@ deputy/
 │   ├── subagent-display.R # Inert HTML for tool displays shown by the Shiny adapter
 │   ├── subagent-history.R # Subagent records saved with a shinychat conversation
 │   ├── tool-display-evidence.R # Approved, bounded tool display/provenance projection
-│   ├── agent-run-state.R   # Shared model-run and batch initialization
+│   ├── agent-run-state.R   # Shared run initialization, settlement, end hooks and teardown
 │   ├── compaction-run.R    # Governed asynchronous summary attempts and recovery
 │   ├── context-policy.R    # S7 ContextPolicy and DeputyCompaction values
 │   ├── context-estimation.R # Token estimates around unpaired tool results
@@ -71,7 +73,8 @@ deputy/
 │   ├── agent-definition-files.R # Portable YAML AgentDefinitions
 │   ├── agent-result.R      # AgentResult and AgentEvent objects
 │   ├── run-ending.R        # RunEnding values and the stop-reason mapping
-│   ├── run-usage.R         # Run accounting and fail-closed limits
+│   ├── run-usage.R         # Run accounting, usage enforcement and fail-closed limits
+│   ├── provider-usage.R    # Provider/ellmer token-table accounting and fallbacks
 │   ├── limit-wrap-up.R     # Opt-in limit wrap-up and cut-off answer handling
 │   ├── stall-detection.R   # Canonical repeated-tool progress signal
 │   ├── permissions.R       # S7 permission configuration and public evaluation

@@ -312,7 +312,7 @@ lead_run_delegation <- function(
       result,
       error,
       stop_reason = private$subagent_runs[[id]]$cancel_reason %||%
-        private$stop_reason_from_hook,
+        private$stop_reason,
       observe = FALSE
     )
     usage_private$release_delegation_usage(id)

@@ -108,7 +108,7 @@ test_that("run_async enforces tool-call limits and releases the run", {
   expect_equal(calls, 2L)
   expect_identical(result$stop_reason, "tool_call_limit")
   expect_false(agent$.__enclos_env__$private$run_active)
-  expect_null(agent$.__enclos_env__$private$tool_call_limit)
+  expect_null(agent$.__enclos_env__$private$current_usage_limits)
 
   # Agent-level limits apply when no override is given.
   calls <- 0L
@@ -125,7 +125,8 @@ test_that("run_async leaves tool calls unbounded when no tool-call limit is set"
   observed <- NULL
   chat <- create_mock_chat()
   chat$stream_async <- function(prompt, stream = "content", controller = NULL) {
-    observed <<- agent$.__enclos_env__$private$tool_call_limit
+    observed <<-
+      agent$.__enclos_env__$private$current_usage_limits$max_tool_calls
     coro::async_generator(function() coro::yield("done"))()
   }
   agent <- Agent$new(chat = chat, usage_limits = UsageLimits(max_requests = 5))

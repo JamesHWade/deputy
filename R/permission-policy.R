@@ -338,3 +338,97 @@ intersect_permission_capabilities <- function(ceiling, requested) {
   )
   out
 }
+
+agent_set_permission_mode <- function(
+  self,
+  private,
+  mode,
+  call = rlang::caller_env()
+) {
+  check_conversation_access(self, NULL)
+  mode <- validate_permission_mode_value(mode)
+  existing <- self$permissions
+  old_mode <- existing$mode
+
+  if (identical(mode, old_mode)) {
+    return(invisible(self))
+  }
+
+  if (!mode %in% permission_mode_targets(old_mode)) {
+    cli_abort(
+      c(
+        "Permission mode cannot widen or replace the current policy",
+        "x" = paste0(
+          "Mode ",
+          old_mode,
+          " cannot change to ",
+          mode,
+          "."
+        ),
+        "i" = paste0(
+          "Create a new Agent with explicitly broader Permissions to ",
+          "make this change."
+        )
+      ),
+      class = c("deputy_permission_mode_widening", "deputy_error"),
+      call = call
+    )
+  }
+
+  capabilities <- intersect_permission_capabilities(
+    permission_capabilities_from(existing),
+    permission_mode_capabilities(mode, self$working_dir)
+  )
+
+  narrowed_permissions <- Permissions(
+    mode = mode,
+    file_read = capabilities$file_read,
+    file_write = capabilities$file_write,
+    bash = capabilities$bash,
+    r_code = capabilities$r_code,
+    web = capabilities$web,
+    install_packages = capabilities$install_packages,
+    can_use_tool = existing$can_use_tool,
+    tool_allowlist = existing$tool_allowlist,
+    tool_denylist = existing$tool_denylist,
+    permission_prompt_tool_name = capabilities$permission_prompt_tool_name
+  )
+
+  registered_tools <- private$.chat$get_tools()
+  provider_native <- vapply(
+    registered_tools,
+    inherits,
+    logical(1),
+    what = "ellmer::ToolBuiltIn"
+  )
+  removed_provider_tools <- character()
+  if (!isTRUE(narrowed_permissions$web) && any(provider_native)) {
+    removed_provider_tools <- vapply(
+      registered_tools[provider_native],
+      \(tool) tool@name,
+      character(1)
+    )
+    private$.chat$set_tools(registered_tools[!provider_native])
+  }
+
+  private$.permissions <- narrowed_permissions
+
+  hook_unawaited(private$fire_hook(
+    "ConfigChange",
+    key = "permission_mode",
+    old_value = old_mode,
+    new_value = mode,
+    context = private$hook_context()
+  ))
+
+  private$notify(
+    paste0("Permission mode changed from ", old_mode, " to ", mode, "."),
+    level = "info",
+    code = "permission_mode_changed",
+    previous_mode = old_mode,
+    permission_mode = mode,
+    removed_provider_tools = removed_provider_tools
+  )
+
+  invisible(self)
+}

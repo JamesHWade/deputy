@@ -168,13 +168,10 @@ begin_model_request <- function(agent) {
       )
     }
   } else {
-    status <- tree_usage_status(agent) %||%
-      background_limit_status(
-        private,
-        private$current_run_usage(),
-        state$limits,
-        require_followup = TRUE
-      )
+    status <- private$limit_status(
+      require_followup = TRUE,
+      limits = state$limits
+    )
     if (!is.null(status)) {
       private$mark_usage_limit(status)
     }

@@ -110,13 +110,8 @@ lead_parallel_delegate <- function(
   context <- merge_run_context(lead$run_context, run_context)
   coro::async(function() {
     check_conversation_lease(lead, NULL)
-    if (isTRUE(private$run_active)) {
-      cli::cli_abort(
-        "This agent already has an active run",
-        class = c("deputy_run_active", "deputy_error")
-      )
-    }
-    state <- private$new_callback_run_state()
+    check_no_active_run(private)
+    state <- private$new_run_state()
     controller <- list(cancel = function(reason = "interrupted") {
       for (id in names(private$active_subagents)) {
         lead$interrupt_subagent(id, reason)
@@ -133,12 +128,12 @@ lead_parallel_delegate <- function(
           lead_settle_delegation(
             lead,
             id,
-            stop_reason = private$stop_reason_from_hook %||%
+            stop_reason = private$stop_reason %||%
               if (completed) "not_started" else "batch_error"
           )
           release_delegation_binding(lead, id)
         }
-        private$finish_callback_run(state)
+        private$finish_run(state)
       },
       add = TRUE
     )
@@ -291,12 +286,12 @@ lead_parallel_delegate <- function(
       lead_settle_delegation(
         lead,
         id,
-        stop_reason = private$stop_reason_from_hook %||% "not_started"
+        stop_reason = private$stop_reason %||% "not_started"
       )
     }
     statuses <- vapply(outcomes, `[[`, character(1), "status")
     if (isTRUE(private$should_stop)) {
-      state$reason <- private$stop_reason_from_hook %||% "interrupted"
+      state$reason <- private$stop_reason %||% "interrupted"
     } else if (any(statuses == "failed")) {
       state$reason <- "delegation_error"
     } else if (any(statuses != "completed")) {
@@ -315,7 +310,7 @@ lead_parallel_delegate <- function(
     if (promises::is.promising(ended)) {
       coro::await(ended)
     }
-    private$finish_callback_run(state)
+    private$finish_run(state)
     list(
       mode = "stateless",
       results = lapply(outcomes, `[[`, "result"),
