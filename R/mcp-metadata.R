@@ -198,7 +198,7 @@ mcp_check_stdio_server <- function(transport, server_name) {
 }
 
 mcp_tool_is_current <- function(tool) {
-  source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  source <- runtime_source_tool(tool)
   check <- attr(source, "deputy_mcp_connection_current", exact = TRUE)
   if (is.null(check)) {
     return(TRUE)
@@ -244,16 +244,11 @@ load_mcp_tools_with_metadata <- function(config, servers) {
   }
   state <- mcp_metadata_state()
   # Filter before connecting: an excluded server must never be started.
-  selected_config <- tempfile("deputy-mcp-", fileext = ".json")
-  on.exit(unlink(selected_config), add = TRUE)
-  file.create(selected_config)
-  Sys.chmod(selected_config, "0600")
-  jsonlite::write_json(
+  selected_config <- write_private_json_tempfile(
     list(mcpServers = configured[unique(servers)]),
-    selected_config,
-    auto_unbox = TRUE,
-    null = "null"
+    prefix = "deputy-mcp-"
   )
+  on.exit(unlink(selected_config), add = TRUE)
   tools <- mcptools::mcp_tools(config = selected_config)
   # The released converter's unlist() returns NULL when every server is empty.
   if (is.null(tools)) {

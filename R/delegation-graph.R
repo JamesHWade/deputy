@@ -19,7 +19,7 @@ graph_plain_text <- function(value, field) {
 
 graph_positive_integer <- function(value, field) {
   tryCatch(
-    context_policy_whole_number(value, field),
+    validate_positive_int(value, field),
     error = function(error) graph_abort(conditionMessage(error))
   )
 }
@@ -36,17 +36,13 @@ graph_node_tools <- function(agent) {
   graph_chat(agent)$get_tools()
 }
 
-graph_tool_source <- function(tool) {
-  attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
-}
-
 graph_tool_is_composition <- function(tool) {
-  source <- graph_tool_source(tool)
+  source <- runtime_source_tool(tool)
   !is.null(composition_tool_owner(source))
 }
 
 graph_tool_is_delegation <- function(tool) {
-  source <- graph_tool_source(tool)
+  source <- runtime_source_tool(tool)
   isTRUE(attr(source, "deputy_delegation_tool", exact = TRUE)) ||
     identical(
       tryCatch(source@name, error = function(error) NULL),
@@ -56,7 +52,7 @@ graph_tool_is_delegation <- function(tool) {
 
 graph_tool_is_native <- function(tool) {
   inherits(tool, "ellmer::ToolBuiltIn") ||
-    inherits(graph_tool_source(tool), "ellmer::ToolBuiltIn")
+    inherits(runtime_source_tool(tool), "ellmer::ToolBuiltIn")
 }
 
 graph_validate_root <- function(owner) {
@@ -309,7 +305,7 @@ graph_validate_routes <- function(routes, nodes, agents, graph_limits) {
 }
 
 graph_route_tool_matches <- function(tool, tree) {
-  source <- graph_tool_source(tool)
+  source <- runtime_source_tool(tool)
   identical(attr(source, "deputy_graph_route_tree", exact = TRUE), tree)
 }
 
@@ -359,7 +355,7 @@ graph_restore_tools <- function(private, base_tools) {
   if (
     !is.null(reader) &&
       identical(
-        attr(graph_tool_source(reader), "deputy_internal_tool", exact = TRUE),
+        attr(runtime_source_tool(reader), "deputy_internal_tool", exact = TRUE),
         deputy_tool_result_reader_marker
       )
   ) {

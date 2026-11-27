@@ -167,10 +167,6 @@ activity_merge_turn <- function(turn, position, overlay) {
   turn
 }
 
-activity_strip <- function(turns) {
-  activity_split(turns)$turns
-}
-
 # Shown activity is keyed by its turn's position in the complete conversation:
 # the compacted prefix (`offset` turns), then the context. When moving to
 # another Chat drops context turns, each card moves to where its turn now sits.

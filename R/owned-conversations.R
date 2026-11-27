@@ -76,8 +76,7 @@ validate_conversation_candidate <- function(owner, agent) {
     any(vapply(
       agent$get_tools(),
       function(tool) {
-        source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||%
-          tool
+        source <- runtime_source_tool(tool)
         isTRUE(attr(source, "deputy_delegation_tool", exact = TRUE)) ||
           identical(source@name, "delegate_to_agent")
       },
@@ -221,7 +220,7 @@ retain_conversation <- function(
       "Release the configured graph before retaining more agents."
     )
   }
-  max_runs <- context_policy_whole_number(max_runs, "max_runs")
+  max_runs <- validate_positive_int(max_runs, "max_runs")
   if (is.null(max_runs) || length(op$owned_conversations) >= 32L) {
     conversation_abort(
       "Retained conversations require finite max_runs and at most 32 live handles."
@@ -627,7 +626,7 @@ conversation_remove_routes <- function(owner, handle) {
     function(tool) {
       identical(
         attr(
-          trusted_tool_source(tool),
+          runtime_source_tool(tool),
           "deputy_composition_handle",
           exact = TRUE
         ),

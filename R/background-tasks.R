@@ -126,8 +126,8 @@ background_tools <- function(
   if (!S7::S7_inherits(usage_limits, UsageLimits)) {
     background_abort("usage_limits must be created with UsageLimits().")
   }
-  max_active <- context_policy_whole_number(max_active, "max_active")
-  max_tasks <- context_policy_whole_number(max_tasks, "max_tasks")
+  max_active <- validate_positive_int(max_active, "max_active")
+  max_tasks <- validate_positive_int(max_tasks, "max_tasks")
   if (
     is.null(max_active) ||
       is.null(max_tasks) ||
@@ -344,7 +344,7 @@ composition_tool_delegates <- function(tool) {
   if (is.null(tool)) {
     return(FALSE)
   }
-  source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  source <- runtime_source_tool(tool)
   !is.null(attr(source, "deputy_composition_owner", exact = TRUE)) &&
     is.null(attr(source, "deputy_background_control", exact = TRUE))
 }

@@ -487,7 +487,7 @@ Agent <- R6::R6Class(
       usage_limits,
       queue = FALSE
     ) {
-      if (!is_true_false(queue)) {
+      if (!rlang::is_bool(queue)) {
         cli_abort("{.arg queue} must be TRUE or FALSE")
       }
       if (queue) {
@@ -1442,7 +1442,7 @@ Agent <- R6::R6Class(
       notes = TRUE
     ) {
       for (name in c("activity", "notes")) {
-        if (!is_true_false(get(name))) {
+        if (!rlang::is_bool(get(name))) {
           cli_abort("{.arg {name}} must be TRUE or FALSE")
         }
       }
@@ -1538,7 +1538,7 @@ Agent <- R6::R6Class(
     #' @return The agent, invisibly.
     set_system_prompt = function(value, keep_summary = TRUE) {
       check_conversation_lease(self, NULL)
-      if (!is_true_false(keep_summary)) {
+      if (!rlang::is_bool(keep_summary)) {
         cli_abort("{.arg keep_summary} must be TRUE or FALSE")
       }
       prompt <- prompt_with_skill_prompts(value, self$skills())
@@ -3339,8 +3339,7 @@ Agent <- R6::R6Class(
             }
           ))
         }
-        source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||%
-          tool
+        source <- runtime_source_tool(tool)
         cancel <- attr(source, "deputy_mcp_cancel_active", exact = TRUE) %||%
           attr(source, "deputy_r_session_cancel_active", exact = TRUE)
         if (!is.function(cancel)) {
@@ -3435,7 +3434,7 @@ Agent <- R6::R6Class(
         result_id <- new_deputy_id("result_")
         producer <- private$.trusted_sources[[tool_name]] %||%
           trusted_policy_sources(policy)[[tool_name]] %||%
-          trusted_tool_source(private$.chat$get_tools()[[tool_name]])
+          runtime_source_tool(private$.chat$get_tools()[[tool_name]])
         event <- private$agent_event(
           "trusted_result",
           result_id = result_id,

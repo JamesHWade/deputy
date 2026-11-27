@@ -164,16 +164,11 @@ mcp_console_connection <- function(
   if (length(env)) {
     server$env <- as.list(env)
   }
-  path <- tempfile(fileext = ".json")
-  on.exit(unlink(path), add = TRUE)
-  file.create(path)
-  Sys.chmod(path, "0600")
-  jsonlite::write_json(
+  path <- write_private_json_tempfile(
     list(mcpServers = list(console = server)),
-    path,
-    auto_unbox = TRUE,
-    null = "null"
+    prefix = "deputy-console-"
   )
+  on.exit(unlink(path), add = TRUE)
   connection <- McpConnection$new(
     path,
     "console",

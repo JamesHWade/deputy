@@ -45,10 +45,8 @@ PermissionResult <- S7::new_class(
   abstract = TRUE
 )
 
-local({
-  S7::method(`$`, HookResult) <- function(x, name) S7::props(x)[[name]]
-  S7::method(`$`, PermissionResult) <- function(x, name) S7::props(x)[[name]]
-})
+register_dollar_prop(HookResult, missing_null = TRUE)
+register_dollar_prop(PermissionResult, missing_null = TRUE)
 
 #' Create a PreToolUse hook result
 #'

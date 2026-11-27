@@ -192,7 +192,7 @@ make_delegation_tool <- function(
 }
 
 composition_tool_owner <- function(tool) {
-  source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  source <- runtime_source_tool(tool)
   attr(source, "deputy_composition_owner", exact = TRUE)
 }
 
@@ -203,8 +203,7 @@ composition_invocation_id <- function(tool, arguments) {
   context <- tryCatch(ellmer::tool_context(), error = function(error) NULL)
   request <- context$request
   source <- if (!is.null(request) && !is.null(request@tool)) {
-    attr(request@tool, "deputy_runtime_source_tool", exact = TRUE) %||%
-      request@tool
+    runtime_source_tool(request@tool)
   }
   if (
     is.null(request) ||

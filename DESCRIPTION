@@ -135,6 +135,7 @@ Collate:
     'mcp-worker.R'
     'owned-conversations.R'
     'parallel-delegate.R'
+    'paths.R'
     'permission-evaluation.R'
     'permission-policy.R'
     'permissions.R'

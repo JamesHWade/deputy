@@ -46,7 +46,7 @@ file_checkpoint_deep_copy <- function(x) {
 }
 
 file_checkpoint_is_absolute <- function(path) {
-  grepl("^(/|[A-Za-z]:[/\\\\]|\\\\\\\\)", path)
+  is_absolute_path(path)
 }
 
 # Normalize dot segments without requiring the target path to exist.
@@ -111,23 +111,7 @@ file_checkpoint_path_equal <- function(x, y) {
 }
 
 file_checkpoint_path_within <- function(path, root) {
-  compare_path <- path
-  compare_root <- root
-  if (.Platform$OS.type == "windows") {
-    compare_path <- tolower(compare_path)
-    compare_root <- tolower(compare_root)
-  }
-
-  if (identical(compare_path, compare_root)) {
-    return(TRUE)
-  }
-
-  root_prefix <- if (endsWith(compare_root, "/")) {
-    compare_root
-  } else {
-    paste0(compare_root, "/")
-  }
-  startsWith(compare_path, root_prefix)
+  path_prefix_within(path, root)
 }
 
 file_checkpoint_relative_path <- function(path, root) {
@@ -140,11 +124,7 @@ file_checkpoint_relative_path <- function(path, root) {
 }
 
 file_checkpoint_link_target <- function(path) {
-  target <- tryCatch(
-    suppressWarnings(Sys.readlink(path)),
-    error = function(e) ""
-  )
-  if (length(target) != 1L || is.na(target)) "" else target
+  read_symlink_target(path)
 }
 
 # Resolve filesystem aliases in the longest existing prefix of a path.
@@ -184,28 +164,10 @@ file_checkpoint_mutating_tool <- function(tool_name) {
 }
 
 file_checkpoint_read_raw <- function(path, max_bytes = Inf, limit_path = path) {
-  connection <- file(path, open = "rb")
-  on.exit(close(connection), add = TRUE)
-
-  chunks <- list()
-  bytes_read <- 0
-  repeat {
-    chunk_size <- 1024L * 1024L
-    if (is.finite(max_bytes)) {
-      # Read at most one byte beyond the limit, which detects growth between
-      # the initial file size check and the capture without buffering it all.
-      chunk_size <- min(chunk_size, max_bytes - bytes_read + 1)
-    }
-    chunk <- readBin(
-      connection,
-      what = "raw",
-      n = as.integer(chunk_size)
-    )
-    if (length(chunk) == 0L) {
-      break
-    }
-    bytes_read <- bytes_read + length(chunk)
-    if (bytes_read > max_bytes) {
+  read_file_raw_bounded(
+    path,
+    max_bytes = max_bytes,
+    on_limit = function() {
       file_checkpoint_abort(
         sprintf(
           "Checkpoint preimage for %s exceeds its configured byte limit.",
@@ -214,10 +176,7 @@ file_checkpoint_read_raw <- function(path, max_bytes = Inf, limit_path = path) {
         limit_error = TRUE
       )
     }
-    chunks[[length(chunks) + 1L]] <- chunk
-  }
-
-  if (length(chunks) == 0L) raw() else do.call(c, chunks)
+  )
 }
 
 file_checkpoint_write_raw <- function(path, bytes) {

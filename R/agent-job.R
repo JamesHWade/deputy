@@ -1,4 +1,4 @@
-#' @include approval-store.R approval-record.R run-usage.R agent-result.R
+#' @include value-properties.R approval-store.R approval-record.R run-usage.R agent-result.R
 NULL
 
 # Durable host-owned Agent jobs. Persistence uses approval_store_*; there is no
@@ -1167,9 +1167,7 @@ AgentJob <- S7::new_class(
   }
 )
 
-local({
-  S7::method(`$`, AgentJob) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(AgentJob)
 
 S7::method(print, AgentJob) <- function(x, ...) {
   cli::cat_line(cli::cli_format_method({

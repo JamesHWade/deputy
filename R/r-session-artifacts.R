@@ -58,15 +58,13 @@ r_session_artifact_path <- function(config, id) {
 
 r_session_artifact_read <- function(config, id) {
   path <- r_session_artifact_path(config, id)
-  if (
-    !utils::file_test("-f", path) || nzchar(file_checkpoint_link_target(path))
-  ) {
+  if (!utils::file_test("-f", path) || nzchar(read_symlink_target(path))) {
     r_session_artifact_abort(
       "The R session artifact is unavailable to this owner."
     )
   }
   html <- tryCatch(
-    suppressWarnings(file_checkpoint_read_raw(path, r_session_artifact_limit)),
+    suppressWarnings(read_file_raw_bounded(path, r_session_artifact_limit)),
     error = function(error) {
       r_session_artifact_abort("Could not read the R session artifact.", error)
     }
@@ -88,25 +86,25 @@ r_session_artifact_write <- function(config, html) {
   sha256 <- r_session_artifact_digest(html)
   id <- paste0("r_artifact_", sha256)
   path <- r_session_artifact_path(config, id)
-  if (!file.exists(path) && !nzchar(file_checkpoint_link_target(path))) {
-    temporary <- tempfile(".r-artifact-", tmpdir = config$directory)
-    on.exit(unlink(temporary), add = TRUE)
-    tryCatch(
-      {
+  if (!file.exists(path) && !nzchar(read_symlink_target(path))) {
+    write_file_atomic(
+      path,
+      write_fn = function(temporary) {
         connection <- file(temporary, "wb")
         tryCatch(writeBin(html, connection), finally = close(connection))
       },
-      error = function(error) {
+      prefix = ".r-artifact-",
+      allow_existing = TRUE,
+      on_write_error = function(error) {
         r_session_artifact_abort(
           "Could not write the R session artifact.",
           error
         )
+      },
+      on_commit_error = function() {
+        r_session_artifact_abort("Could not publish the R session artifact.")
       }
     )
-    Sys.chmod(temporary, "0600")
-    if (!suppressWarnings(file.rename(temporary, path)) && !file.exists(path)) {
-      r_session_artifact_abort("Could not publish the R session artifact.")
-    }
   }
   r_session_artifact_read(config, id)
   list(id = id, media_type = "text/html", bytes = length(html), sha256 = sha256)

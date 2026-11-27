@@ -533,8 +533,8 @@ ContextFork <- S7::new_class(
       context_fork_abort("invalid", "{.arg view} must be one string.")
     }
     view <- match.arg(view, c("transcript", "context"))
-    max_bytes <- context_policy_whole_number(max_bytes, "max_bytes")
-    max_turns <- context_policy_whole_number(max_turns, "max_turns")
+    max_bytes <- validate_positive_int(max_bytes, "max_bytes")
+    max_turns <- validate_positive_int(max_turns, "max_turns")
     if (is.null(max_bytes) || is.null(max_turns)) {
       context_fork_abort(
         "invalid",
@@ -857,6 +857,4 @@ validate_fork_candidate <- function(parent, agent) {
   invisible(NULL)
 }
 
-local({
-  S7::method(`$`, ContextFork) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(ContextFork)

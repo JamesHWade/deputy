@@ -140,7 +140,7 @@ TrustedResults <- S7::new_class(
       value <- results[[type]]
       if (inherits(value, "ellmer::ToolDef")) {
         # The tool itself names its one producer, not just the name.
-        source <- trusted_tool_source(value)
+        source <- runtime_source_tool(value)
         if (!is_nonempty_string(source@name)) {
           cli_abort("The tool for result type {.val {type}} must have a name.")
         }
@@ -191,9 +191,7 @@ TrustedResults <- S7::new_class(
   }
 )
 
-local({
-  S7::method(`$`, TrustedResults) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(TrustedResults)
 
 S7::method(print, TrustedResults) <- function(x, ...) {
   cli::cat_line(cli::cli_format_method({
@@ -236,7 +234,7 @@ trusted_result_type <- function(policy, tool_name) {
 # Code execution and delegation can compute or relay any kind of result, so no
 # host assertion makes them safe beside a trusted tool.
 trusted_bypass_reason <- function(tool) {
-  source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  source <- runtime_source_tool(tool)
   if (
     !is.null(composition_tool_owner(source)) ||
       !is.null(attr(source, "deputy_delegation_tool", exact = TRUE)) ||
@@ -271,10 +269,6 @@ trusted_registry_abort <- function(
   )
 }
 
-trusted_tool_source <- function(tool) {
-  attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
-}
-
 # Explicit producers by tool name.
 trusted_policy_sources <- function(policy) {
   if (is.null(policy) || !length(policy@producers)) {
@@ -292,7 +286,7 @@ trusted_tree_sources <- function(policy, registries) {
   sources <- trusted_policy_sources(policy)
   for (tools in registries) {
     for (name in intersect(names(tools), policy@results)) {
-      source <- trusted_tool_source(tools[[name]])
+      source <- runtime_source_tool(tools[[name]])
       if (is.null(sources[[name]])) {
         sources[[name]] <- source
       } else if (!identical(sources[[name]], source)) {
@@ -311,7 +305,7 @@ trusted_tree_sources <- function(policy, registries) {
 trusted_check_names <- function(sources, registries) {
   for (tools in registries) {
     for (name in intersect(names(tools), names(sources))) {
-      if (!identical(trusted_tool_source(tools[[name]]), sources[[name]])) {
+      if (!identical(runtime_source_tool(tools[[name]]), sources[[name]])) {
         trusted_registry_abort(
           "Trusted tool {.val {name}} must be the same tool everywhere in the delegation tree.",
           tool_name = name
@@ -399,7 +393,7 @@ trusted_check_tool <- function(
       isTRUE(allow_delegation) &&
       is.null(trusted_type) &&
       isTRUE(attr(
-        trusted_tool_source(tool),
+        runtime_source_tool(tool),
         "deputy_delegation_tool",
         exact = TRUE
       )) &&
@@ -433,7 +427,7 @@ trusted_check_tool <- function(
     }
     if (
       !is.null(sources[[name]]) &&
-        !identical(sources[[name]], trusted_tool_source(tool))
+        !identical(sources[[name]], runtime_source_tool(tool))
     ) {
       trusted_registry_abort(
         if (is.null(explicit[[name]])) {
@@ -495,8 +489,7 @@ trusted_invocation_id <- function(tool) {
   context <- tryCatch(ellmer::tool_context(), error = function(error) NULL)
   request <- context$request
   source <- if (!is.null(request) && !is.null(request@tool)) {
-    attr(request@tool, "deputy_runtime_source_tool", exact = TRUE) %||%
-      request@tool
+    runtime_source_tool(request@tool)
   }
   if (
     is.null(request) ||
@@ -577,7 +570,7 @@ trusted_policy_root <- function(agent) {
 # target was checked against the same root policy when it was retained; NULL
 # otherwise.
 trusted_route_target <- function(agent, tool) {
-  source <- trusted_tool_source(tool)
+  source <- runtime_source_tool(tool)
   handle <- attr(source, "deputy_composition_handle", exact = TRUE)
   if (
     !identical(composition_tool_owner(source), agent) ||
@@ -882,7 +875,7 @@ trusted_combine <- function(owner, root_policy, own, tools) {
     for (type in names(own@results)) {
       name <- own@results[[type]]
       producer <- own@producers[[type]] %||%
-        trusted_tool_source(tools[[name]] %||% list())
+        runtime_source_tool(tools[[name]] %||% list())
       if (!inherits(producer, "ellmer::ToolDef")) {
         trusted_combine_abort(
           "Trusted tool {.val {name}} of the retained agent is not registered.",

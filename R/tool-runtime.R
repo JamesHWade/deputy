@@ -57,10 +57,7 @@ runtime_wrap_tool <- function(
     cli_abort("Runtime tool adapters must be functions")
   }
 
-  source_tool <- attr(tool, "deputy_runtime_source_tool", exact = TRUE)
-  if (is.null(source_tool)) {
-    source_tool <- tool
-  }
+  source_tool <- runtime_source_tool(tool)
 
   wrapper_env <- rlang::env(
     original = source_tool,
@@ -916,8 +913,8 @@ read_tool_result_chunk <- function(
   policy,
   session_id
 ) {
-  offset <- context_policy_nonnegative_whole_number(offset, "offset")
-  max_chars <- context_policy_whole_number(max_chars, "max_chars")
+  offset <- validate_nonnegative_int(offset, "offset")
+  max_chars <- validate_positive_int(max_chars, "max_chars")
   if (max_chars > 16384L) {
     cli_abort("{.arg max_chars} must not exceed 16384")
   }

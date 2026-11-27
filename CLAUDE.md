@@ -114,7 +114,8 @@ deputy/
 │   ├── cli.R               # Runtime for the deputy command-line app
 │   ├── errors.R            # Custom error hierarchy
 │   ├── ids.R               # Runtime correlation identifiers
-│   ├── value-properties.R  # Read-only S7 property helper
+│   ├── value-properties.R  # Read-only S7 property and `$` registration helpers
+│   ├── paths.R             # Path normalization, symlink checks, bounded reads and atomic writes
 │   ├── deputy-package.R    # Package documentation and imports
 │   └── utils.R             # Internal utilities
 ├── tests/testthat/         # Unit tests (testthat edition 3)
@@ -405,8 +406,8 @@ tryCatch(
 ```
 
 Available constructors: `abort_deputy()`, `abort_permission_denied()`, `abort_tool_execution()`,
-`abort_budget_exceeded()`, `abort_request_limit()`, `abort_cost_unavailable()`, `abort_provider()`,
-`abort_session_load()`, `abort_session_save()`, `abort_hook()`. Test membership with
+`abort_budget_exceeded()`, `abort_request_limit()`, `abort_cost_unavailable()`,
+`abort_session_load()`, `abort_session_save()`. Test membership with
 `is_deputy_error(x, class)`.
 
 Argument validation still uses `cli_abort()` directly in many places, so those errors

@@ -35,13 +35,7 @@ validate_tool_annotations <- function(annotations, tool_name) {
   if (is.null(annotations) || identical(annotations, list())) {
     return(invisible(NULL))
   }
-  if (
-    !is.list(annotations) ||
-      is.null(names(annotations)) ||
-      anyNA(names(annotations)) ||
-      anyDuplicated(names(annotations)) ||
-      !all(nzchar(names(annotations)))
-  ) {
+  if (!is.list(annotations) || !has_unique_names(annotations)) {
     tool_registration_error(
       "Annotations for tool {.val {tool_name}} must be a uniquely named list."
     )
@@ -91,7 +85,7 @@ validate_tool_batch <- function(
       )
     }
     # Re-register the executable source, not an old Agent's runtime wrapper.
-    tool <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+    tool <- runtime_source_tool(tool)
     name <- tool@name
     if (!is_nonempty_string(name)) {
       tool_registration_error(

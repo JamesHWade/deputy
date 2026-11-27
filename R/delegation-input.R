@@ -435,6 +435,4 @@ resolve_delegation_input <- function(lead, definition, input) {
   list(input = input, sources = sources, message = message)
 }
 
-local({
-  S7::method(`$`, DelegationInput) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(DelegationInput)

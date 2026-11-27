@@ -236,22 +236,23 @@ r_session_tool_json <- function(value, max_bytes, context = "value") {
 }
 
 r_session_tool_atomic_write <- function(path, text) {
-  directory <- dirname(path)
-  temporary <- tempfile("mailbox-", tmpdir = directory)
-  on.exit(unlink(temporary), add = TRUE)
-  connection <- file(temporary, open = "wb")
-  on.exit(try(close(connection), silent = TRUE), add = TRUE)
-  writeChar(enc2utf8(text), connection, eos = NULL, useBytes = TRUE)
-  close(connection)
-  on.exit(unlink(temporary), add = FALSE)
-  Sys.chmod(temporary, mode = "0600")
-  if (!file.rename(temporary, path)) {
-    abort_deputy(
-      "Could not publish the R session mailbox message.",
-      class = "r_session_tool_mailbox"
-    )
-  }
-  invisible(path)
+  write_file_atomic(
+    path,
+    write_fn = function(temporary) {
+      connection <- file(temporary, open = "wb")
+      tryCatch(
+        writeChar(enc2utf8(text), connection, eos = NULL, useBytes = TRUE),
+        finally = close(connection)
+      )
+    },
+    prefix = "mailbox-",
+    on_commit_error = function() {
+      abort_deputy(
+        "Could not publish the R session mailbox message.",
+        class = "r_session_tool_mailbox"
+      )
+    }
+  )
 }
 
 r_session_tool_read_io <- function(fun, context) {
@@ -465,12 +466,7 @@ r_session_tool_validate_request <- function(
       class = "r_session_tool_protocol"
     )
   }
-  if (
-    length(arguments) &&
-      (is.null(names(arguments)) ||
-        !all(nzchar(names(arguments))) ||
-        anyDuplicated(names(arguments)) > 0L)
-  ) {
+  if (length(arguments) && !has_unique_names(arguments)) {
     abort_deputy(
       "R session tool arguments must be named.",
       class = "r_session_tool_protocol"

@@ -290,7 +290,7 @@ validate_mcp_tool_owner <- function(
   agent,
   run_context = agent$run_context
 ) {
-  source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+  source <- runtime_source_tool(tool)
   owner <- attr(source, "deputy_mcp_owner", exact = TRUE)
   if (
     !is.null(owner) &&
@@ -339,7 +339,7 @@ mcp_desynchronized_error <- function(server, parent) {
 cancel_active_mcp_tools <- function(tools, agent, run_context) {
   owner <- mcp_connection_owner(agent, run_context)
   for (tool in tools) {
-    source <- attr(tool, "deputy_runtime_source_tool", exact = TRUE) %||% tool
+    source <- runtime_source_tool(tool)
     if (!identical(attr(source, "deputy_mcp_owner", exact = TRUE), owner)) {
       next
     }

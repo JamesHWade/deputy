@@ -154,7 +154,7 @@ LeadAgent <- R6::R6Class(
       )
       private$delegation_sources <- sources$sources
       private$delegation_scope <- sources$scope
-      private$delegation_max_bytes <- context_policy_whole_number(
+      private$delegation_max_bytes <- validate_positive_int(
         delegation_max_bytes,
         "delegation_max_bytes"
       )

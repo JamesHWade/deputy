@@ -545,14 +545,7 @@ approval_validate_inputs <- function(inputs) {
   approval_portable(inputs)
   approval_json_inputs(inputs)
   approval_no_replay_tags(inputs)
-  if (
-    !is.list(inputs) ||
-      (length(inputs) &&
-        (is.null(names(inputs)) ||
-          anyNA(names(inputs)) ||
-          !all(nzchar(names(inputs))) ||
-          anyDuplicated(names(inputs))))
-  ) {
+  if (!is.list(inputs) || (length(inputs) && !has_unique_names(inputs))) {
     approval_abort(
       "Tool inputs must be a uniquely named list of portable JSON values."
     )
@@ -577,12 +570,7 @@ approval_json_inputs <- function(value) {
     return(invisible(NULL))
   }
   if (is.list(value)) {
-    if (
-      !is.null(names(value)) &&
-        (anyNA(names(value)) ||
-          !all(nzchar(names(value))) ||
-          anyDuplicated(names(value)))
-    ) {
+    if (!is.null(names(value)) && !has_unique_names(value)) {
       approval_abort("JSON object names must be unique non-empty strings.")
     }
     for (item in value) {

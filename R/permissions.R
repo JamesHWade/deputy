@@ -175,9 +175,7 @@ Permissions <- S7::new_class(
   }
 )
 
-local({
-  S7::method(`$`, Permissions) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(Permissions)
 
 #' Check a tool call against a permission policy
 #'

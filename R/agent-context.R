@@ -351,10 +351,6 @@ deputy_agent_context_methods <- function(self = NULL, private = NULL) {
       invisible(NULL)
     },
 
-    system_prompt_without_compaction = function() {
-      private$.conversation_state$prompt_without_summary(private$.chat)
-    },
-
     context_token_count = function(messages, turns = NULL) {
       chat <- private$.chat
       if (!is.null(turns)) {

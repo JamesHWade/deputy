@@ -332,9 +332,7 @@ AgentDefinition <- S7::new_class(
 #' @export
 agent_definition <- AgentDefinition
 
-local({
-  S7::method(`$`, AgentDefinition) <- function(x, name) S7::prop(x, name)
-})
+register_dollar_prop(AgentDefinition)
 
 S7::method(print, AgentDefinition) <- function(x, ...) {
   cli::cat_line(cli::cli_format_method({

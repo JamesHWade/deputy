@@ -6,7 +6,7 @@ validate_parallel_tasks <- function(lead, tasks, max_active, mode) {
       "Only {.code mode = 'stateless'} is supported for parallel delegation."
     )
   }
-  max_active <- context_policy_whole_number(max_active, "max_active")
+  max_active <- validate_positive_int(max_active, "max_active")
   if (is.null(max_active)) {
     cli_abort("{.arg max_active} must be a positive whole number")
   }
