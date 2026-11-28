@@ -21,6 +21,7 @@ jobs:
     name: ir package executable
     runs-on: ubuntu-latest
     env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       IR_CACHE_DIR: /tmp/deputy-ir-cache
       IR_TOOL_STORE_DIR: /tmp/deputy-ir-tools
       R_USER_CACHE_DIR: /tmp/deputy-r-cache

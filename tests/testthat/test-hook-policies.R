@@ -527,6 +527,7 @@ test_that("hook_limit_file_writes covers every native file mutation tool", {
 })
 
 test_that("hook_limit_file_writes rejects symlink escapes", {
+  skip_on_os("windows")
   withr::local_tempdir(pattern = "deputy-test") -> parent_dir
   parent_dir <- normalizePath(parent_dir, mustWork = TRUE)
   allowed_dir <- file.path(parent_dir, "allowed")
