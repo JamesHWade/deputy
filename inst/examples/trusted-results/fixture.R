@@ -8,6 +8,17 @@ forecast_fixture <- function() {
     "_local-openai-fixture.R",
     package = "deputy"
   )
+  if (!nzchar(shared_path) && isNamespaceLoaded("deputy")) {
+    candidate <- file.path(
+      getNamespaceInfo(asNamespace("deputy"), "path"),
+      "inst",
+      "examples",
+      "_local-openai-fixture.R"
+    )
+    if (file.exists(candidate)) {
+      shared_path <- candidate
+    }
+  }
   if (!nzchar(shared_path)) {
     shared_path <- "../_local-openai-fixture.R"
   }

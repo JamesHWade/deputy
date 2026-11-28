@@ -294,7 +294,7 @@ test_that("session snapshots retain both views without executable archived tools
       offload_dir = file.path(directory, "results")
     )
   )
-  runtime <- RSession$new(agent)
+  runtime <- RSession$new(agent, timeout = 60)
   withr::defer(runtime$close())
   agent$register_tools(runtime$tools())
   agent$run_sync("Plot the values")
